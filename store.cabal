@@ -1,0 +1,46 @@
+name:                store
+version:             0.1.0.0
+synopsis:            Fast serialization
+description:         Please see README.md
+homepage:            http://github.com/fpco/store#readme
+license:             AllRightsReserved
+license-file:        LICENSE
+author:              Michael Sloan
+maintainer:          sloa@fpcomplete.com
+copyright:           2016 Michael Sloan
+category:            Web
+build-type:          Simple
+-- extra-source-files:
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Data.Store
+                     , Data.Store.Internal
+                     , Data.Store.Generics
+  build-depends:       base >= 4.7 && < 5
+                     , primitive
+                     , fail
+                     , ghc-prim
+                     , th-reify-many
+                     , template-haskell
+                     , text
+                     , containers
+                     , vector
+                     , transformers
+                     , mono-traversable
+                     , bytestring
+  default-language:    Haskell2010
+
+test-suite store-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , store
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/fpco/store
