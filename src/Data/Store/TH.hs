@@ -3,6 +3,7 @@
 
 module Data.Store.TH where
 
+import           Control.Applicative
 import           Data.Complex ()
 import qualified Data.Map as M
 import           Data.Store.Impl
@@ -36,6 +37,9 @@ isPtrType (AppT (ConT n) _) = n `elem`
     -- throws errors when the denominator is 0.
     , ''Ratio
     ]
+isPtrType (AppT (AppT (ConT n) _) _) = n `elem`
+    [ ''Const
+    ]
 isPtrType _ = False
 
 deriveManyStoreFromStorableImpl :: (Type -> Bool) -> Q [Dec]
@@ -47,17 +51,15 @@ deriveManyStoreFromStorableImpl p = do
                 ([_ty], [x]) -> Just x
                 _ -> Nothing
     storables <- postprocess . instancesMap <$> getInstances ''Storable
-    stores <- postprocess . instancesMap <$> getInstances storeName
+    stores <- postprocess . instancesMap <$> getInstances ''Store
     return $ M.elems $ flip M.mapMaybe (storables `M.difference` stores) $ \(TypeclassInstance context ty _) ->
         let argTy = head (tail (unAppsT ty)) in
         if p argTy
-            then Just $
-                InstanceD (addTypeableForStorable context)
-                          (AppT (ConT ''Store) argTy)
-                          [ ValD (VarP 'size) (NormalB (VarE sizeStorableName)) []
-                          , ValD (VarP 'peek) (NormalB (VarE peekStorableName)) []
-                          , ValD (VarP 'poke) (NormalB (VarE pokeStorableName)) []
-                          ]
+            then Just $ makeStoreInstance (addTypeableForStorable context)
+                                          argTy
+                                          'sizeStorable
+                                          'peekStorable
+                                          'pokeStorable
             else Nothing
 
 -- Necessitated by the Typeable constraint on pokeStorable
@@ -66,6 +68,25 @@ addTypeableForStorable = concatMap go
   where
     go t@(AppT (ConT ((== ''Storable) -> True)) ty) = [t, AppT (ConT ''Typeable) ty]
     go t = [t]
+
+makeStoreInstance :: Cxt -> Type -> Name -> Name -> Name -> Dec
+makeStoreInstance context ty sizeName peekName pokeName =
+    InstanceD context
+              (AppT (ConT ''Store) ty)
+              [ ValD (VarP 'size) (NormalB (VarE sizeName)) []
+              , ValD (VarP 'peek) (NormalB (VarE peekName)) []
+              , ValD (VarP 'poke) (NormalB (VarE pokeName)) []
+              ]
+
+makeTupleInstance :: Int -> Dec
+makeTupleInstance n =
+    makeGenericInstance (map (AppT (ConT ''Store)) tvs)
+                        (foldl1 AppT (TupleT n : tvs))
+  where
+    tvs = take n (map (VarT . mkName . (:[])) ['a'..'z'])
+
+makeGenericInstance :: Cxt -> Type -> Dec
+makeGenericInstance context ty = InstanceD context (AppT (ConT ''Store) ty) []
 
 -- TOOD: move these to th-reify-many
 

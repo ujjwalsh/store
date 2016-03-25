@@ -6,22 +6,26 @@ module Spec.TH where
 import Data.Generics.Schemes (listify)
 import Data.Maybe (fromMaybe)
 import Data.Store
-import Debug.Trace (trace)
 import Language.Haskell.TH
 import Language.Haskell.TH.ReifyMany.Internal (unAppsT, getInstances, TypeclassInstance(..))
 import Safe (headMay)
 import Test.Hspec
 import Test.Hspec.SmallCheck (property)
+import Test.SmallCheck
+
+#if VERBOSE_TEST
+import Debug.Trace (trace)
+#endif
 
 testMany :: [Q (String, Exp)] -> ExpQ
 testMany = doE . map (\f -> f >>= \(name, expr) -> noBindS [e| it name $ $(return expr) |])
 
-testManyRoundtrips :: [TypeQ] -> ExpQ
-testManyRoundtrips = testMany . map testRoundtrip
+testManyRoundtrips :: Int -> [TypeQ] -> ExpQ
+testManyRoundtrips depth = testMany . map testRoundtrip
   where
     testRoundtrip tyq = do
         ty <- tyq
-        expr <- [e| property $ \x -> verboseTrace "decoded" (decode (verboseTrace "encoded" (encode x))) == Right (x :: $(return ty)) |]
+        expr <- [e| property $ changeDepth (\_ -> depth) $ \x -> verboseTrace "decoded" (decode (verboseTrace "encoded" (encode x))) == Right (x :: $(return ty)) |]
         return ("Roundtrips (" ++ pprint ty ++ ")", expr)
 
 verboseTrace :: Show a => String -> a -> a
