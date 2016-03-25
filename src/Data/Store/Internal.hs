@@ -188,31 +188,6 @@ peekMutableSequence new write = do
 {-# INLINE peekMutableSequence #-}
 
 ------------------------------------------------------------------------
--- Utils for implementing 'Store' instances for list-like MonoFoldable
-
-{-
-
--- | NOTE that many MonoFoldable instances have fast implementations
--- involving memcpy.
-sizeMonoListLike :: forall t. (MonoFoldable t, Store (Element t)) => Size t
-sizeMonoListLike = VarSize $ \t ->
-    case size :: Size (Element t) of
-        ConstSize n -> n * olength t + sizeOf (undefined :: Int)
-        VarSize f -> ofoldl' (\acc x -> acc + f x) (sizeOf (undefined :: Int)) t
-{-# INLINE sizeMonoListLike #-}
-
--- | NOTE that many MonoFoldable instances have fast implementations
--- involving memcpy.
-pokeMonoListLike :: forall t. (MonoFoldable t, Store (Element t)) => t -> Poke ()
-pokeMonoListLike t = do
-    poke (olength t)
-    omapM_ poke t
-{-# INLINE pokeMonoListLike #-}
-
--}
-
-
-------------------------------------------------------------------------
 -- Utilities for implementing 'Store' instances via memcpy
 
 pokeForeignPtr :: ForeignPtr a -> Int -> Int -> Poke ()
