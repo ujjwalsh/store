@@ -1,20 +1,21 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Data.Store.TH where
 
-import           Control.Applicative
 import           Data.Complex ()
 import qualified Data.Map as M
-import           Data.Maybe (fromMaybe)
-import           Data.Traversable (forM)
-import           Foreign.C.Types ()
+import           Data.Store.Impl
+import           Data.Typeable (Typeable)
+import           Foreign.C.Types
 import           Foreign.Ptr (IntPtr, WordPtr, Ptr, FunPtr)
 import           Foreign.StablePtr (StablePtr)
 import           Foreign.Storable (Storable)
+import           GHC.Real (Ratio)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany.Internal (TypeclassInstance(..), getInstances, unAppsT)
 import           Language.Haskell.TH.Syntax (mkNameG_tc, mkNameG_v)
-import           System.Posix.Types ()
+import           System.Posix.Types (Fd)
 
 -- TODO: This pattern of "define this set of instances given some other
 -- instances / values" could be libraryized similarly to
@@ -22,34 +23,49 @@ import           System.Posix.Types ()
 
 -- TODO: Generate inline pragmas? Probably not necessary
 
+deriveManyStoreFromStorable :: (Type -> Bool) -> Q [Dec]
 deriveManyStoreFromStorable =
-    deriveManyStoreFromStorableImpl . (\pred x -> pred x && not (isPtrType x))
+    deriveManyStoreFromStorableImpl . (\p x -> p x && not (isPtrType x))
 
 isPtrType :: Type -> Bool
-isPtrType (ConT n) = n `elem` [''StablePtr, ''IntPtr, ''WordPtr, ''Ptr, ''FunPtr]
+isPtrType (ConT n) = n `elem`
+    [''IntPtr, ''WordPtr, ''Fd, ''CUIntPtr, ''CIntPtr]
+isPtrType (AppT (ConT n) _) = n `elem`
+    [ ''FunPtr, ''Ptr, ''StablePtr
+    -- Bit of a special case. The issue is that the Storable instance
+    -- throws errors when the denominator is 0.
+    , ''Ratio
+    ]
 isPtrType _ = False
 
 deriveManyStoreFromStorableImpl :: (Type -> Bool) -> Q [Dec]
-deriveManyStoreFromStorableImpl pred = do
+deriveManyStoreFromStorableImpl p = do
     -- Filters out overlapping instances and instances with more than
     -- one type arg (should be impossible).
     let postprocess = M.mapMaybeWithKey $ \tys xs ->
             case (tys, xs) of
-                ([ty], [x]) -> Just x
+                ([_ty], [x]) -> Just x
                 _ -> Nothing
     storables <- postprocess . instancesMap <$> getInstances ''Storable
     stores <- postprocess . instancesMap <$> getInstances storeName
-    return $ M.elems $ flip M.mapMaybe (storables `M.difference` stores) $ \(TypeclassInstance cxt ty _) ->
+    return $ M.elems $ flip M.mapMaybe (storables `M.difference` stores) $ \(TypeclassInstance context ty _) ->
         let argTy = head (tail (unAppsT ty)) in
-        if pred argTy
+        if p argTy
             then Just $
-                InstanceD cxt
-                          (AppT (ConT storeName) argTy)
-                          [ ValD (VarP (mkName "size")) (NormalB (VarE sizeStorableName)) []
-                          , ValD (VarP (mkName "peek")) (NormalB (VarE peekStorableName)) []
-                          , ValD (VarP (mkName "poke")) (NormalB (VarE pokeStorableName)) []
+                InstanceD (addTypeableForStorable context)
+                          (AppT (ConT ''Store) argTy)
+                          [ ValD (VarP 'size) (NormalB (VarE sizeStorableName)) []
+                          , ValD (VarP 'peek) (NormalB (VarE peekStorableName)) []
+                          , ValD (VarP 'poke) (NormalB (VarE pokeStorableName)) []
                           ]
             else Nothing
+
+-- Necessitated by the Typeable constraint on pokeStorable
+addTypeableForStorable :: Cxt -> Cxt
+addTypeableForStorable = concatMap go
+  where
+    go t@(AppT (ConT ((== ''Storable) -> True)) ty) = [t, AppT (ConT ''Typeable) ty]
+    go t = [t]
 
 -- TOOD: move these to th-reify-many
 
@@ -76,7 +92,14 @@ storePkg :: String
 storePkg = $( (LitE . StringL . loc_package) `fmap` location )
 
 storeName, sizeStorableName, peekStorableName, pokeStorableName :: Name
-storeName = mkNameG_tc storePkg "Data.Store" "Store"
-sizeStorableName = mkNameG_v storePkg "Data.Store" "sizeStorable"
-peekStorableName = mkNameG_v storePkg "Data.Store" "peekStorable"
-pokeStorableName = mkNameG_v storePkg "Data.Store" "pokeStorable"
+storeName = mkNameG_tc storePkg "Data.Store.Impl" "Store"
+sizeStorableName = mkNameG_v storePkg "Data.Store.Impl" "sizeStorable"
+peekStorableName = mkNameG_v storePkg "Data.Store.Impl" "peekStorable"
+pokeStorableName = mkNameG_v storePkg "Data.Store.Impl" "pokeStorable"
+
+-- Misc Util
+
+appsT :: [TypeQ] -> TypeQ
+appsT [] = error "appsE []"
+appsT [x] = x
+appsT (x:y:zs) = appsT ( (appT x y) : zs )
