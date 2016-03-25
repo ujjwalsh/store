@@ -57,6 +57,7 @@ test-suite store-test
                      , bytestring
                      , containers
                      , mono-traversable
+                     , text
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -fwarn-identities
   if flag(verbose-test)
       cpp-options:     -DVERBOSE_TEST

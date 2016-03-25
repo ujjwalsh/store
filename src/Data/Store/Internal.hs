@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -32,11 +32,17 @@ import           Data.IntSet (IntSet)
 import           Data.Map (Map)
 import           Data.MonoTraversable
 import           Data.Monoid
+import           Data.Primitive.ByteArray
+import           Data.Primitive.Types (Addr(..))
 import           Data.Sequence (Seq)
 import           Data.Sequences (IsSequence, Index, replicateM)
 import           Data.Set (Set)
 import           Data.Store.Impl
 import           Data.Store.TH
+import qualified Data.Text as T
+import qualified Data.Text.Array as TA
+import qualified Data.Text.Foreign as T
+import qualified Data.Text.Internal as T
 import           Data.Tree (Tree)
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic.Mutable as MGV
@@ -47,6 +53,7 @@ import qualified Data.Vector.Storable.Mutable as MSV
 import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 import           Foreign.Ptr (Ptr, castPtr, plusPtr)
 import           Foreign.Storable (Storable, sizeOf)
+import           GHC.Ptr (Ptr(..))
 import           GHC.Real (Ratio(..))
 import           Numeric.Natural (Natural)
 
@@ -305,20 +312,27 @@ instance Store LBS.ByteString where
     poke = poke . LBS.toStrict
     peek = fmap LBS.fromStrict peek
 
-{-
 instance Store T.Text where
     size = VarSize $ \x ->
         sizeOf (undefined :: Int) +
         2 * (T.lengthWord16 x)
     poke x = do
-        let T.Text (TA.Array array w16Len) = x
-            !(Addr addr) = byteArrayContents array
+        let !(T.Text (TA.Array array) offset w16Len) = x
+            !(Addr addr) = byteArrayContents (ByteArray array)
         poke w16Len
-        pokePtr (Ptr addr) 0 (2 * w16Len)
+        pokePtr ((Ptr addr) `plusPtr` (2 * offset)) 0 (2 * w16Len)
     peek = do
         w16Len <- peek
-        return (T.Text (TA.Array array w16Len))
--}
+        Peek $ \_total sourcePtr sourceOffset k -> do
+            -- TODO: could be cleaned up a little with MGV.unsafeNew?
+            let byteLen = w16Len * 2
+            marray <- newByteArray byteLen
+            let !(Addr addr) = mutableByteArrayContents marray
+            BS.memcpy (Ptr addr)
+                      (sourcePtr `plusPtr` sourceOffset)
+                      byteLen
+            !(ByteArray array) <- unsafeFreezeByteArray marray
+            k (sourceOffset + byteLen) (T.Text (TA.Array array) 0 w16Len)
 
 ------------------------------------------------------------------------
 -- containers instances

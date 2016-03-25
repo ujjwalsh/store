@@ -18,6 +18,7 @@ import           Data.Sequence (Seq)
 import           Data.Sequences (fromList)
 import           Data.Set (Set)
 import           Data.Store
+import           Data.Text (Text)
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
 import           Data.Word
@@ -108,6 +109,9 @@ instance (Monad m, Serial m a) => Serial m (IntMap a) where
 
 instance Monad m => Serial m IntSet where
     series = fmap setFromList series
+
+instance Monad m => Serial m Text where
+    series = fmap fromList series
 
 instance (Monad m, Serial m a) => Serial m (Seq a) where
     series = fmap fromList series
