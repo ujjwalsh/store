@@ -74,8 +74,11 @@ makeStoreInstance context ty sizeName peekName pokeName =
     InstanceD context
               (AppT (ConT ''Store) ty)
               [ ValD (VarP 'size) (NormalB (VarE sizeName)) []
+              , PragmaD (InlineP 'size Inline FunLike AllPhases)
               , ValD (VarP 'peek) (NormalB (VarE peekName)) []
+              , PragmaD (InlineP 'peek Inline FunLike AllPhases)
               , ValD (VarP 'poke) (NormalB (VarE pokeName)) []
+              , PragmaD (InlineP 'poke Inline FunLike AllPhases)
               ]
 
 makeTupleInstance :: Int -> Dec
