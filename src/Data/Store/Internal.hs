@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -18,6 +20,9 @@ module Data.Store.Internal
     , module Data.Store.Internal
     ) where
 
+import System.IO.Unsafe
+import GHC.Ptr
+import GHC.Types (IO (..), Int (..))
 import           Control.Exception (throwIO, try)
 import           Control.Monad.IO.Class (liftIO)
 import           Data.Array (Array)
@@ -67,21 +72,22 @@ encode x = BS.unsafeCreate
 
 -- FIXME: can we really justify accursed unutterable things?
 
-decode :: Store a => BS.ByteString -> Either PeekException a
-decode = BS.accursedUnutterablePerformIO . try . decodeImpl
+decode' :: Peek a -> BS.ByteString -> Either PeekException a
+decode' peek' = BS.accursedUnutterablePerformIO . try . decodeImpl' peek'
+{-# INLINE decode' #-}
 
-unsafeDecode :: Store a => BS.ByteString -> a
-unsafeDecode = BS.accursedUnutterablePerformIO . decodeImpl
+unsafeDecode' :: Peek a -> BS.ByteString -> a
+unsafeDecode' peek' = unsafePerformIO . decodeImpl' peek'
+{-# INLINE unsafeDecode' #-}
 
-decodeImpl :: Store a => BS.ByteString -> IO a
-decodeImpl (BS.PS x s len) =
-    withForeignPtr x $ \p ->
-        let total = len + s
-            final offset y
-                | offset == total = return y
-                | offset < total = throwIO $ PeekException offset "Didn't consume all input"
-                | otherwise = throwIO $ PeekException offset "Overshot end of buffer"
-         in runPeek peek (len + s) p s final
+decodeImpl' :: Peek a -> BS.ByteString -> IO a
+decodeImpl' peek' (BS.PS x s@(I# s') len) =
+    withForeignPtr x $ \(Ptr p) ->
+        case len + s of
+            I# total -> IO (\s0 ->
+                case runPeek peek' total p s' s0 of
+                    (# s1, _off, y #) -> (# s1, y #))
+{-# INLINE decodeImpl' #-}
 
 ------------------------------------------------------------------------
 -- Utilities for defining list-like 'Store' instances in terms of 'IsSequence'
@@ -182,18 +188,6 @@ peekMap = mapFromList <$> peek
 ------------------------------------------------------------------------
 -- Utilities for implementing 'Store' instances for list-like mutable things
 
-peekMutableSequence
-    :: Store a
-    => (Int -> IO r)
-    -> (r -> Int -> a -> IO ())
-    -> Peek r
-peekMutableSequence new write = do
-    n <- peekStorable
-    mut <- liftIO (new n)
-    forM_ [0..n-1] $ \i -> peek >>= liftIO . write mut i
-    return mut
-{-# INLINE peekMutableSequence #-}
-
 ------------------------------------------------------------------------
 -- Utilities for implementing 'Store' instances via memcpy
 
@@ -216,11 +210,6 @@ pokePtr sourcePtr sourceOffset sourceLength =
 
 ------------------------------------------------------------------------
 -- Instances for types based on flat representations
-
-instance Store a => Store (V.Vector a) where
-    size = sizeSequence
-    poke = pokeSequence
-    peek = V.unsafeFreeze =<< peekMutableSequence MV.new MV.write
 
 {-
 instance (Prim a, UV.Unbox a) => Store (UV.Vector a) where
@@ -261,78 +250,6 @@ unboxedToPrimitive = unsafeCoerce
 primitiveToUnboxed :: PV.Vector a -> UV.Vector a
 primitiveToUnboxed = unsafeCoerce
 -}
-
-instance Storable a => Store (SV.Vector a) where
-    size = VarSize $ \x ->
-        sizeOf (undefined :: Int) +
-        sizeOf (undefined :: a) * SV.length x
-    poke x = do
-        let (fptr, len) = SV.unsafeToForeignPtr0 x
-        poke len
-        pokeForeignPtr fptr 0 (sizeOf (undefined :: a) * len)
-    peek = do
-        len <- peek
-        Peek $ \_ sourcePtr sourceOffset k -> do
-            mv <- MGV.unsafeNew len
-            let (fptr, _) = MSV.unsafeToForeignPtr0 mv
-                byteLen = len * sizeOf (undefined :: a)
-            withForeignPtr fptr $ \ptr ->
-                BS.memcpy (castPtr ptr)
-                          (sourcePtr `plusPtr` sourceOffset)
-                          byteLen
-            x <- SV.unsafeFreeze mv
-            k (sourceOffset + byteLen) x
-
-instance Store BS.ByteString where
-    size = VarSize $ \x ->
-        sizeOf (undefined :: Int) +
-        BS.length x
-    poke x = do
-        poke (BS.length x)
-        let (sourceFp, sourceOffset, sourceLength) = BS.toForeignPtr x
-        pokeForeignPtr sourceFp sourceOffset sourceLength
-    peek = do
-        len <- peek
-        Peek $ \_ sourcePtr sourceOffset k -> do
-            x <- BS.create len $ \targetPtr ->
-               BS.memcpy targetPtr
-                         (sourcePtr `plusPtr` sourceOffset)
-                         len
-            k (sourceOffset + len) x
-
-instance Store LBS.ByteString where
-    -- FIXME: faster conversion? Is this ever going to be a problem?
-    --
-    -- I think on 64 bit systems, Int will have 64 bits. On 32 bit
-    -- systems, we'll never exceed the range of Int by this conversion.
-    size = VarSize $ \x ->
-         sizeOf (undefined :: Int)  +
-         fromIntegral (LBS.length x)
-    -- FIXME: more efficient implementation that avoids the double copy
-    poke = poke . LBS.toStrict
-    peek = fmap LBS.fromStrict peek
-
-instance Store T.Text where
-    size = VarSize $ \x ->
-        sizeOf (undefined :: Int) +
-        2 * (T.lengthWord16 x)
-    poke x = do
-        let !(T.Text (TA.Array array) offset w16Len) = x
-            !(Addr addr) = byteArrayContents (ByteArray array)
-        poke w16Len
-        pokePtr ((Ptr addr) `plusPtr` (2 * offset)) 0 (2 * w16Len)
-    peek = do
-        w16Len <- peek
-        Peek $ \_total sourcePtr sourceOffset k -> do
-            -- TODO: could be cleaned up a little with MGV.unsafeNew?
-            let byteLen = w16Len * 2
-            marray <- newByteArray byteLen
-            let !(Addr addr) = mutableByteArrayContents marray
-            BS.memcpy (Ptr addr)
-                      (sourcePtr `plusPtr` sourceOffset)
-                      byteLen
-            !(ByteArray array) <- unsafeFreezeByteArray marray
-            k (sourceOffset + byteLen) (T.Text (TA.Array array) 0 w16Len)
 
 ------------------------------------------------------------------------
 -- containers instances
