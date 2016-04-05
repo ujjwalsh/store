@@ -20,8 +20,8 @@ module Data.Store.Internal
 
 import           Control.Exception (throwIO, try)
 import           Control.Monad.IO.Class (liftIO)
-import           Data.Array (Array)
-import qualified Data.Array.Unboxed as UA
+
+
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -43,11 +43,11 @@ import qualified Data.Text as T
 import qualified Data.Text.Array as TA
 import qualified Data.Text.Foreign as T
 import qualified Data.Text.Internal as T
-import           Data.Tree (Tree)
+
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic.Mutable as MGV
 import qualified Data.Vector.Mutable as MV
-import qualified Data.Vector.Primitive as PV
+
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
@@ -55,7 +55,7 @@ import           Foreign.Ptr (Ptr, castPtr, plusPtr)
 import           Foreign.Storable (Storable, sizeOf)
 import           GHC.Ptr (Ptr(..))
 import           GHC.Real (Ratio(..))
-import           Numeric.Natural (Natural)
+
 
 ------------------------------------------------------------------------
 -- Utilities for defining list-like 'Store' instances in terms of 'Foldable'
@@ -73,6 +73,12 @@ decode = BS.accursedUnutterablePerformIO . try . decodeImpl
 unsafeDecode :: Store a => BS.ByteString -> a
 unsafeDecode = BS.accursedUnutterablePerformIO . decodeImpl
 
+unsafeDecodeWith :: Peek a -> BS.ByteString -> a
+unsafeDecodeWith f = BS.accursedUnutterablePerformIO . decodeImplWith f
+
+unsafeDecodeWithOffset :: Peek a -> BS.ByteString -> (Offset,a)
+unsafeDecodeWithOffset f = BS.accursedUnutterablePerformIO . decodeImplWithOffset f
+
 decodeImpl :: Store a => BS.ByteString -> IO a
 decodeImpl (BS.PS x s len) =
     withForeignPtr x $ \p ->
@@ -82,6 +88,32 @@ decodeImpl (BS.PS x s len) =
                 | offset < total = throwIO $ PeekException offset "Didn't consume all input"
                 | otherwise = throwIO $ PeekException offset "Overshot end of buffer"
          in runPeek peek (len + s) p s final
+
+decodeWith :: (Peek a) -> BS.ByteString -> Either PeekException a
+decodeWith mypeek = BS.accursedUnutterablePerformIO . try . decodeImplWith mypeek
+
+decodeImplWith :: (Peek a) -> BS.ByteString -> IO a
+decodeImplWith mypeek (BS.PS x s len) =
+    withForeignPtr x $ \p ->
+        let total = len + s
+            final offset y
+                | offset == total = return y
+                | offset < total =
+                  (throwIO $ PeekException offset
+                                           ("Didn't consume all input: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total)))
+                | otherwise = throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
+         in runPeek mypeek (len + s) p s final
+
+decodeImplWithOffset :: (Peek a) -> BS.ByteString -> IO (Int,a)
+decodeImplWithOffset mypeek (BS.PS x s len) =
+    withForeignPtr x $ \p ->
+        let total = len + s
+            final offset y
+                | offset == total = return (offset,y)
+                | offset < total =
+                  return (offset,y)
+                | otherwise = throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
+         in runPeek mypeek (len + s) p s final
 
 ------------------------------------------------------------------------
 -- Utilities for defining list-like 'Store' instances in terms of 'IsSequence'

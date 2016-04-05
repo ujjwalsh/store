@@ -150,11 +150,11 @@ peekStorable = Peek $ \total ptr offset k ->
                 x <- peekByteOff ptr offset
                 k offset' x
             else throwIO $ PeekException offset $ T.pack $
-                "Attempted to read too many bytes, for " ++
+                "Attempted to read too many bytes for " ++
                 show (typeRep (Proxy :: Proxy a)) ++
-                "Needed " ++
+                ". Needed " ++
                 show needed ++ ", but only " ++
-                show (total - offset) ++ " remain."
+                show (total - offset) ++ " remain. Total: " ++ show total
 {-# INLINE peekStorable #-}
 
 ------------------------------------------------------------------------
@@ -217,7 +217,7 @@ newtype Peek a = Peek
      -> (Offset -> a -> IO r)
      -> IO r
     }
-    deriving Functor
+   deriving Functor
 
 instance Applicative Peek where
     pure x = Peek (\_ _ offset k -> k offset x)
