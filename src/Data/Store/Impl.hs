@@ -23,8 +23,9 @@ import           Data.Proxy
 import qualified Data.Text as T
 import           Data.Typeable
 import           Data.Word
-import           Foreign.Ptr (Ptr)
-import           Foreign.Storable (peekByteOff, pokeByteOff, Storable, sizeOf)
+import           Foreign.Ptr (Ptr, plusPtr, castPtr)
+import           Foreign.Storable (pokeByteOff, Storable, sizeOf)
+import qualified Foreign.Storable as Storable
 import           GHC.Generics
 import           GHC.Prim ( unsafeCoerce#, RealWorld )
 import           GHC.TypeLits
@@ -143,17 +144,21 @@ pokeStorable x = Poke $ \ptr offset k -> do
 
 -- | A @Peek@ implementation based on an instance of @Storable@
 peekStorable :: forall a. (Storable a, Typeable a) => Peek a
-peekStorable = Peek $ \total ptr offset ->
-    let offset' = offset + needed
+peekStorable = Peek $ \end ptr ->
+    let ptr' = plusPtr ptr needed
         needed = sizeOf (undefined :: a)
-     in if total >= offset'
-            then fmap (offset', ) (peekByteOff ptr offset)
-            else throwIO $ PeekException offset $ T.pack $
+     in if end > ptr'
+            then fmap (ptr', ) (Storable.peek (castPtr ptr))
+            else throwIO $ PeekException 0 {-offset-} $ T.pack $
                 "Attempted to read too many bytes for " ++
+                -- FIXME
+                ""
+                {-
                 show (typeRep (Proxy :: Proxy a)) ++
                 ". Needed " ++
                 show needed ++ ", but only " ++
                 show (total - offset) ++ " remain. Total: " ++ show total
+                -}
 {-# INLINE peekStorable #-}
 
 ------------------------------------------------------------------------
@@ -210,24 +215,23 @@ instance MonadIO Poke where
 
 newtype Peek a = Peek
     { runPeek :: forall byte.
-        Total
+        Ptr byte -- one byte past end of buffer
      -> Ptr byte
-     -> Offset
-     -> IO (Offset, a)
+     -> IO (Ptr byte, a)
     }
    deriving Functor
 
 instance Applicative Peek where
-    pure x = Peek (\_ _ offset -> pure (offset, x))
+    pure x = Peek (\_ ptr -> pure (ptr, x))
     {-# INLINE pure #-}
-    Peek f <*> Peek g = Peek $ \total ptr offset1 -> do
-        (offset2, f') <- f total ptr offset1
-        (offset3, g') <- g total ptr offset2
-        pure (offset3, f' g')
+    Peek f <*> Peek g = Peek $ \end ptr1 -> do
+        (ptr2, f') <- f end ptr1
+        (ptr3, g') <- g end ptr2
+        pure (ptr3, f' g')
     {-# INLINE (<*>) #-}
-    Peek f *> Peek g = Peek $ \total ptr offset1 -> do
-        (offset2, _) <- f total ptr offset1
-        g total ptr offset2
+    Peek f *> Peek g = Peek $ \end ptr1 -> do
+        (ptr2, _) <- f end ptr1
+        g end ptr2
     {-# INLINE (*>) #-}
 
 instance Monad Peek where
@@ -235,9 +239,9 @@ instance Monad Peek where
     {-# INLINE return #-}
     (>>) = (*>)
     {-# INLINE (>>) #-}
-    Peek x >>= f = Peek $ \total ptr offset1 -> do
-        (offset2, x') <- x total ptr offset1
-        runPeek (f x') total ptr offset2
+    Peek x >>= f = Peek $ \end ptr1 -> do
+        (ptr2, x') <- x end ptr1
+        runPeek (f x') end ptr2
     {-# INLINE (>>=) #-}
     fail = Fail.fail
     {-# INLINE fail #-}
@@ -248,12 +252,12 @@ instance Fail.MonadFail Peek where
 
 instance PrimMonad Peek where
     type PrimState Peek = RealWorld
-    primitive action = Peek $ \_ _ offset ->
-        fmap (offset, ) (primitive (unsafeCoerce# action))
+    primitive action = Peek $ \_ ptr ->
+        fmap (ptr, ) (primitive (unsafeCoerce# action))
     {-# INLINE primitive #-}
 
 instance MonadIO Peek where
-    liftIO f = Peek $ \_ _ offset -> fmap (offset, ) f
+    liftIO f = Peek $ \_ ptr -> fmap (ptr, ) f
     {-# INLINE liftIO #-}
 
 -- | Exception thrown while running 'peek'. Note that other types of
@@ -274,7 +278,9 @@ data Size a
     deriving Typeable
 
 peekException :: T.Text -> Peek a
-peekException msg = Peek $ \_ _ offset -> throwIO (PeekException offset msg)
+peekException msg = Peek $ \_ _ -> throwIO (PeekException offset msg)
+  where
+    offset = 0 -- FIXME
 
 -- FIXME: export as utils?
 

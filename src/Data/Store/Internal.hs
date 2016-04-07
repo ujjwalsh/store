@@ -89,6 +89,8 @@ decodeWith mypeek = BS.accursedUnutterablePerformIO . try . decodeImplWith mypee
 
 decodeImplWith :: (Peek a) -> BS.ByteString -> IO a
 decodeImplWith mypeek (BS.PS x s len) =
+    error "FIXME decodeImplWith"
+    {-
     withForeignPtr x $ \p -> do
         let total = len + s
         (offset, y) <- runPeek mypeek (len + s) p s
@@ -97,15 +99,19 @@ decodeImplWith mypeek (BS.PS x s len) =
             LT -> throwIO $ PeekException offset
                                            ("Didn't consume all input: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
             GT -> throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
+    -}
 
 decodeImplWithOffset :: (Peek a) -> BS.ByteString -> IO (Int,a)
 decodeImplWithOffset mypeek (BS.PS x s len) =
+    error "FIXME decodeImplWithOffset"
+    {-
     withForeignPtr x $ \p -> do
         let total = len + s
         (offset, y) <- runPeek mypeek (len + s) p s
         case compare offset total of
             GT -> throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
             _ -> return (offset, y)
+    -}
 
 ------------------------------------------------------------------------
 -- Utilities for defining list-like 'Store' instances in terms of 'IsSequence'
@@ -294,6 +300,8 @@ instance Storable a => Store (SV.Vector a) where
         let (fptr, len) = SV.unsafeToForeignPtr0 x
         poke len
         pokeForeignPtr fptr 0 (sizeOf (undefined :: a) * len)
+    peek = error "SV.Vector peek"
+    {- FIXME
     peek = do
         len <- peek
         Peek $ \_ sourcePtr sourceOffset -> do
@@ -305,7 +313,9 @@ instance Storable a => Store (SV.Vector a) where
                           (sourcePtr `plusPtr` sourceOffset)
                           byteLen
             fmap (sourceOffset + byteLen, ) (SV.unsafeFreeze mv)
+            -}
 
+{- FIXME
 instance Store BS.ByteString where
     size = VarSize $ \x ->
         sizeOf (undefined :: Int) +
@@ -355,6 +365,7 @@ instance Store T.Text where
                       byteLen
             !(ByteArray array) <- unsafeFreezeByteArray marray
             pure (sourceOffset + byteLen, T.Text (TA.Array array) 0 w16Len)
+-}
 
 ------------------------------------------------------------------------
 -- containers instances
