@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -11,6 +12,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Data.Store.Impl where
@@ -27,8 +29,10 @@ import           Foreign.Ptr (Ptr, plusPtr, castPtr)
 import           Foreign.Storable (pokeByteOff, Storable, sizeOf)
 import qualified Foreign.Storable as Storable
 import           GHC.Generics
-import           GHC.Prim ( unsafeCoerce#, RealWorld )
+import           GHC.Prim ( unsafeCoerce#, RealWorld, State#, Addr#, plusAddr#, gtAddr# )
 import           GHC.TypeLits
+import           GHC.Types (IO (..), Int (..), isTrue#)
+import           GHC.Ptr (Ptr (..))
 
 ------------------------------------------------------------------------
 -- Store class
@@ -144,12 +148,15 @@ pokeStorable x = Poke $ \ptr offset k -> do
 
 -- | A @Peek@ implementation based on an instance of @Storable@
 peekStorable :: forall a. (Storable a, Typeable a) => Peek a
-peekStorable = Peek $ \end ptr ->
-    let ptr' = plusPtr ptr needed
-        needed = sizeOf (undefined :: a)
-     in if end > ptr'
-            then fmap (ptr', ) (Storable.peek (castPtr ptr))
-            else throwIO $ PeekException 0 {-offset-} $ T.pack $
+peekStorable = Peek $ \end ptr s ->
+    let ptr' = plusAddr# ptr needed
+        !(I# needed) = sizeOf (undefined :: a)
+     in if isTrue# (gtAddr# end ptr')
+            then let IO f = Storable.peek (Ptr ptr)
+                  in case f s of
+                       (# s', x #) -> (# s', ptr', x #)
+            else error "FIXME peekStorable"
+            {- throwIO $ PeekException 0 {-offset-} $ T.pack $
                 "Attempted to read too many bytes for " ++
                 -- FIXME
                 ""
@@ -158,6 +165,7 @@ peekStorable = Peek $ \end ptr ->
                 ". Needed " ++
                 show needed ++ ", but only " ++
                 show (total - offset) ++ " remain. Total: " ++ show total
+                -}
                 -}
 {-# INLINE peekStorable #-}
 
@@ -214,24 +222,27 @@ instance MonadIO Poke where
 -- Peek monad
 
 newtype Peek a = Peek
-    { runPeek :: forall byte.
-        Ptr byte -- one byte past end of buffer
-     -> Ptr byte
-     -> IO (Ptr byte, a)
+    { runPeek ::
+        Addr# -- one byte past end of buffer
+     -> Addr#
+     -> State# RealWorld
+     -> (# State# RealWorld, Addr#, a #)
     }
    deriving Functor
 
 instance Applicative Peek where
-    pure x = Peek (\_ ptr -> pure (ptr, x))
+    pure x = Peek (\_ ptr s -> (# s, ptr, x #))
     {-# INLINE pure #-}
-    Peek f <*> Peek g = Peek $ \end ptr1 -> do
-        (ptr2, f') <- f end ptr1
-        (ptr3, g') <- g end ptr2
-        pure (ptr3, f' g')
+    Peek f <*> Peek g = Peek $ \end ptr1 s1 ->
+      case f end ptr1 s1 of
+        (# s2, ptr2, f' #) ->
+          case g end ptr2 s2 of
+            (# s3, ptr3, g' #) ->
+              (# s3, ptr3, f' g' #)
     {-# INLINE (<*>) #-}
-    Peek f *> Peek g = Peek $ \end ptr1 -> do
-        (ptr2, _) <- f end ptr1
-        g end ptr2
+    Peek f *> Peek g = Peek $ \end ptr1 s1 ->
+        case f end ptr1 s1 of
+          (# s2, ptr2, _f' #) -> g end ptr2 s2
     {-# INLINE (*>) #-}
 
 instance Monad Peek where
@@ -239,9 +250,10 @@ instance Monad Peek where
     {-# INLINE return #-}
     (>>) = (*>)
     {-# INLINE (>>) #-}
-    Peek x >>= f = Peek $ \end ptr1 -> do
-        (ptr2, x') <- x end ptr1
-        runPeek (f x') end ptr2
+    Peek x >>= f = Peek $ \end ptr1 s1 ->
+      case x end ptr1 s1 of
+        (# s2, ptr2, x' #) ->
+          runPeek (f x') end ptr2 s2
     {-# INLINE (>>=) #-}
     fail = Fail.fail
     {-# INLINE fail #-}
@@ -252,12 +264,15 @@ instance Fail.MonadFail Peek where
 
 instance PrimMonad Peek where
     type PrimState Peek = RealWorld
-    primitive action = Peek $ \_ ptr ->
-        fmap (ptr, ) (primitive (unsafeCoerce# action))
+    primitive action = Peek $ \_ ptr s ->
+        case action s of
+            (# s', x #) -> (# s, ptr, x #)
     {-# INLINE primitive #-}
 
 instance MonadIO Peek where
-    liftIO f = Peek $ \_ ptr -> fmap (ptr, ) f
+    liftIO (IO f) = Peek $ \_ ptr s ->
+        case f s of
+            (# s', x #) -> (# s', ptr, x #)
     {-# INLINE liftIO #-}
 
 -- | Exception thrown while running 'peek'. Note that other types of
@@ -278,9 +293,7 @@ data Size a
     deriving Typeable
 
 peekException :: T.Text -> Peek a
-peekException msg = Peek $ \_ _ -> throwIO (PeekException offset msg)
-  where
-    offset = 0 -- FIXME
+peekException msg = error "FIXME peekException" -- Peek $ \_ _ -> throwIO (PeekException offset msg)
 
 -- FIXME: export as utils?
 
