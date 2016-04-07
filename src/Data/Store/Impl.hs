@@ -8,6 +8,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -142,13 +143,11 @@ pokeStorable x = Poke $ \ptr offset k -> do
 
 -- | A @Peek@ implementation based on an instance of @Storable@
 peekStorable :: forall a. (Storable a, Typeable a) => Peek a
-peekStorable = Peek $ \total ptr offset k ->
+peekStorable = Peek $ \total ptr offset ->
     let offset' = offset + needed
         needed = sizeOf (undefined :: a)
      in if total >= offset'
-            then do
-                x <- peekByteOff ptr offset
-                k offset' x
+            then fmap (offset', ) (peekByteOff ptr offset)
             else throwIO $ PeekException offset $ T.pack $
                 "Attempted to read too many bytes for " ++
                 show (typeRep (Proxy :: Proxy a)) ++
@@ -210,26 +209,25 @@ instance MonadIO Poke where
 -- Peek monad
 
 newtype Peek a = Peek
-    { runPeek :: forall r byte.
+    { runPeek :: forall byte.
         Total
      -> Ptr byte
      -> Offset
-     -> (Offset -> a -> IO r)
-     -> IO r
+     -> IO (Offset, a)
     }
    deriving Functor
 
 instance Applicative Peek where
-    pure x = Peek (\_ _ offset k -> k offset x)
+    pure x = Peek (\_ _ offset -> pure (offset, x))
     {-# INLINE pure #-}
-    Peek f <*> Peek g = Peek $ \total ptr offset1 k ->
-        f total ptr offset1 $ \offset2 f' ->
-        g total ptr offset2 $ \offset3 g' ->
-        k offset3 (f' g')
+    Peek f <*> Peek g = Peek $ \total ptr offset1 -> do
+        (offset2, f') <- f total ptr offset1
+        (offset3, g') <- g total ptr offset2
+        pure (offset3, f' g')
     {-# INLINE (<*>) #-}
-    Peek f *> Peek g = Peek $ \total ptr offset1 k ->
-        f total ptr offset1 $ \offset2 _ ->
-        g total ptr offset2 k
+    Peek f *> Peek g = Peek $ \total ptr offset1 -> do
+        (offset2, _) <- f total ptr offset1
+        g total ptr offset2
     {-# INLINE (*>) #-}
 
 instance Monad Peek where
@@ -237,9 +235,9 @@ instance Monad Peek where
     {-# INLINE return #-}
     (>>) = (*>)
     {-# INLINE (>>) #-}
-    Peek x >>= f = Peek $ \total ptr offset1 k ->
-        x total ptr offset1 $ \offset2 x' ->
-        runPeek (f x') total ptr offset2 k
+    Peek x >>= f = Peek $ \total ptr offset1 -> do
+        (offset2, x') <- x total ptr offset1
+        runPeek (f x') total ptr offset2
     {-# INLINE (>>=) #-}
     fail = Fail.fail
     {-# INLINE fail #-}
@@ -250,13 +248,12 @@ instance Fail.MonadFail Peek where
 
 instance PrimMonad Peek where
     type PrimState Peek = RealWorld
-    primitive action = Peek $ \_ _ offset k -> do
-        x <- primitive (unsafeCoerce# action)
-        k offset x
+    primitive action = Peek $ \_ _ offset ->
+        fmap (offset, ) (primitive (unsafeCoerce# action))
     {-# INLINE primitive #-}
 
 instance MonadIO Peek where
-    liftIO f = Peek $ \_ _ offset k -> f >>= k offset
+    liftIO f = Peek $ \_ _ offset -> fmap (offset, ) f
     {-# INLINE liftIO #-}
 
 -- | Exception thrown while running 'peek'. Note that other types of
@@ -277,7 +274,7 @@ data Size a
     deriving Typeable
 
 peekException :: T.Text -> Peek a
-peekException msg = Peek $ \_ _ offset _ -> throwIO (PeekException offset msg)
+peekException msg = Peek $ \_ _ offset -> throwIO (PeekException offset msg)
 
 -- FIXME: export as utils?
 

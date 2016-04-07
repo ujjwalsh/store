@@ -8,6 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -80,40 +81,31 @@ unsafeDecodeWithOffset :: Peek a -> BS.ByteString -> (Offset,a)
 unsafeDecodeWithOffset f = BS.accursedUnutterablePerformIO . decodeImplWithOffset f
 
 decodeImpl :: Store a => BS.ByteString -> IO a
-decodeImpl (BS.PS x s len) =
-    withForeignPtr x $ \p ->
-        let total = len + s
-            final offset y
-                | offset == total = return y
-                | offset < total = throwIO $ PeekException offset "Didn't consume all input"
-                | otherwise = throwIO $ PeekException offset "Overshot end of buffer"
-         in runPeek peek (len + s) p s final
+decodeImpl = decodeImplWith peek
+{-# INLINE decodeImpl #-}
 
 decodeWith :: (Peek a) -> BS.ByteString -> Either PeekException a
 decodeWith mypeek = BS.accursedUnutterablePerformIO . try . decodeImplWith mypeek
 
 decodeImplWith :: (Peek a) -> BS.ByteString -> IO a
 decodeImplWith mypeek (BS.PS x s len) =
-    withForeignPtr x $ \p ->
+    withForeignPtr x $ \p -> do
         let total = len + s
-            final offset y
-                | offset == total = return y
-                | offset < total =
-                  (throwIO $ PeekException offset
-                                           ("Didn't consume all input: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total)))
-                | otherwise = throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
-         in runPeek mypeek (len + s) p s final
+        (offset, y) <- runPeek mypeek (len + s) p s
+        case compare offset total of
+            EQ -> return y
+            LT -> throwIO $ PeekException offset
+                                           ("Didn't consume all input: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
+            GT -> throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
 
 decodeImplWithOffset :: (Peek a) -> BS.ByteString -> IO (Int,a)
 decodeImplWithOffset mypeek (BS.PS x s len) =
-    withForeignPtr x $ \p ->
+    withForeignPtr x $ \p -> do
         let total = len + s
-            final offset y
-                | offset == total = return (offset,y)
-                | offset < total =
-                  return (offset,y)
-                | otherwise = throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
-         in runPeek mypeek (len + s) p s final
+        (offset, y) <- runPeek mypeek (len + s) p s
+        case compare offset total of
+            GT -> throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
+            _ -> return (offset, y)
 
 ------------------------------------------------------------------------
 -- Utilities for defining list-like 'Store' instances in terms of 'IsSequence'
@@ -304,7 +296,7 @@ instance Storable a => Store (SV.Vector a) where
         pokeForeignPtr fptr 0 (sizeOf (undefined :: a) * len)
     peek = do
         len <- peek
-        Peek $ \_ sourcePtr sourceOffset k -> do
+        Peek $ \_ sourcePtr sourceOffset -> do
             mv <- MGV.unsafeNew len
             let (fptr, _) = MSV.unsafeToForeignPtr0 mv
                 byteLen = len * sizeOf (undefined :: a)
@@ -312,8 +304,7 @@ instance Storable a => Store (SV.Vector a) where
                 BS.memcpy (castPtr ptr)
                           (sourcePtr `plusPtr` sourceOffset)
                           byteLen
-            x <- SV.unsafeFreeze mv
-            k (sourceOffset + byteLen) x
+            fmap (sourceOffset + byteLen, ) (SV.unsafeFreeze mv)
 
 instance Store BS.ByteString where
     size = VarSize $ \x ->
@@ -325,12 +316,11 @@ instance Store BS.ByteString where
         pokeForeignPtr sourceFp sourceOffset sourceLength
     peek = do
         len <- peek
-        Peek $ \_ sourcePtr sourceOffset k -> do
-            x <- BS.create len $ \targetPtr ->
+        Peek $ \_ sourcePtr sourceOffset ->
+            fmap (sourceOffset + len, ) (BS.create len $ \targetPtr ->
                BS.memcpy targetPtr
                          (sourcePtr `plusPtr` sourceOffset)
-                         len
-            k (sourceOffset + len) x
+                         len)
 
 instance Store LBS.ByteString where
     -- FIXME: faster conversion? Is this ever going to be a problem?
@@ -355,7 +345,7 @@ instance Store T.Text where
         pokePtr ((Ptr addr) `plusPtr` (2 * offset)) 0 (2 * w16Len)
     peek = do
         w16Len <- peek
-        Peek $ \_total sourcePtr sourceOffset k -> do
+        Peek $ \_total sourcePtr sourceOffset -> do
             -- TODO: could be cleaned up a little with MGV.unsafeNew?
             let byteLen = w16Len * 2
             marray <- newByteArray byteLen
@@ -364,7 +354,7 @@ instance Store T.Text where
                       (sourcePtr `plusPtr` sourceOffset)
                       byteLen
             !(ByteArray array) <- unsafeFreezeByteArray marray
-            k (sourceOffset + byteLen) (T.Text (TA.Array array) 0 w16Len)
+            pure (sourceOffset + byteLen, T.Text (TA.Array array) 0 w16Len)
 
 ------------------------------------------------------------------------
 -- containers instances
