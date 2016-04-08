@@ -10,6 +10,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -19,8 +20,7 @@ module Data.Store.Internal
     ) where
 
 import           Control.Monad.IO.Class (liftIO)
-
-
+import           Control.Monad.Primitive (PrimState)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -32,7 +32,6 @@ import           Data.Map (Map)
 import           Data.MonoTraversable
 import           Data.Monoid
 import           Data.Primitive.ByteArray
-import           Data.Primitive.Types (Addr(..))
 import           Data.Sequence (Seq)
 import           Data.Sequences (IsSequence, Index, replicateM)
 import           Data.Set (Set)
@@ -42,18 +41,18 @@ import qualified Data.Text as T
 import qualified Data.Text.Array as TA
 import qualified Data.Text.Foreign as T
 import qualified Data.Text.Internal as T
-
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic.Mutable as MGV
 import qualified Data.Vector.Mutable as MV
-
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 import           Foreign.Ptr (Ptr, castPtr, plusPtr)
 import           Foreign.Storable (Storable, sizeOf)
+import           GHC.Prim (copyByteArrayToAddr#, copyAddrToByteArray#)
 import           GHC.Ptr (Ptr(..))
 import           GHC.Real (Ratio(..))
+import           GHC.Types (IO(..), Int(..))
 
 ------------------------------------------------------------------------
 -- Utilities for defining list-like 'Store' instances in terms of 'IsSequence'
@@ -90,7 +89,7 @@ peekSequence = do
 {-# INLINE peekSequence #-}
 
 ------------------------------------------------------------------------
--- Utilities for defining list-like 'Store' instances in terms of 'isSet'
+-- Utilities for defining list-like 'Store' instances in terms of 'IsSet'
 
 -- | Implement 'size' for an 'IsSet' of 'Store' instances.
 sizeSet :: forall t. (IsSet t, Store (Element t)) => Size t
@@ -170,21 +169,44 @@ peekMutableSequence new write = do
 -- Utilities for implementing 'Store' instances via memcpy
 
 pokeForeignPtr :: ForeignPtr a -> Int -> Int -> Poke ()
-pokeForeignPtr sourceFp sourceOffset sourceLength =
+pokeForeignPtr sourceFp sourceOffset len =
     Poke $ \targetPtr targetOffset k -> do
         withForeignPtr sourceFp $ \sourcePtr ->
             BS.memcpy (targetPtr `plusPtr` targetOffset)
                       (sourcePtr `plusPtr` sourceOffset)
-                      sourceLength
-        k (targetOffset + sourceLength) ()
+                      len
+        k (targetOffset + len) ()
 
 pokePtr :: Ptr a -> Int -> Int -> Poke ()
-pokePtr sourcePtr sourceOffset sourceLength =
+pokePtr sourcePtr sourceOffset len =
     Poke $ \targetPtr targetOffset k -> do
         BS.memcpy (targetPtr `plusPtr` targetOffset)
                   (sourcePtr `plusPtr` sourceOffset)
-                  sourceLength
-        k (targetOffset + sourceLength) ()
+                  len
+        k (targetOffset + len) ()
+
+pokeByteArray :: ByteArray# -> Int -> Int -> Poke ()
+pokeByteArray sourceArr sourceOffset len =
+    Poke $ \targetPtr targetOffset k -> do
+        let target = targetPtr `plusPtr` targetOffset
+        copyByteArrayToAddr sourceArr sourceOffset target len
+        k (targetOffset + len) ()
+
+peekByteArray :: Int -> Peek ByteArray
+peekByteArray len =
+    Peek $ \_total sourcePtr sourceOffset k -> do
+        marr <- newByteArray len
+        copyAddrToByteArray (sourcePtr `plusPtr` sourceOffset) marr 0 len
+        arr <- unsafeFreezeByteArray marr
+        k (sourceOffset + len) arr
+
+copyByteArrayToAddr :: ByteArray# -> Int -> Ptr a -> Int -> IO ()
+copyByteArrayToAddr arr (I# offset) (Ptr addr) (I# len) =
+    IO (\s -> (# copyByteArrayToAddr# arr offset addr len s, () #))
+
+copyAddrToByteArray :: Ptr a -> MutableByteArray (PrimState IO) -> Int -> Int -> IO ()
+copyAddrToByteArray (Ptr addr) (MutableByteArray arr) (I# offset) (I# len) =
+    IO (\s -> (# copyAddrToByteArray# addr arr offset len s, () #))
 
 ------------------------------------------------------------------------
 -- Instances for types based on flat representations
@@ -289,22 +311,13 @@ instance Store T.Text where
         sizeOf (undefined :: Int) +
         2 * (T.lengthWord16 x)
     poke x = do
-        let !(T.Text (TA.Array array) offset w16Len) = x
-            !(Addr addr) = byteArrayContents (ByteArray array)
+        let !(T.Text (TA.Array array) w16Off w16Len) = x
         poke w16Len
-        pokePtr ((Ptr addr) `plusPtr` (2 * offset)) 0 (2 * w16Len)
+        pokeByteArray array (2 * w16Off) (2 * w16Len)
     peek = do
         w16Len <- peek
-        Peek $ \_total sourcePtr sourceOffset k -> do
-            -- TODO: could be cleaned up a little with MGV.unsafeNew?
-            let byteLen = w16Len * 2
-            marray <- newByteArray byteLen
-            let !(Addr addr) = mutableByteArrayContents marray
-            BS.memcpy (Ptr addr)
-                      (sourcePtr `plusPtr` sourceOffset)
-                      byteLen
-            !(ByteArray array) <- unsafeFreezeByteArray marray
-            k (sourceOffset + byteLen) (T.Text (TA.Array array) 0 w16Len)
+        ByteArray array <- peekByteArray (2 * w16Len)
+        return (T.Text (TA.Array array) 0 w16Len)
 
 ------------------------------------------------------------------------
 -- containers instances
