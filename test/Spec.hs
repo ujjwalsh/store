@@ -7,6 +7,7 @@
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Short as SBS
 import           Data.Complex (Complex(..))
 import           Data.Containers (mapFromList, setFromList)
 import           Data.Int
@@ -89,6 +90,9 @@ instance Monad m => Serial m BS.ByteString where
 
 instance Monad m => Serial m LBS.ByteString where
     series = fmap LBS.pack series
+
+instance Monad m => Serial m SBS.ShortByteString where
+    series = fmap SBS.pack series
 
 instance (Monad m, Serial m a, Storable a) => Serial m (SV.Vector a) where
     series = fmap SV.fromList series

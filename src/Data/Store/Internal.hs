@@ -24,6 +24,7 @@ import           Control.Monad.Primitive (PrimState)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Short.Internal as SBS
 import           Data.Coerce (coerce)
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
 import           Data.Foldable (forM_)
@@ -50,6 +51,8 @@ import           Data.Void
 import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 import           Foreign.Ptr (Ptr, plusPtr)
 import           Foreign.Storable (Storable, sizeOf)
+import qualified GHC.Arr as Arr
+import           GHC.Arr (Array(..))
 import           GHC.Prim (copyByteArrayToAddr#, copyAddrToByteArray#)
 import           GHC.Ptr (Ptr(..))
 import           GHC.Real (Ratio(..))
@@ -150,6 +153,25 @@ peekMap
     => Peek t
 peekMap = mapFromList <$> peek
 {-# INLINE peekMap #-}
+
+{-
+------------------------------------------------------------------------
+-- Utilities for defining list-like 'Store' instances in terms of Foldable
+
+-- | Implement 'size' for a 'Foldable' of 'Store' instances. Note that
+-- this assumes the extra 'Foldable' structure is discardable - this
+-- only serializes the elements.
+sizeListLikeFoldable :: forall t a. (Foldable t, Store a) => Size (t a)
+sizeListLikeFoldable = VarSize $ \t ->
+    case size :: Size e of
+        ConstSize n ->  n * length x + sizeOf (undefined :: Int)
+        VarSize f -> foldl' (\acc x -> acc + f x) (sizeOf (undefined :: Int))
+{-# INLINE sizeSequence #-}
+
+pokeListLikeFoldable :: forall t a. Foldable t => t a -> Poke ()
+pokeListLikeFoldable x = do
+    poke (length x)
+-}
 
 ------------------------------------------------------------------------
 -- Utilities for implementing 'Store' instances for list-like mutable things
@@ -293,6 +315,19 @@ instance Store BS.ByteString where
         fp <- peekPlainForeignPtr len
         return (BS.PS fp 0 len)
 
+instance Store SBS.ShortByteString where
+    size = VarSize $ \x ->
+         sizeOf (undefined :: Int) +
+         SBS.length x
+    poke x@(SBS.SBS arr) = do
+        let len = SBS.length x
+        poke len
+        pokeByteArray arr 0 len
+    peek = do
+        len <- peek
+        ByteArray array <- peekByteArray len
+        return (SBS.SBS array)
+
 instance Store LBS.ByteString where
     -- FIXME: faster conversion? Is this ever going to be a problem?
     --
@@ -317,6 +352,17 @@ instance Store T.Text where
         w16Len <- peek
         ByteArray array <- peekByteArray (2 * w16Len)
         return (T.Text (TA.Array array) 0 w16Len)
+
+{-
+-- Gets a little tricky to compute size due to size of storing indices.
+
+instance (Store i, Store e) => Store (Array i e) where
+    size = combineSize' () () () $
+        VarSize $ \t ->
+        case size :: Size e of
+            ConstSize n ->  n * length x
+            VarSize f -> foldl' (\acc x -> acc + f x) 0
+-}
 
 ------------------------------------------------------------------------
 -- containers instances
@@ -360,6 +406,10 @@ instance (Ord k, Store k, Store a) => Store (Map k a) where
 -- instance Store Natural where
 --
 -- instance Store Integer where
+--
+-- instance Store GHC.Fingerprint.Types.Fingerprint where
+--
+-- instance Store a => Store (Fixed a) where
 --
 -- instance Store a => Store (Tree a) where
 

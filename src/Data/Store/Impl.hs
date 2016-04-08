@@ -371,3 +371,7 @@ combineSize' toA toB sizeA sizeB =
 getSize :: Size a -> a -> Int
 getSize (VarSize f) x = f x
 getSize (ConstSize n) _ = n
+
+scaleSize :: Int -> Size a -> Size a
+scaleSize s (ConstSize n) = ConstSize (s * n)
+scaleSize s (VarSize f) = VarSize ((s *) . f)
