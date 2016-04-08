@@ -24,6 +24,7 @@ import           Control.Monad.Primitive (PrimState)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
+import           Data.Coerce (coerce)
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
 import           Data.Foldable (forM_)
 import           Data.IntMap (IntMap)
@@ -42,12 +43,11 @@ import qualified Data.Text.Array as TA
 import qualified Data.Text.Foreign as T
 import qualified Data.Text.Internal as T
 import qualified Data.Vector as V
-import qualified Data.Vector.Generic.Mutable as MGV
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
-import           Foreign.Ptr (Ptr, castPtr, plusPtr)
+import           Foreign.Ptr (Ptr, plusPtr)
 import           Foreign.Storable (Storable, sizeOf)
 import           GHC.Prim (copyByteArrayToAddr#, copyAddrToByteArray#)
 import           GHC.Ptr (Ptr(..))
@@ -177,6 +177,16 @@ pokeForeignPtr sourceFp sourceOffset len =
                       len
         k (targetOffset + len) ()
 
+peekPlainForeignPtr :: Int -> Peek (ForeignPtr a)
+peekPlainForeignPtr len =
+    Peek $ \_total sourcePtr sourceOffset k -> do
+        fp <- BS.mallocByteString len
+        withForeignPtr fp $ \targetPtr ->
+            BS.memcpy targetPtr
+                      (sourcePtr `plusPtr` sourceOffset)
+                      len
+        k (sourceOffset + len) (coerce fp)
+
 pokePtr :: Ptr a -> Int -> Int -> Poke ()
 pokePtr sourcePtr sourceOffset len =
     Poke $ \targetPtr targetOffset k -> do
@@ -266,16 +276,8 @@ instance Storable a => Store (SV.Vector a) where
         pokeForeignPtr fptr 0 (sizeOf (undefined :: a) * len)
     peek = do
         len <- peek
-        Peek $ \_ sourcePtr sourceOffset k -> do
-            mv <- MGV.unsafeNew len
-            let (fptr, _) = MSV.unsafeToForeignPtr0 mv
-                byteLen = len * sizeOf (undefined :: a)
-            withForeignPtr fptr $ \ptr ->
-                BS.memcpy (castPtr ptr)
-                          (sourcePtr `plusPtr` sourceOffset)
-                          byteLen
-            x <- SV.unsafeFreeze mv
-            k (sourceOffset + byteLen) x
+        fp <- peekPlainForeignPtr (sizeOf (undefined :: a) * len)
+        liftIO $ SV.unsafeFreeze (MSV.MVector len fp)
 
 instance Store BS.ByteString where
     size = VarSize $ \x ->
@@ -287,12 +289,8 @@ instance Store BS.ByteString where
         pokeForeignPtr sourceFp sourceOffset sourceLength
     peek = do
         len <- peek
-        Peek $ \_ sourcePtr sourceOffset k -> do
-            x <- BS.create len $ \targetPtr ->
-               BS.memcpy targetPtr
-                         (sourcePtr `plusPtr` sourceOffset)
-                         len
-            k (sourceOffset + len) x
+        fp <- peekPlainForeignPtr len
+        return (BS.PS fp 0 len)
 
 instance Store LBS.ByteString where
     -- FIXME: faster conversion? Is this ever going to be a problem?
