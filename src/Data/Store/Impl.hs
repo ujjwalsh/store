@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE EmptyCase #-}
 
 module Data.Store.Impl where
 
@@ -134,6 +135,11 @@ instance GStore U1 where
     gsize = ConstSize 0
     gpoke _ = return ()
     gpeek = return U1
+
+instance GStore V1 where
+    gsize = ConstSize 0
+    gpoke x = case x of {}
+    gpeek = undefined
 
 instance (GStore a, GStore b) => GStore (a :*: b) where
     gsize = combineSize' (\(x :*: _) -> x) (\(_ :*: y) -> y) gsize gsize

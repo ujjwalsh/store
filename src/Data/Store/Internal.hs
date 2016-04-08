@@ -46,6 +46,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
+import           Data.Void
 import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 import           Foreign.Ptr (Ptr, plusPtr)
 import           Foreign.Storable (Storable, sizeOf)
@@ -381,6 +382,7 @@ instance Store a => Store (Ratio a) where
 instance Store ()
 instance Store All
 instance Store Any
+instance Store Void
 instance Store a => Store (Dual a)
 instance Store a => Store (Sum a)
 instance Store a => Store (Product a)

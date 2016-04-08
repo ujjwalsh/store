@@ -22,6 +22,7 @@ import           Data.Store.TH
 import           Data.Text (Text)
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
+import           Data.Void (Void)
 import           Data.Word
 import           Foreign.C.Types
 import           Foreign.Storable (Storable)
@@ -115,6 +116,10 @@ instance (Monad m, Serial m a) => Serial m (Seq a) where
 
 instance (Monad m, Serial m a) => Serial m (Complex a) where
     series = uncurry (:+) <$> (series >< series)
+
+-- Should probably get added to smallcheck :)
+instance (Monad m) => Serial m Void where
+    series = generate (\_ -> [])
 
 ------------------------------------------------------------------------
 -- Test datatypes for generics support
