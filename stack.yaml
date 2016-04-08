@@ -5,3 +5,11 @@ packages:
 - .
 - location: deps/smallcheck
   extra-dep: true
+- location:
+    git: https://github.com/well-typed/binary-serialise-cbor
+    commit: 1d91b000cf8201042b8fcff77ddb94f7b732c4ef
+  extra-dep: true
+# - ../stack
+
+# cbor has overly tight constraint on time
+allow-newer: true
