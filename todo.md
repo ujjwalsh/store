@@ -29,3 +29,5 @@
 
 * Storable instance in Base for Ratio throws errors when denominator is 0.
   Fixed via custom instance, but a patch to base should maybe be made.
+
+* Make `encode` on Storable Vector and similar do 0 copy

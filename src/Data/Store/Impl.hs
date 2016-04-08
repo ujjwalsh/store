@@ -15,13 +15,18 @@
 module Data.Store.Impl where
 
 import           Control.Exception (Exception, throwIO)
+import           Control.Exception (try)
 import qualified Control.Monad.Fail as Fail
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Primitive (PrimMonad (..))
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Internal as BS
+import           Data.Monoid
 import           Data.Proxy
 import qualified Data.Text as T
 import           Data.Typeable
 import           Data.Word
+import           Foreign.ForeignPtr (withForeignPtr)
 import           Foreign.Ptr (Ptr)
 import           Foreign.Storable (peekByteOff, pokeByteOff, Storable, sizeOf)
 import           GHC.Generics
@@ -44,6 +49,64 @@ class Store a where
 
     default peek :: (Generic a , GStore (Rep a)) => Peek a
     peek = to <$> gpeek
+
+------------------------------------------------------------------------
+-- Utilities for encoding / decoding strict ByteStrings
+
+encode :: Store a => a -> BS.ByteString
+encode x = BS.unsafeCreate
+    (getSize size x)
+    (\p -> runPoke (poke x) p 0 (\_ _ -> return ()))
+
+-- FIXME: can we really justify accursed unutterable things?
+
+decode :: Store a => BS.ByteString -> Either PeekException a
+decode = BS.accursedUnutterablePerformIO . try . decodeImpl
+
+unsafeDecode :: Store a => BS.ByteString -> a
+unsafeDecode = BS.accursedUnutterablePerformIO . decodeImpl
+
+unsafeDecodeWith :: Peek a -> BS.ByteString -> a
+unsafeDecodeWith f = BS.accursedUnutterablePerformIO . decodeImplWith f
+
+unsafeDecodeWithOffset :: Peek a -> BS.ByteString -> (Offset,a)
+unsafeDecodeWithOffset f = BS.accursedUnutterablePerformIO . decodeImplWithOffset f
+
+decodeImpl :: Store a => BS.ByteString -> IO a
+decodeImpl (BS.PS x s len) =
+    withForeignPtr x $ \p ->
+        let total = len + s
+            final offset y
+                | offset == total = return y
+                | offset < total = throwIO $ PeekException offset "Didn't consume all input"
+                | otherwise = throwIO $ PeekException offset "Overshot end of buffer"
+         in runPeek peek (len + s) p s final
+
+decodeWith :: (Peek a) -> BS.ByteString -> Either PeekException a
+decodeWith mypeek = BS.accursedUnutterablePerformIO . try . decodeImplWith mypeek
+
+decodeImplWith :: (Peek a) -> BS.ByteString -> IO a
+decodeImplWith mypeek (BS.PS x s len) =
+    withForeignPtr x $ \p ->
+        let total = len + s
+            final offset y
+                | offset == total = return y
+                | offset < total =
+                  (throwIO $ PeekException offset
+                                           ("Didn't consume all input: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total)))
+                | otherwise = throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
+         in runPeek mypeek (len + s) p s final
+
+decodeImplWithOffset :: (Peek a) -> BS.ByteString -> IO (Int,a)
+decodeImplWithOffset mypeek (BS.PS x s len) =
+    withForeignPtr x $ \p ->
+        let total = len + s
+            final offset y
+                | offset == total = return (offset,y)
+                | offset < total =
+                  return (offset,y)
+                | otherwise = throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
+         in runPeek mypeek (len + s) p s final
 
 ------------------------------------------------------------------------
 -- Generics instances

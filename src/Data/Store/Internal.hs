@@ -18,7 +18,6 @@ module Data.Store.Internal
     , module Data.Store.Internal
     ) where
 
-import           Control.Exception (throwIO, try)
 import           Control.Monad.IO.Class (liftIO)
 
 
@@ -55,65 +54,6 @@ import           Foreign.Ptr (Ptr, castPtr, plusPtr)
 import           Foreign.Storable (Storable, sizeOf)
 import           GHC.Ptr (Ptr(..))
 import           GHC.Real (Ratio(..))
-
-
-------------------------------------------------------------------------
--- Utilities for defining list-like 'Store' instances in terms of 'Foldable'
-
-encode :: Store a => a -> BS.ByteString
-encode x = BS.unsafeCreate
-    (getSize size x)
-    (\p -> runPoke (poke x) p 0 (\_ _ -> return ()))
-
--- FIXME: can we really justify accursed unutterable things?
-
-decode :: Store a => BS.ByteString -> Either PeekException a
-decode = BS.accursedUnutterablePerformIO . try . decodeImpl
-
-unsafeDecode :: Store a => BS.ByteString -> a
-unsafeDecode = BS.accursedUnutterablePerformIO . decodeImpl
-
-unsafeDecodeWith :: Peek a -> BS.ByteString -> a
-unsafeDecodeWith f = BS.accursedUnutterablePerformIO . decodeImplWith f
-
-unsafeDecodeWithOffset :: Peek a -> BS.ByteString -> (Offset,a)
-unsafeDecodeWithOffset f = BS.accursedUnutterablePerformIO . decodeImplWithOffset f
-
-decodeImpl :: Store a => BS.ByteString -> IO a
-decodeImpl (BS.PS x s len) =
-    withForeignPtr x $ \p ->
-        let total = len + s
-            final offset y
-                | offset == total = return y
-                | offset < total = throwIO $ PeekException offset "Didn't consume all input"
-                | otherwise = throwIO $ PeekException offset "Overshot end of buffer"
-         in runPeek peek (len + s) p s final
-
-decodeWith :: (Peek a) -> BS.ByteString -> Either PeekException a
-decodeWith mypeek = BS.accursedUnutterablePerformIO . try . decodeImplWith mypeek
-
-decodeImplWith :: (Peek a) -> BS.ByteString -> IO a
-decodeImplWith mypeek (BS.PS x s len) =
-    withForeignPtr x $ \p ->
-        let total = len + s
-            final offset y
-                | offset == total = return y
-                | offset < total =
-                  (throwIO $ PeekException offset
-                                           ("Didn't consume all input: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total)))
-                | otherwise = throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
-         in runPeek mypeek (len + s) p s final
-
-decodeImplWithOffset :: (Peek a) -> BS.ByteString -> IO (Int,a)
-decodeImplWithOffset mypeek (BS.PS x s len) =
-    withForeignPtr x $ \p ->
-        let total = len + s
-            final offset y
-                | offset == total = return (offset,y)
-                | offset < total =
-                  return (offset,y)
-                | otherwise = throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
-         in runPeek mypeek (len + s) p s final
 
 ------------------------------------------------------------------------
 -- Utilities for defining list-like 'Store' instances in terms of 'IsSequence'
@@ -414,7 +354,7 @@ instance (Ord k, Store k, Store a) => Store (Map k a) where
 ------------------------------------------------------------------------
 -- Other instances
 
--- Manual implementation due to no Generic instance for Store. Also due
+-- Manual implementation due to no Generic instance for Ratio. Also due
 -- to the instance for Storable erroring when the denominator is 0.
 -- Perhaps we should keep the behavior but instead a peekException?
 --
@@ -439,7 +379,7 @@ instance Store a => Store (Maybe a)
 instance (Store a, Store b) => Store (Either a b)
 
 -- TODO: higher arities?  Limited now by Generics instances for tuples
-$(return $ map makeTupleInstance [2..7])
+$(return $ map makeTupleStoreInstance [2..7])
 
 ------------------------------------------------------------------------
 -- Instances for Storable types

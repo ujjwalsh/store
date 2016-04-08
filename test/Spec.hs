@@ -18,6 +18,7 @@ import           Data.Sequence (Seq)
 import           Data.Sequences (fromList)
 import           Data.Set (Set)
 import           Data.Store
+import           Data.Store.TH
 import           Data.Text (Text)
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
@@ -39,10 +40,6 @@ import           Test.SmallCheck.Series
 
 -- TODO: should be possible to do something clever where it only defines
 -- instances that don't already exist.  For now, just doing it manually.
-
--- TODO: Have a noisy mode that outputs the value along with the
--- representation. That way we can keep track of runaway testcase
--- quantity.
 
 addMinAndMaxBounds :: forall a. (Bounded a, Eq a, Num a) => [a] -> [a]
 addMinAndMaxBounds xs =
@@ -140,14 +137,14 @@ main :: IO ()
 main = hspec $ do
     describe "Store on all monomorphic instances"
         $(do insts <- getAllInstanceTypes1 ''Store
-             testManyRoundtrips 3 . map return . filter isMonoType $ insts)
+             smallcheckManyStore verbose 3 . map return . filter isMonoType $ insts)
     describe "Store on all custom generic instances"
-        $(testManyRoundtrips 3
+        $(smallcheckManyStore verbose 3
             [ [t| Test |]
             , [t| X |]
             ])
     describe "Manually listed polymorphic store instances"
-        $(testManyRoundtrips 3
+        $(smallcheckManyStore verbose 3
             [ [t| SV.Vector Int8 |]
             , [t| V.Vector  Int8 |]
             , [t| Ratio     Int8 |]
