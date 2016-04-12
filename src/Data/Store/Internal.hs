@@ -19,6 +19,7 @@ module Data.Store.Internal
     , module Data.Store.Internal
     ) where
 
+import           Control.Exception (throwIO)
 import           Control.Monad (when)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Primitive (PrimState)
@@ -245,6 +246,29 @@ copyByteArrayToAddr arr (I# offset) (Ptr addr) (I# len) =
 copyAddrToByteArray :: Ptr a -> MutableByteArray (PrimState IO) -> Int -> Int -> IO ()
 copyAddrToByteArray (Ptr addr) (MutableByteArray arr) (I# offset) (I# len) =
     IO (\s -> (# copyAddrToByteArray# addr arr offset len s, () #))
+
+------------------------------------------------------------------------
+-- Useful combinators
+
+-- | Skip n bytes forward.
+skip :: Int -> Peek ()
+skip len = Peek $ \end ptr -> do
+    let ptr2 = ptr `plusPtr` len
+    when (ptr2 > end) $
+        tooManyBytes len (end `minusPtr` ptr) "skip"
+    return (ptr2, ())
+
+-- | Isolate the input to n bytes, skipping n bytes forward. Fails if @m@
+-- advances the offset beyond the isolated region.
+isolate :: Int -> Peek a -> Peek a
+isolate len m = Peek $ \end ptr -> do
+    let ptr2 = ptr `plusPtr` len
+    when (ptr2 > end) $
+        tooManyBytes len (end `minusPtr` ptr) "isolate"
+    (ptr', x) <- runPeek m end ptr
+    when (ptr' > end) $
+        throwIO $ PeekException (ptr' `minusPtr` end) "Overshot end of isolated bytes"
+    return (ptr2, x)
 
 ------------------------------------------------------------------------
 -- Instances for types based on flat representations
