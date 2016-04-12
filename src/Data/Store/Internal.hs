@@ -19,6 +19,7 @@ module Data.Store.Internal
     , module Data.Store.Internal
     ) where
 
+import           Control.Monad (when)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Primitive (PrimState)
 import qualified Data.ByteString as BS
@@ -48,11 +49,11 @@ import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import           Data.Void
-import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
-import           Foreign.Ptr (Ptr, plusPtr)
+import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr, castForeignPtr)
+import           Foreign.Ptr (Ptr, plusPtr, minusPtr, castPtr)
 import           Foreign.Storable (Storable, sizeOf)
-import qualified GHC.Arr as Arr
 import           GHC.Arr (Array(..))
+import qualified GHC.Arr as Arr
 import           GHC.Prim (copyByteArrayToAddr#, copyAddrToByteArray#)
 import           GHC.Ptr (Ptr(..))
 import           GHC.Real (Ratio(..))
@@ -200,15 +201,16 @@ pokeForeignPtr sourceFp sourceOffset len =
                       len
         k (targetOffset + len) ()
 
-peekPlainForeignPtr :: Int -> Peek (ForeignPtr a)
-peekPlainForeignPtr len =
-    Peek $ \_total sourcePtr sourceOffset k -> do
+peekPlainForeignPtr :: String -> Int -> Peek (ForeignPtr a)
+peekPlainForeignPtr ty len =
+    Peek $ \end sourcePtr -> do
+        let ptr2 = sourcePtr `plusPtr` len
+        when (ptr2 > end) $
+            tooManyBytes len (end `minusPtr` sourcePtr) ty
         fp <- BS.mallocByteString len
         withForeignPtr fp $ \targetPtr ->
-            BS.memcpy targetPtr
-                      (sourcePtr `plusPtr` sourceOffset)
-                      len
-        k (sourceOffset + len) (coerce fp)
+            BS.memcpy targetPtr (castPtr sourcePtr) len
+        return (ptr2, castForeignPtr fp)
 
 pokePtr :: Ptr a -> Int -> Int -> Poke ()
 pokePtr sourcePtr sourceOffset len =
@@ -225,13 +227,16 @@ pokeByteArray sourceArr sourceOffset len =
         copyByteArrayToAddr sourceArr sourceOffset target len
         k (targetOffset + len) ()
 
-peekByteArray :: Int -> Peek ByteArray
-peekByteArray len =
-    Peek $ \_total sourcePtr sourceOffset k -> do
+peekByteArray :: String -> Int -> Peek ByteArray
+peekByteArray ty len =
+    Peek $ \end sourcePtr -> do
+        let ptr2 = sourcePtr `plusPtr` len
+        when (ptr2 > end) $
+            tooManyBytes len (end `minusPtr` sourcePtr) ty
         marr <- newByteArray len
-        copyAddrToByteArray (sourcePtr `plusPtr` sourceOffset) marr 0 len
-        arr <- unsafeFreezeByteArray marr
-        k (sourceOffset + len) arr
+        copyAddrToByteArray sourcePtr marr 0 len
+        x <- unsafeFreezeByteArray marr
+        return (ptr2, x)
 
 copyByteArrayToAddr :: ByteArray# -> Int -> Ptr a -> Int -> IO ()
 copyByteArrayToAddr arr (I# offset) (Ptr addr) (I# len) =
@@ -299,7 +304,7 @@ instance Storable a => Store (SV.Vector a) where
         pokeForeignPtr fptr 0 (sizeOf (undefined :: a) * len)
     peek = do
         len <- peek
-        fp <- peekPlainForeignPtr (sizeOf (undefined :: a) * len)
+        fp <- peekPlainForeignPtr "Data.Storable.Vector.Vector" (sizeOf (undefined :: a) * len)
         liftIO $ SV.unsafeFreeze (MSV.MVector len fp)
 
 instance Store BS.ByteString where
@@ -312,7 +317,7 @@ instance Store BS.ByteString where
         pokeForeignPtr sourceFp sourceOffset sourceLength
     peek = do
         len <- peek
-        fp <- peekPlainForeignPtr len
+        fp <- peekPlainForeignPtr "Data.Storable.Vector.Vector" len
         return (BS.PS fp 0 len)
 
 instance Store SBS.ShortByteString where
@@ -325,7 +330,7 @@ instance Store SBS.ShortByteString where
         pokeByteArray arr 0 len
     peek = do
         len <- peek
-        ByteArray array <- peekByteArray len
+        ByteArray array <- peekByteArray "Data.ByteString.Short.ShortByteString" len
         return (SBS.SBS array)
 
 instance Store LBS.ByteString where
@@ -350,7 +355,7 @@ instance Store T.Text where
         pokeByteArray array (2 * w16Off) (2 * w16Len)
     peek = do
         w16Len <- peek
-        ByteArray array <- peekByteArray (2 * w16Len)
+        ByteArray array <- peekByteArray "Data.Text.Text" (2 * w16Len)
         return (T.Text (TA.Array array) 0 w16Len)
 
 {-

@@ -12,11 +12,13 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE TupleSections #-}
 
 module Data.Store.Impl where
 
-import           Control.Exception (Exception, throwIO)
+import           Control.Exception (Exception(..), throwIO)
 import           Control.Exception (try)
+import           Control.Monad
 import qualified Control.Monad.Fail as Fail
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Primitive (PrimMonad (..))
@@ -28,8 +30,9 @@ import qualified Data.Text as T
 import           Data.Typeable
 import           Data.Word
 import           Foreign.ForeignPtr (withForeignPtr)
-import           Foreign.Ptr (Ptr)
+import           Foreign.Ptr (Ptr, plusPtr, minusPtr, castPtr)
 import           Foreign.Storable (peekByteOff, pokeByteOff, Storable, sizeOf)
+import qualified Foreign.Storable as Storable
 import           GHC.Generics
 import           GHC.Prim ( unsafeCoerce#, RealWorld )
 import           GHC.TypeLits
@@ -62,52 +65,41 @@ encode x = BS.unsafeCreate
 -- FIXME: can we really justify accursed unutterable things?
 
 decode :: Store a => BS.ByteString -> Either PeekException a
-decode = BS.accursedUnutterablePerformIO . try . decodeImpl
+decode = BS.accursedUnutterablePerformIO . try . decodeIO
 
 unsafeDecode :: Store a => BS.ByteString -> a
-unsafeDecode = BS.accursedUnutterablePerformIO . decodeImpl
+unsafeDecode = BS.accursedUnutterablePerformIO . decodeIO
 
 unsafeDecodeWith :: Peek a -> BS.ByteString -> a
-unsafeDecodeWith f = BS.accursedUnutterablePerformIO . decodeImplWith f
+unsafeDecodeWith f = BS.accursedUnutterablePerformIO . decodeIOWith f
 
 unsafeDecodeWithOffset :: Peek a -> BS.ByteString -> (Offset,a)
-unsafeDecodeWithOffset f = BS.accursedUnutterablePerformIO . decodeImplWithOffset f
+unsafeDecodeWithOffset f = BS.accursedUnutterablePerformIO . decodeIOPortionWith f
 
-decodeImpl :: Store a => BS.ByteString -> IO a
-decodeImpl (BS.PS x s len) =
-    withForeignPtr x $ \p ->
-        let total = len + s
-            final offset y
-                | offset == total = return y
-                | offset < total = throwIO $ PeekException offset "Didn't consume all input"
-                | otherwise = throwIO $ PeekException offset "Overshot end of buffer"
-         in runPeek peek (len + s) p s final
+decodeIO :: Store a => BS.ByteString -> IO a
+decodeIO = decodeIOWith peek
 
 decodeWith :: (Peek a) -> BS.ByteString -> Either PeekException a
-decodeWith mypeek = BS.accursedUnutterablePerformIO . try . decodeImplWith mypeek
+decodeWith mypeek = BS.accursedUnutterablePerformIO . try . decodeIOWith mypeek
 
-decodeImplWith :: (Peek a) -> BS.ByteString -> IO a
-decodeImplWith mypeek (BS.PS x s len) =
-    withForeignPtr x $ \p ->
-        let total = len + s
-            final offset y
-                | offset == total = return y
-                | offset < total =
-                  (throwIO $ PeekException offset
-                                           ("Didn't consume all input: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total)))
-                | otherwise = throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
-         in runPeek mypeek (len + s) p s final
+decodeIOWith :: Peek a -> BS.ByteString -> IO a
+decodeIOWith mypeek bs = do
+    (offset, x) <- decodeIOPortionWith mypeek bs
+    let remaining = BS.length bs - offset
+    if remaining > 0
+        then throwIO $ PeekException remaining "Didn't consume all input."
+        else return x
 
-decodeImplWithOffset :: (Peek a) -> BS.ByteString -> IO (Int,a)
-decodeImplWithOffset mypeek (BS.PS x s len) =
-    withForeignPtr x $ \p ->
-        let total = len + s
-            final offset y
-                | offset == total = return (offset,y)
-                | offset < total =
-                  return (offset,y)
-                | otherwise = throwIO $ PeekException offset ("Overshot: offset=" <> T.pack (show offset) <> ", but total is " <> T.pack (show total))
-         in runPeek mypeek (len + s) p s final
+decodeIOPortionWith :: Peek a -> BS.ByteString -> IO (Int, a)
+decodeIOPortionWith mypeek (BS.PS x s len) =
+    withForeignPtr x $ \ptr0 ->
+        let ptr = ptr0 `plusPtr` s
+            end = ptr `plusPtr` len
+         in do
+             (ptr2, x) <- runPeek mypeek end ptr
+             if ptr2 > end
+                 then throwIO $ PeekException (end `minusPtr` ptr2) "Overshot end of buffer"
+                 else return (ptr2 `minusPtr` ptr, x)
 
 ------------------------------------------------------------------------
 -- Generics instances
@@ -183,7 +175,7 @@ instance (GStore a, KnownNat n) => GStoreSum n (C1 c a) where
         gpoke x
     gpeekSum tag _
         | tag == cur = gpeek
-        | tag > cur = peekException "Pointer tag invalid"
+        | tag > cur = peekException "Sum tag invalid"
         | otherwise = peekException "Error in implementation of Store Generics"
       where
         cur = fromInteger (natVal (Proxy :: Proxy n))
@@ -211,19 +203,15 @@ pokeStorable x = Poke $ \ptr offset k -> do
 
 -- | A @Peek@ implementation based on an instance of @Storable@
 peekStorable :: forall a. (Storable a, Typeable a) => Peek a
-peekStorable = Peek $ \total ptr offset k ->
-    let offset' = offset + needed
+peekStorable = Peek $ \end ptr ->
+    let ptr' = ptr `plusPtr` needed
         needed = sizeOf (undefined :: a)
-     in if total >= offset'
-            then do
-                x <- peekByteOff ptr offset
-                k offset' x
-            else throwIO $ PeekException offset $ T.pack $
-                "Attempted to read too many bytes for " ++
-                show (typeRep (Proxy :: Proxy a)) ++
-                ". Needed " ++
-                show needed ++ ", but only " ++
-                show (total - offset) ++ " remain. Total: " ++ show total
+        remaining = end `minusPtr` ptr
+     in do
+        when (ptr' > end) $
+            tooManyBytes needed remaining (show (typeRep (Proxy :: Proxy a)))
+        x <- Storable.peek (castPtr ptr)
+        return (ptr', x)
 {-# INLINE peekStorable #-}
 
 ------------------------------------------------------------------------
@@ -279,26 +267,24 @@ instance MonadIO Poke where
 -- Peek monad
 
 newtype Peek a = Peek
-    { runPeek :: forall r byte.
-        Total
+    { runPeek :: forall byte.
+        Ptr byte
      -> Ptr byte
-     -> Offset
-     -> (Offset -> a -> IO r)
-     -> IO r
+     -> IO (Ptr byte, a)
     }
    deriving Functor
 
 instance Applicative Peek where
-    pure x = Peek (\_ _ offset k -> k offset x)
+    pure x = Peek (\_ ptr -> return (ptr, x))
     {-# INLINE pure #-}
-    Peek f <*> Peek g = Peek $ \total ptr offset1 k ->
-        f total ptr offset1 $ \offset2 f' ->
-        g total ptr offset2 $ \offset3 g' ->
-        k offset3 (f' g')
+    Peek f <*> Peek g = Peek $ \end ptr1 -> do
+        (ptr2, f') <- f end ptr1
+        (ptr3, g') <- g end ptr2
+        return (ptr3, f' g')
     {-# INLINE (<*>) #-}
-    Peek f *> Peek g = Peek $ \total ptr offset1 k ->
-        f total ptr offset1 $ \offset2 _ ->
-        g total ptr offset2 k
+    Peek f *> Peek g = Peek $ \end ptr1 -> do
+        (ptr2, _) <- f end ptr1
+        g end ptr2
     {-# INLINE (*>) #-}
 
 instance Monad Peek where
@@ -306,9 +292,9 @@ instance Monad Peek where
     {-# INLINE return #-}
     (>>) = (*>)
     {-# INLINE (>>) #-}
-    Peek x >>= f = Peek $ \total ptr offset1 k ->
-        x total ptr offset1 $ \offset2 x' ->
-        runPeek (f x') total ptr offset2 k
+    Peek x >>= f = Peek $ \end ptr1 -> do
+        (ptr2, x') <- x end ptr1
+        runPeek (f x') end ptr2
     {-# INLINE (>>=) #-}
     fail = Fail.fail
     {-# INLINE fail #-}
@@ -319,21 +305,28 @@ instance Fail.MonadFail Peek where
 
 instance PrimMonad Peek where
     type PrimState Peek = RealWorld
-    primitive action = Peek $ \_ _ offset k -> do
+    primitive action = Peek $ \_ ptr -> do
         x <- primitive (unsafeCoerce# action)
-        k offset x
+        return (ptr, x)
     {-# INLINE primitive #-}
 
 instance MonadIO Peek where
-    liftIO f = Peek $ \_ _ offset k -> f >>= k offset
+    liftIO f = Peek $ \_ ptr -> (ptr, ) <$> f
     {-# INLINE liftIO #-}
+
+-- TODO: custom Show instance which clarifies meaning of offset
 
 -- | Exception thrown while running 'peek'. Note that other types of
 -- exceptions can also be thrown.
 data PeekException = PeekException Offset T.Text
     deriving (Eq, Show, Typeable)
 
-instance Exception PeekException
+instance Exception PeekException where
+    displayException (PeekException offset msg) =
+        "Exception while peeking, " ++
+        show offset ++
+        " bytes from end : " ++
+        T.unpack msg
 
 ------------------------------------------------------------------------
 -- Size type
@@ -346,7 +339,16 @@ data Size a
     deriving Typeable
 
 peekException :: T.Text -> Peek a
-peekException msg = Peek $ \_ _ offset _ -> throwIO (PeekException offset msg)
+peekException msg = Peek $ \end ptr -> throwIO (PeekException (end `minusPtr` ptr) msg)
+
+tooManyBytes :: Int -> Int -> String -> IO void
+tooManyBytes needed remaining ty =
+    throwIO $ PeekException remaining $ T.pack $
+        "Attempted to read too many bytes for " ++
+        ty ++
+        ". Needed " ++
+        show needed ++ ", but only " ++
+        show remaining ++ " remain."
 
 -- FIXME: export as utils?
 
