@@ -251,6 +251,7 @@ copyAddrToByteArray (Ptr addr) (MutableByteArray arr) (I# offset) (I# len) =
 -- Useful combinators
 
 -- | Skip n bytes forward.
+{-# INLINE skip #-}
 skip :: Int -> Peek ()
 skip len = Peek $ \end ptr -> do
     let ptr2 = ptr `plusPtr` len
@@ -260,6 +261,7 @@ skip len = Peek $ \end ptr -> do
 
 -- | Isolate the input to n bytes, skipping n bytes forward. Fails if @m@
 -- advances the offset beyond the isolated region.
+{-# INLINE isolate #-}
 isolate :: Int -> Peek a -> Peek a
 isolate len m = Peek $ \end ptr -> do
     let ptr2 = ptr `plusPtr` len
