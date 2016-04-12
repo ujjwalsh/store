@@ -27,7 +27,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short.Internal as SBS
-import           Data.Coerce (coerce)
+
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
 import           Data.Foldable (forM_)
 import           Data.IntMap (IntMap)
@@ -53,8 +53,8 @@ import           Data.Void
 import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr, castForeignPtr)
 import           Foreign.Ptr (Ptr, plusPtr, minusPtr, castPtr)
 import           Foreign.Storable (Storable, sizeOf)
-import           GHC.Arr (Array(..))
-import qualified GHC.Arr as Arr
+
+
 import           GHC.Prim (copyByteArrayToAddr#, copyAddrToByteArray#)
 import           GHC.Ptr (Ptr(..))
 import           GHC.Real (Ratio(..))

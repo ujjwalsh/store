@@ -24,14 +24,13 @@ import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Primitive (PrimMonad (..))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
-import           Data.Monoid
 import           Data.Proxy
 import qualified Data.Text as T
 import           Data.Typeable
 import           Data.Word
 import           Foreign.ForeignPtr (withForeignPtr)
 import           Foreign.Ptr (Ptr, plusPtr, minusPtr, castPtr)
-import           Foreign.Storable (peekByteOff, pokeByteOff, Storable, sizeOf)
+import           Foreign.Storable (pokeByteOff, Storable, sizeOf)
 import qualified Foreign.Storable as Storable
 import           GHC.Generics
 import           GHC.Prim ( unsafeCoerce#, RealWorld )
@@ -97,10 +96,10 @@ decodeIOPortionWith mypeek (BS.PS x s len) =
         let ptr = ptr0 `plusPtr` s
             end = ptr `plusPtr` len
          in do
-             (ptr2, x) <- runPeek mypeek end ptr
+             (ptr2, x') <- runPeek mypeek end ptr
              if ptr2 > end
                  then throwIO $ PeekException (end `minusPtr` ptr2) "Overshot end of buffer"
-                 else return (ptr2 `minusPtr` ptr, x)
+                 else return (ptr2 `minusPtr` ptr, x')
 
 ------------------------------------------------------------------------
 -- Generics instances
