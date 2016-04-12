@@ -1,3 +1,8 @@
+* Should we exclude pointer types from Store?  On one hand, they don't serialize
+  between processes.  However, if we view Store as just being a variant of
+  Storable that supports variable length storage, then there's no reason to
+  leave out pointers.
+
 * Document that the 'instance Storable a => Store (SV.Vector a)' means that
   every Store instance must be compatible with its Storable.
 
