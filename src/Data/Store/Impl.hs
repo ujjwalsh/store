@@ -36,6 +36,7 @@ import qualified Foreign.Storable as Storable
 import           GHC.Generics
 import           GHC.Prim ( unsafeCoerce#, RealWorld )
 import           GHC.TypeLits
+import           System.IO.Unsafe (unsafePerformIO)
 
 ------------------------------------------------------------------------
 -- Store class
@@ -65,22 +66,22 @@ encode x = BS.unsafeCreate
 -- FIXME: can we really justify accursed unutterable things?
 
 decode :: Store a => BS.ByteString -> Either PeekException a
-decode = BS.accursedUnutterablePerformIO . try . decodeIO
+decode = unsafePerformIO . try . decodeIO
 
 unsafeDecode :: Store a => BS.ByteString -> a
-unsafeDecode = BS.accursedUnutterablePerformIO . decodeIO
+unsafeDecode = unsafePerformIO . decodeIO
 
 unsafeDecodeWith :: Peek a -> BS.ByteString -> a
-unsafeDecodeWith f = BS.accursedUnutterablePerformIO . decodeIOWith f
+unsafeDecodeWith f = unsafePerformIO . decodeIOWith f
 
 unsafeDecodeWithOffset :: Peek a -> BS.ByteString -> (Offset,a)
-unsafeDecodeWithOffset f = BS.accursedUnutterablePerformIO . decodeIOPortionWith f
+unsafeDecodeWithOffset f = unsafePerformIO . decodeIOPortionWith f
 
 decodeIO :: Store a => BS.ByteString -> IO a
 decodeIO = decodeIOWith peek
 
 decodeWith :: (Peek a) -> BS.ByteString -> Either PeekException a
-decodeWith mypeek = BS.accursedUnutterablePerformIO . try . decodeIOWith mypeek
+decodeWith mypeek = unsafePerformIO . try . decodeIOWith mypeek
 
 decodeIOWith :: Peek a -> BS.ByteString -> IO a
 decodeIOWith mypeek bs = do
