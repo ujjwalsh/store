@@ -65,14 +65,14 @@ encode x = BS.unsafeCreate
 decode :: Store a => BS.ByteString -> Either PeekException a
 decode = unsafePerformIO . try . decodeIO
 
-unsafeDecode :: Store a => BS.ByteString -> a
-unsafeDecode = unsafePerformIO . decodeIO
+decodeEx :: Store a => BS.ByteString -> a
+decodeEx = unsafePerformIO . decodeIO
 
-unsafeDecodeWith :: Peek a -> BS.ByteString -> a
-unsafeDecodeWith f = unsafePerformIO . decodeIOWith f
+decodeExWith :: Peek a -> BS.ByteString -> a
+decodeExWith f = unsafePerformIO . decodeIOWith f
 
-unsafeDecodeWithOffset :: Peek a -> BS.ByteString -> (Offset,a)
-unsafeDecodeWithOffset f = unsafePerformIO . decodeIOPortionWith f
+decodeExWithOffset :: Peek a -> BS.ByteString -> (Offset,a)
+decodeExWithOffset f = unsafePerformIO . decodeIOPortionWith f
 
 decodeIO :: Store a => BS.ByteString -> IO a
 decodeIO = decodeIOWith peek

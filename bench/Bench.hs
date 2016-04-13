@@ -83,7 +83,7 @@ benchDecode = benchEncode' ""
 benchDecode' :: forall a. Ctx a => String -> a -> Benchmark
 benchDecode' prefix x0 =
     env (return (encode x0)) $ \x ->
-        bench (prefix ++ "(" ++ show (typeOf x0) ++ ")") (nf (unsafeDecode :: BS.ByteString -> a) x)
+        bench (prefix ++ "(" ++ show (typeOf x0) ++ ")") (nf (decodeEx :: BS.ByteString -> a) x)
 
 ------------------------------------------------------------------------
 -- Serialized datatypes
