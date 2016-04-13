@@ -62,8 +62,6 @@ encode x = BS.unsafeCreate
     (getSize size x)
     (\p -> runPoke (poke x) p 0 (\_ _ -> return ()))
 
--- FIXME: can we really justify accursed unutterable things?
-
 decode :: Store a => BS.ByteString -> Either PeekException a
 decode = unsafePerformIO . try . decodeIO
 
