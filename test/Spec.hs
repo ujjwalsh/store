@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -15,6 +16,7 @@ import           Data.IntMap (IntMap)
 import           Data.IntSet (IntSet)
 import           Data.Map (Map)
 import           Data.Monoid
+import           Data.Primitive.Types (Addr)
 import           Data.Sequence (Seq)
 import           Data.Sequences (fromList)
 import           Data.Set (Set)
@@ -23,6 +25,8 @@ import           Data.Store.TH
 import           Data.Text (Text)
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
+import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector.Primitive as PV
 import           Data.Void (Void)
 import           Data.Word
 import           Foreign.C.Types
@@ -71,6 +75,13 @@ $(do let ns = [ ''CUSeconds, ''CClock, ''CTime, ''CUChar, ''CSize, ''CSigAtomic
          f n = [d| instance Monad m => Serial m $(conT n) where
                       series = generate (\_ -> [0, 1]) |]
      concat <$> mapM f ns)
+
+-- Serial instances for Primitive vectors
+
+$(do tys <- getAllInstanceTypes1 ''PV.Prim
+     let f ty = [d| instance (Serial m $(return ty), Monad m) => Serial m (PV.Vector $(return ty)) where
+                      series = fmap PV.fromList series |]
+     concat <$> mapM f tys)
 
 -- Serial instances for (Generic a) types.
 
@@ -121,6 +132,9 @@ instance (Monad m, Serial m a) => Serial m (Seq a) where
 instance (Monad m, Serial m a) => Serial m (Complex a) where
     series = uncurry (:+) <$> (series >< series)
 
+instance (Monad m, Serial m a, UV.Unbox a) => Serial m (UV.Vector a) where
+    series = fmap fromList series
+
 -- Should probably get added to smallcheck :)
 instance (Monad m) => Serial m Void where
     series = generate (\_ -> [])
@@ -146,7 +160,9 @@ main :: IO ()
 main = hspec $ do
     describe "Store on all monomorphic instances"
         $(do insts <- getAllInstanceTypes1 ''Store
-             smallcheckManyStore verbose 3 . map return . filter isMonoType $ insts)
+             addrTy <- [t| PV.Vector Addr |]
+             let f ty = isMonoType ty && ty /= addrTy
+             smallcheckManyStore verbose 3 . map return . filter f $ insts)
     describe "Store on all custom generic instances"
         $(smallcheckManyStore verbose 3
             [ [t| Test |]

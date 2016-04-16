@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Data.Store.Internal
@@ -47,8 +48,11 @@ import qualified Data.Text.Foreign as T
 import qualified Data.Text.Internal as T
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Primitive as PV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
+import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector.Unboxed.Base as UV
 import           Data.Void
 import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr, castForeignPtr)
 import           Foreign.Ptr (Ptr, plusPtr, minusPtr, castPtr)
@@ -191,63 +195,6 @@ peekMutableSequence new write = do
 {-# INLINE peekMutableSequence #-}
 
 ------------------------------------------------------------------------
--- Utilities for implementing 'Store' instances via memcpy
-
-pokeForeignPtr :: ForeignPtr a -> Int -> Int -> Poke ()
-pokeForeignPtr sourceFp sourceOffset len =
-    Poke $ \targetPtr targetOffset k -> do
-        withForeignPtr sourceFp $ \sourcePtr ->
-            BS.memcpy (targetPtr `plusPtr` targetOffset)
-                      (sourcePtr `plusPtr` sourceOffset)
-                      len
-        k (targetOffset + len) ()
-
-peekPlainForeignPtr :: String -> Int -> Peek (ForeignPtr a)
-peekPlainForeignPtr ty len =
-    Peek $ \end sourcePtr -> do
-        let ptr2 = sourcePtr `plusPtr` len
-        when (ptr2 > end) $
-            tooManyBytes len (end `minusPtr` sourcePtr) ty
-        fp <- BS.mallocByteString len
-        withForeignPtr fp $ \targetPtr ->
-            BS.memcpy targetPtr (castPtr sourcePtr) len
-        return (ptr2, castForeignPtr fp)
-
-pokePtr :: Ptr a -> Int -> Int -> Poke ()
-pokePtr sourcePtr sourceOffset len =
-    Poke $ \targetPtr targetOffset k -> do
-        BS.memcpy (targetPtr `plusPtr` targetOffset)
-                  (sourcePtr `plusPtr` sourceOffset)
-                  len
-        k (targetOffset + len) ()
-
-pokeByteArray :: ByteArray# -> Int -> Int -> Poke ()
-pokeByteArray sourceArr sourceOffset len =
-    Poke $ \targetPtr targetOffset k -> do
-        let target = targetPtr `plusPtr` targetOffset
-        copyByteArrayToAddr sourceArr sourceOffset target len
-        k (targetOffset + len) ()
-
-peekByteArray :: String -> Int -> Peek ByteArray
-peekByteArray ty len =
-    Peek $ \end sourcePtr -> do
-        let ptr2 = sourcePtr `plusPtr` len
-        when (ptr2 > end) $
-            tooManyBytes len (end `minusPtr` sourcePtr) ty
-        marr <- newByteArray len
-        copyAddrToByteArray sourcePtr marr 0 len
-        x <- unsafeFreezeByteArray marr
-        return (ptr2, x)
-
-copyByteArrayToAddr :: ByteArray# -> Int -> Ptr a -> Int -> IO ()
-copyByteArrayToAddr arr (I# offset) (Ptr addr) (I# len) =
-    IO (\s -> (# copyByteArrayToAddr# arr offset addr len s, () #))
-
-copyAddrToByteArray :: Ptr a -> MutableByteArray (PrimState IO) -> Int -> Int -> IO ()
-copyAddrToByteArray (Ptr addr) (MutableByteArray arr) (I# offset) (I# len) =
-    IO (\s -> (# copyAddrToByteArray# addr arr offset len s, () #))
-
-------------------------------------------------------------------------
 -- Useful combinators
 
 -- | Skip n bytes forward.
@@ -280,45 +227,13 @@ instance Store a => Store (V.Vector a) where
     poke = pokeSequence
     peek = V.unsafeFreeze =<< peekMutableSequence MV.new MV.write
 
-{-
-instance (Prim a, UV.Unbox a) => Store (UV.Vector a) where
+-- NOTE: soon we'll have TH generation for all of the unbox instances.
+instance Store (UV.Vector Word) where
     size = VarSize $ \x ->
         sizeOf (undefined :: Int) +
-        Prim.sizeOf (undefined :: a) * UV.length x
-    poke x = do
-        let PV.Vector offset len array = unboxedToPrimitive x
-            !(Addr addr) = byteArrayContents array
-            elBytes = Prim.sizeOf (undefined :: a)
-        poke len
-        pokePtr (Ptr addr) (offset * elBytes) (len * elBytes)
-    peek = do
-        len <- peek
-        Peek $ \total sourcePtr sourceOffset k -> do
-            -- TODO: could be cleaned up a little with MGV.unsafeNew?
-            let byteLen = Prim.sizeOf (undefined :: a) * len
-            marray <- newByteArray byteLen
-            let !(Addr addr) = mutableByteArrayContents marray
-            BS.memcpy (Ptr addr)
-                      (sourcePtr `plusPtr` sourceOffset)
-                      byteLen
-            array <- unsafeFreezeByteArray marray
-            k (sourceOffset + byteLen) (primitiveToUnboxed (PV.Vector 0 len array))
-
--- I tried (Coercible (UV.Vector a) (PV.Vector a)) in the instance
--- above, but it seems like GHC wants to solve the Coercible constraint
--- right away and can't see that I have a constraint for it. I believe
--- the coercion check would work out once the data family gets applied.
-
-FIXME: commenting these out, because the data rep of UV.Vector () is
-_not_ a PV.Vector (). Instead, we need a typeclass and instances for
-converting to a primitive vector.
-
-unboxedToPrimitive :: UV.Vector a -> PV.Vector a
-unboxedToPrimitive = unsafeCoerce
-
-primitiveToUnboxed :: PV.Vector a -> UV.Vector a
-primitiveToUnboxed = unsafeCoerce
--}
+        sizeOf (undefined :: Word) * UV.length x
+    poke !(UV.V_Word pv) = poke pv
+    peek = UV.V_Word <$> peek
 
 instance Storable a => Store (SV.Vector a) where
     size = VarSize $ \x ->
@@ -479,3 +394,4 @@ $(return $ map makeTupleStoreInstance [2..7])
 -- Instances for Storable types
 
 $(deriveManyStoreFromStorable (\_ -> True))
+$(deriveManyStorePrimVector)

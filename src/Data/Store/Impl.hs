@@ -13,6 +13,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 module Data.Store.Impl where
 
@@ -24,17 +25,25 @@ import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Primitive (PrimMonad (..))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
+import           Data.Monoid
+import           Data.Primitive.ByteArray
 import           Data.Proxy
 import qualified Data.Text as T
 import           Data.Typeable
 import           Data.Word
-import           Foreign.ForeignPtr (withForeignPtr)
+import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr, castForeignPtr)
 import           Foreign.Ptr (Ptr, plusPtr, minusPtr, castPtr)
 import           Foreign.Storable (pokeByteOff, Storable, sizeOf)
 import qualified Foreign.Storable as Storable
+import           GHC.Arr (Array(..))
+import qualified GHC.Arr as Arr
 import           GHC.Generics
 import           GHC.Prim ( unsafeCoerce#, RealWorld )
+import           GHC.Prim (copyByteArrayToAddr#, copyAddrToByteArray#)
+import           GHC.Ptr (Ptr(..))
+import           GHC.Real (Ratio(..))
 import           GHC.TypeLits
+import           GHC.Types (IO(..), Int(..))
 import           System.IO.Unsafe (unsafePerformIO)
 
 ------------------------------------------------------------------------
@@ -49,10 +58,10 @@ class Store a where
     size = contramapSize from gsize
 
     default poke :: (Generic a, GStore (Rep a)) => a -> Poke ()
-    poke = gpoke . from
+    poke = genericPoke
 
     default peek :: (Generic a , GStore (Rep a)) => Peek a
-    peek = to <$> gpeek
+    peek = genericPeek
 
 ------------------------------------------------------------------------
 -- Utilities for encoding / decoding strict ByteStrings
@@ -100,7 +109,13 @@ decodeIOPortionWith mypeek (BS.PS x s len) =
                  else return (ptr2 `minusPtr` ptr, x')
 
 ------------------------------------------------------------------------
--- Generics instances
+-- Generics
+
+genericPoke :: (Generic a, GStore (Rep a)) => a -> Poke ()
+genericPoke = gpoke . from
+
+genericPeek :: (Generic a , GStore (Rep a)) => Peek a
+genericPeek = to <$> gpeek
 
 type family SumArity (a :: * -> *) :: Nat where
     SumArity (C1 c a) = 1
@@ -375,3 +390,60 @@ getSize (ConstSize n) _ = n
 scaleSize :: Int -> Size a -> Size a
 scaleSize s (ConstSize n) = ConstSize (s * n)
 scaleSize s (VarSize f) = VarSize ((s *) . f)
+
+------------------------------------------------------------------------
+-- Utilities for implementing 'Store' instances via memcpy
+
+pokeForeignPtr :: ForeignPtr a -> Int -> Int -> Poke ()
+pokeForeignPtr sourceFp sourceOffset len =
+    Poke $ \targetPtr targetOffset k -> do
+        withForeignPtr sourceFp $ \sourcePtr ->
+            BS.memcpy (targetPtr `plusPtr` targetOffset)
+                      (sourcePtr `plusPtr` sourceOffset)
+                      len
+        k (targetOffset + len) ()
+
+peekPlainForeignPtr :: String -> Int -> Peek (ForeignPtr a)
+peekPlainForeignPtr ty len =
+    Peek $ \end sourcePtr -> do
+        let ptr2 = sourcePtr `plusPtr` len
+        when (ptr2 > end) $
+            tooManyBytes len (end `minusPtr` sourcePtr) ty
+        fp <- BS.mallocByteString len
+        withForeignPtr fp $ \targetPtr ->
+            BS.memcpy targetPtr (castPtr sourcePtr) len
+        return (ptr2, castForeignPtr fp)
+
+pokePtr :: Ptr a -> Int -> Int -> Poke ()
+pokePtr sourcePtr sourceOffset len =
+    Poke $ \targetPtr targetOffset k -> do
+        BS.memcpy (targetPtr `plusPtr` targetOffset)
+                  (sourcePtr `plusPtr` sourceOffset)
+                  len
+        k (targetOffset + len) ()
+
+pokeByteArray :: ByteArray# -> Int -> Int -> Poke ()
+pokeByteArray sourceArr sourceOffset len =
+    Poke $ \targetPtr targetOffset k -> do
+        let target = targetPtr `plusPtr` targetOffset
+        copyByteArrayToAddr sourceArr sourceOffset target len
+        k (targetOffset + len) ()
+
+peekByteArray :: String -> Int -> Peek ByteArray
+peekByteArray ty len =
+    Peek $ \end sourcePtr -> do
+        let ptr2 = sourcePtr `plusPtr` len
+        when (ptr2 > end) $
+            tooManyBytes len (end `minusPtr` sourcePtr) ty
+        marr <- newByteArray len
+        copyAddrToByteArray sourcePtr marr 0 len
+        x <- unsafeFreezeByteArray marr
+        return (ptr2, x)
+
+copyByteArrayToAddr :: ByteArray# -> Int -> Ptr a -> Int -> IO ()
+copyByteArrayToAddr arr (I# offset) (Ptr addr) (I# len) =
+    IO (\s -> (# copyByteArrayToAddr# arr offset addr len s, () #))
+
+copyAddrToByteArray :: Ptr a -> MutableByteArray (PrimState IO) -> Int -> Int -> IO ()
+copyAddrToByteArray (Ptr addr) (MutableByteArray arr) (I# offset) (I# len) =
+    IO (\s -> (# copyAddrToByteArray# addr arr offset len s, () #))

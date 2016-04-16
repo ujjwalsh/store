@@ -1,3 +1,6 @@
+* Have a `peekSize :: Peek Int`?  Maybe in another typeclass.  It's a tradeoff
+  with figuring out the full size ahead of time when encoding.
+
 * Should we exclude pointer types from Store?  On one hand, they don't serialize
   between processes.  However, if we view Store as just being a variant of
   Storable that supports variable length storage, then there's no reason to
