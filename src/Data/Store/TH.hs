@@ -25,9 +25,8 @@ import           Data.Primitive.Types
 import           Data.Store.Impl
 import           Data.Traversable (forM)
 import           Data.Typeable (Typeable)
-import qualified Data.Vector.Generic as GV
 import qualified Data.Vector.Primitive as PV
-import qualified Data.Vector.Unboxed as UV
+-- import qualified Data.Vector.Unboxed as UV
 import           Debug.Trace (trace)
 import           Foreign.C.Types
 import           Foreign.Ptr (IntPtr, WordPtr, Ptr, FunPtr)
@@ -101,7 +100,8 @@ deriveManyStorePrimVector = do
 primSizeOfExpr :: Type -> ExpQ
 primSizeOfExpr ty = [| $(varE 'sizeOf#) (error "sizeOf# evaluated its argument" :: $(return ty)) |]
 
-{-
+{- TODO: WIP
+
 deriveManyStoreUnboxVector :: Q [Dec]
 deriveManyStoreUnboxVector = do
     unboxes <- getUnboxInfo
@@ -118,16 +118,15 @@ deriveManyStoreUnboxVector = do
             let argTy = head (tail (unAppsT ty)) in
             Just $ makeStoreInstance cs argTy
                 (AppE (VarE 'pokeUnboxedVector) (proxyEx)
--}
 
 getUnboxInfo :: Q [(Type, Name, [Type])]
 getUnboxInfo = do
     FamilyI _ insts <- reify ''UV.Vector
     return (map go insts)
   where
-    go (NewtypeInstD cxt _ [ty] con _) =
+    go (NewtypeInstD _ _ [ty] con _) =
         (ty, conName con, conFields con)
-    go (DataInstD cxt _ [ty] [con] _) =
+    go (DataInstD _ _ [ty] [con] _) =
         (ty, conName con, conFields con)
     go x = error ("Unexpected result from reifying Unboxed Vector instances: " ++ pprint x)
 
@@ -143,7 +142,6 @@ conFields (RecC _ tys) = map (\(_,_,ty) -> ty) tys
 conFields (InfixC l _ r) = [snd l, snd r]
 conFields (ForallC _ _ con) = conFields con
 
-{-
 pokeUnboxedVector =
     let !(UV.V_Word (PV.Vector offset len (ByteArray array))) = x
     sz = sizeOf (undefined :: Word)
@@ -171,6 +169,7 @@ deriveManyStoreFromStorableImpl p = do
 
 -- Filters out overlapping instances and instances with more than one
 -- type arg (should be impossible).
+postprocess :: M.Map [Type] [a] -> M.Map [Type] a
 postprocess =
     M.mapMaybeWithKey $ \tys xs ->
         case (tys, xs) of

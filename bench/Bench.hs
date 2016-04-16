@@ -9,7 +9,6 @@ import           Criterion.Main
 import qualified Data.ByteString as BS
 import           Data.Int
 import           Data.Store
-import           Data.Store.Internal
 import           Data.Typeable
 import qualified Data.Vector.Storable as SV
 import           Data.Word

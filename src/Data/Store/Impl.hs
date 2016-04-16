@@ -25,7 +25,6 @@ import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Primitive (PrimMonad (..))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
-import           Data.Monoid
 import           Data.Primitive.ByteArray
 import           Data.Proxy
 import qualified Data.Text as T
@@ -35,13 +34,10 @@ import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr, castForeignPtr)
 import           Foreign.Ptr (Ptr, plusPtr, minusPtr, castPtr)
 import           Foreign.Storable (pokeByteOff, Storable, sizeOf)
 import qualified Foreign.Storable as Storable
-import           GHC.Arr (Array(..))
-import qualified GHC.Arr as Arr
 import           GHC.Generics
 import           GHC.Prim ( unsafeCoerce#, RealWorld )
 import           GHC.Prim (copyByteArrayToAddr#, copyAddrToByteArray#)
 import           GHC.Ptr (Ptr(..))
-import           GHC.Real (Ratio(..))
 import           GHC.TypeLits
 import           GHC.Types (IO(..), Int(..))
 import           System.IO.Unsafe (unsafePerformIO)

@@ -23,12 +23,10 @@ module Data.Store.Internal
 import           Control.Exception (throwIO)
 import           Control.Monad (when)
 import           Control.Monad.IO.Class (liftIO)
-import           Control.Monad.Primitive (PrimState)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short.Internal as SBS
-
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
 import           Data.Foldable (forM_)
 import           Data.IntMap (IntMap)
@@ -48,21 +46,16 @@ import qualified Data.Text.Foreign as T
 import qualified Data.Text.Internal as T
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
-import qualified Data.Vector.Primitive as PV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.Vector.Unboxed.Base as UV
 import           Data.Void
-import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr, castForeignPtr)
-import           Foreign.Ptr (Ptr, plusPtr, minusPtr, castPtr)
+import           Foreign.Ptr (plusPtr, minusPtr)
 import           Foreign.Storable (Storable, sizeOf)
 
 
-import           GHC.Prim (copyByteArrayToAddr#, copyAddrToByteArray#)
-import           GHC.Ptr (Ptr(..))
 import           GHC.Real (Ratio(..))
-import           GHC.Types (IO(..), Int(..))
 
 ------------------------------------------------------------------------
 -- Utilities for defining list-like 'Store' instances in terms of 'IsSequence'
