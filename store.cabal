@@ -5,10 +5,10 @@ description:         Please see README.md
 homepage:            http://github.com/fpco/store#readme
 license:             AllRightsReserved
 license-file:        LICENSE
-author:              Michael Sloan
-maintainer:          sloa@fpcomplete.com
-copyright:           2016 Michael Sloan
-category:            Web
+author:              FP Complete <dev@fpcomplete.com>
+maintainer:          FP Complete <dev@fpcomplete.com>
+copyright:           2016 FP Complete
+category:            Serialization Data
 build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.10
