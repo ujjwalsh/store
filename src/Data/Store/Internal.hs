@@ -30,9 +30,9 @@ import qualified Data.ByteString.Short.Internal as SBS
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
 import           Data.Fixed (Fixed (..), Pico)
 import           Data.Foldable (forM_)
-import           Data.Hashable (Hashable)
 import           Data.HashMap.Strict (HashMap)
 import           Data.HashSet (HashSet)
+import           Data.Hashable (Hashable)
 import           Data.IntMap (IntMap)
 import           Data.IntSet (IntSet)
 import           Data.Map (Map)
@@ -61,9 +61,8 @@ import           Foreign.Ptr (plusPtr, minusPtr)
 import           Foreign.Storable (Storable, sizeOf)
 import qualified GHC.Integer.GMP.Internals as I
 import           GHC.Prim (sizeofByteArray#)
-import           GHC.Types (Int (I#))
-
 import           GHC.Real (Ratio(..))
+import           GHC.Types (Int (I#))
 
 ------------------------------------------------------------------------
 -- Utilities for defining list-like 'Store' instances in terms of 'IsSequence'
