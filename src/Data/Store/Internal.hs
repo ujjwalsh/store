@@ -29,6 +29,9 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short.Internal as SBS
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
 import           Data.Foldable (forM_)
+import           Data.Hashable (Hashable)
+import           Data.HashMap.Strict (HashMap)
+import           Data.HashSet (HashSet)
 import           Data.IntMap (IntMap)
 import           Data.IntSet (IntSet)
 import           Data.Map (Map)
@@ -338,6 +341,16 @@ instance (Ord k, Store k, Store a) => Store (Map k a) where
     size = sizeMap
     poke = pokeMap
     peek = peekMap
+
+instance (Eq k, Hashable k, Store k, Store a) => Store (HashMap k a) where
+    size = sizeMap
+    poke = pokeMap
+    peek = peekMap
+
+instance (Eq a, Hashable a, Store a) => Store (HashSet a) where
+    size = sizeSet
+    poke = pokeSet
+    peek = peekSet
 
 -- FIXME: implement
 --
