@@ -11,6 +11,9 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short as SBS
 import           Data.Complex (Complex(..))
 import           Data.Containers (mapFromList, setFromList)
+import           Data.Hashable (Hashable)
+import           Data.HashMap.Strict (HashMap)
+import           Data.HashSet (HashSet)
 import           Data.Int
 import           Data.IntMap (IntMap)
 import           Data.IntSet (IntSet)
@@ -135,6 +138,12 @@ instance (Monad m, Serial m a) => Serial m (Complex a) where
 instance (Monad m, Serial m a, UV.Unbox a) => Serial m (UV.Vector a) where
     series = fmap fromList series
 
+instance (Monad m, Serial m k, Serial m a, Hashable k, Eq k) => Serial m (HashMap k a) where
+    series = fmap mapFromList series
+
+instance (Monad m, Serial m a, Hashable a, Eq a) => Serial m (HashSet a) where
+    series = fmap setFromList series
+
 -- Should probably get added to smallcheck :)
 instance (Monad m) => Serial m Void where
     series = generate (\_ -> [])
@@ -207,6 +216,10 @@ main = hspec $ do
             , [t| IntMap Int64 |]
             , [t| Map Int8 Int8 |]
             , [t| Map Int64 Int64 |]
+            , [t| HashMap Int8 Int8 |]
+            , [t| HashMap Int64 Int64 |]
+            , [t| HashSet Int8 |]
+            , [t| HashSet Int64 |]
             ])
     it "Size of generic instance for single fieldless constructor is 0" $ do
         case size :: Size X of
