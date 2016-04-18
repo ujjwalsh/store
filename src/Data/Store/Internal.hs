@@ -51,9 +51,12 @@ import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.Vector.Unboxed.Base as UV
 import           Data.Void
+import           Data.Word
 import           Foreign.Ptr (plusPtr, minusPtr)
 import           Foreign.Storable (Storable, sizeOf)
-
+import qualified GHC.Integer.GMP.Internals as I
+import           GHC.Prim (sizeofByteArray#)
+import           GHC.Types (Int (I#))
 
 import           GHC.Real (Ratio(..))
 
@@ -344,7 +347,36 @@ instance (Ord k, Store k, Store a) => Store (Map k a) where
 --
 -- instance Store Natural where
 --
--- instance Store Integer where
+instance Store Integer where
+    size = VarSize $ \ x ->
+        sizeOf (undefined :: Word8) + case x of
+            I.S# _ -> sizeOf (undefined :: Int)
+            I.Jp# (I.BN# arr) -> sizeOf (undefined :: Int) + I# (sizeofByteArray# arr)
+            I.Jn# (I.BN# arr) -> sizeOf (undefined :: Int) + I# (sizeofByteArray# arr)
+    poke (I.S# x) = poke (0 :: Word8) >> poke (I# x)
+    poke (I.Jp# (I.BN# arr)) = do
+        let len = I# (sizeofByteArray# arr)
+        poke (1 :: Word8)
+        poke len
+        pokeByteArray arr 0 len
+    poke (I.Jn# (I.BN# arr)) = do
+        let len = I# (sizeofByteArray# arr)
+        poke (2 :: Word8)
+        poke len
+        pokeByteArray arr 0 len
+    peek = do
+        tag <- peek :: Peek Word8
+        case tag of
+            0 -> fromIntegral <$> (peek :: Peek Int)
+            1 -> I.Jp# <$> peekBN
+            2 -> I.Jn# <$> peekBN
+            _ -> peekException "Invalid Integer tag"
+      where
+        peekBN = do
+          len <- peek :: Peek Int
+          ByteArray arr <- peekByteArray "GHC>Integer" len
+          return $ I.BN# arr
+
 --
 -- instance Store GHC.Fingerprint.Types.Fingerprint where
 --
