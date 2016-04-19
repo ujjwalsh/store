@@ -26,6 +26,7 @@ import           Data.Set (Set)
 import           Data.Store
 import           Data.Store.TH
 import           Data.Text (Text)
+import qualified Data.Time as Time
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
@@ -143,6 +144,15 @@ instance (Monad m, Serial m k, Serial m a, Hashable k, Eq k) => Serial m (HashMa
 
 instance (Monad m, Serial m a, Hashable a, Eq a) => Serial m (HashSet a) where
     series = fmap setFromList series
+
+instance Monad m => Serial m Time.Day where
+    series = Time.ModifiedJulianDay <$> series
+
+instance Monad m => Serial m Time.DiffTime where
+    series = Time.picosecondsToDiffTime <$> series
+
+instance Monad m => Serial m Time.UTCTime where
+    series = uncurry Time.UTCTime <$> (series >< series)
 
 -- Should probably get added to smallcheck :)
 instance (Monad m) => Serial m Void where
