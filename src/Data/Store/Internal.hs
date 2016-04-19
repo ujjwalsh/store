@@ -28,6 +28,7 @@ import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short.Internal as SBS
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
+import           Data.Fixed (Fixed (..), Pico)
 import           Data.Foldable (forM_)
 import           Data.Hashable (Hashable)
 import           Data.HashMap.Strict (HashMap)
@@ -47,6 +48,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Array as TA
 import qualified Data.Text.Foreign as T
 import qualified Data.Text.Internal as T
+import qualified Data.Time as Time
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable as SV
@@ -234,6 +236,13 @@ instance Store (UV.Vector Word) where
     poke !(UV.V_Word pv) = poke pv
     peek = UV.V_Word <$> peek
 
+instance Store (UV.Vector Word8) where
+    size = VarSize $ \x ->
+        sizeOf (undefined :: Int) +
+        sizeOf (undefined :: Word8) * UV.length x
+    poke !(UV.V_Word8 pv) = poke pv
+    peek = UV.V_Word8 <$> peek
+
 instance Storable a => Store (SV.Vector a) where
     size = VarSize $ \x ->
         sizeOf (undefined :: Int) +
@@ -393,8 +402,11 @@ instance Store Integer where
 --
 -- instance Store GHC.Fingerprint.Types.Fingerprint where
 --
--- instance Store a => Store (Fixed a) where
---
+instance Store (Fixed a) where
+    size = contramapSize (\(MkFixed x) -> x) (size :: Size Integer)
+    poke (MkFixed x) = poke x
+    peek = MkFixed <$> peek
+
 -- instance Store a => Store (Tree a) where
 
 ------------------------------------------------------------------------
@@ -412,6 +424,21 @@ instance Store a => Store (Ratio a) where
     size = combineSize (\(x :% _) -> x) (\(_ :% y) -> y)
     poke (x :% y) = poke (x, y)
     peek = uncurry (:%) <$> peek
+
+instance Store Time.Day where
+    size = contramapSize Time.toModifiedJulianDay (size :: Size Integer)
+    poke = poke . Time.toModifiedJulianDay
+    peek = Time.ModifiedJulianDay <$> peek
+
+instance Store Time.DiffTime where
+    size = contramapSize (realToFrac :: Time.DiffTime -> Pico) (size :: Size Pico)
+    poke = (poke :: Pico -> Poke ()) . realToFrac
+    peek = Time.picosecondsToDiffTime <$> peek
+
+instance Store Time.UTCTime where
+    size = combineSize Time.utctDay Time.utctDayTime
+    poke (Time.UTCTime day time) = poke (day, time)
+    peek = uncurry Time.UTCTime <$> peek
 
 instance Store ()
 instance Store All
