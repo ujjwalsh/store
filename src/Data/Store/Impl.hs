@@ -413,6 +413,10 @@ scaleSize :: Int -> Size a -> Size a
 scaleSize s (ConstSize n) = ConstSize (s * n)
 scaleSize s (VarSize f) = VarSize ((s *) . f)
 
+addSize :: Int -> Size a -> Size a
+addSize x (ConstSize n) = ConstSize (x + n)
+addSize x (VarSize f) = VarSize ((x +) . f)
+
 ------------------------------------------------------------------------
 -- Utilities for implementing 'Store' instances via memcpy
 

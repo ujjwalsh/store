@@ -13,6 +13,9 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Data.Store.Internal
@@ -20,6 +23,7 @@ module Data.Store.Internal
     , module Data.Store.Internal
     ) where
 
+import           Control.DeepSeq (NFData)
 import           Control.Exception (throwIO)
 import           Control.Monad (when)
 import           Control.Monad.IO.Class (liftIO)
@@ -28,6 +32,7 @@ import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short.Internal as SBS
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
+import           Data.Data (Data)
 import           Data.Fixed (Fixed (..), Pico)
 import           Data.Foldable (forM_)
 import           Data.HashMap.Strict (HashMap)
@@ -39,6 +44,7 @@ import           Data.Map (Map)
 import           Data.MonoTraversable
 import           Data.Monoid
 import           Data.Primitive.ByteArray
+import           Data.Proxy (Proxy(..))
 import           Data.Sequence (Seq)
 import           Data.Sequences (IsSequence, Index, replicateM)
 import           Data.Set (Set)
@@ -49,6 +55,7 @@ import qualified Data.Text.Array as TA
 import qualified Data.Text.Foreign as T
 import qualified Data.Text.Internal as T
 import qualified Data.Time as Time
+import           Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable as SV
@@ -59,10 +66,15 @@ import           Data.Void
 import           Data.Word
 import           Foreign.Ptr (plusPtr, minusPtr)
 import           Foreign.Storable (Storable, sizeOf)
+import           GHC.Generics (Generic)
 import qualified GHC.Integer.GMP.Internals as I
 import           GHC.Prim (sizeofByteArray#)
 import           GHC.Real (Ratio(..))
+import           GHC.TypeLits
 import           GHC.Types (Int (I#))
+import           Language.Haskell.TH
+import           Language.Haskell.TH.ReifyMany
+import           Language.Haskell.TH.Syntax
 
 ------------------------------------------------------------------------
 -- Utilities for defining list-like 'Store' instances in terms of 'IsSequence'
@@ -265,7 +277,7 @@ instance Store BS.ByteString where
         pokeForeignPtr sourceFp sourceOffset sourceLength
     peek = do
         len <- peek
-        fp <- peekPlainForeignPtr "Data.Storable.Vector.Vector" len
+        fp <- peekPlainForeignPtr "Data.ByteString.ByteString" len
         return (BS.PS fp 0 len)
 
 instance Store SBS.ShortByteString where
@@ -316,6 +328,50 @@ instance (Store i, Store e) => Store (Array i e) where
             ConstSize n ->  n * length x
             VarSize f -> foldl' (\acc x -> acc + f x) 0
 -}
+
+------------------------------------------------------------------------
+-- Known size instances
+
+-- TODO: this doesn't scale nicely to 'Text'. Force it to be byte size?
+-- 'StaticByteSize'?
+
+newtype StaticSize (n :: Nat) a = StaticSize { unStaticSize :: a }
+    deriving (Eq, Show, Ord, Data, Typeable, Generic)
+
+instance NFData a => NFData (StaticSize n a)
+
+class KnownNat n => IsStaticSize n a where
+    toStaticSize :: a -> Maybe (StaticSize n a)
+
+toStaticSizeEx :: IsStaticSize n a => a -> StaticSize n a
+toStaticSizeEx x =
+    case toStaticSize x of
+        Just r -> r
+        Nothing -> error "Failed to assert a static size via toStaticSizeEx"
+
+instance KnownNat n => IsStaticSize n BS.ByteString where
+    toStaticSize bs
+        | BS.length bs == fromInteger (natVal (Proxy :: Proxy n)) = Just (StaticSize bs)
+        | otherwise = Nothing
+
+instance KnownNat n => Store (StaticSize n BS.ByteString) where
+    size = ConstSize (fromInteger (natVal (Proxy :: Proxy n)))
+    poke (StaticSize x) = do
+        -- TODO: worth it to put an assert here?
+        let (sourceFp, sourceOffset, sourceLength) = BS.toForeignPtr x
+        pokeForeignPtr sourceFp sourceOffset sourceLength
+    peek = do
+        let len = fromInteger (natVal (Proxy :: Proxy n))
+        fp <- peekPlainForeignPtr ("StaticSize " ++ show len ++ " Data.ByteString") len
+        return (StaticSize (BS.PS fp 0 len))
+
+-- NOTE: this could be a 'Lift' instance, but we can't use type holes in
+-- TH. Alternatively we'd need a (TypeRep -> Type) function and Typeable
+-- constraint.
+liftStaticSize :: forall n a. (KnownNat n, Lift a) => TypeQ -> StaticSize n a -> ExpQ
+liftStaticSize tyq (StaticSize x) = do
+    let numTy = litT $ numTyLit $ natVal (Proxy :: Proxy n)
+    [| StaticSize $(lift x) :: StaticSize $(numTy) $(tyq) |]
 
 ------------------------------------------------------------------------
 -- containers instances
@@ -398,7 +454,6 @@ instance Store Integer where
           ByteArray arr <- peekByteArray "GHC>Integer" len
           return $ I.BN# arr
 
---
 -- instance Store GHC.Fingerprint.Types.Fingerprint where
 --
 instance Store (Fixed a) where
@@ -451,11 +506,15 @@ instance Store a => Store (Last a)
 instance Store a => Store (Maybe a)
 instance (Store a, Store b) => Store (Either a b)
 
+------------------------------------------------------------------------
+-- Instances generated by TH
+
 -- TODO: higher arities?  Limited now by Generics instances for tuples
 $(return $ map makeTupleStoreInstance [2..7])
 
-------------------------------------------------------------------------
--- Instances for Storable types
-
 $(deriveManyStoreFromStorable (\_ -> True))
+
 $(deriveManyStorePrimVector)
+
+$(reifyManyWithoutInstances ''Store [''Info, ''Loc] (const True) >>=
+  mapM (\name -> return (InstanceD [] (AppT (ConT ''Store) (ConT name)) [])))
