@@ -75,26 +75,28 @@ deriveManyStorePrimVector = do
             M.mapKeys (map (AppT (ConT ''PV.Vector))) prims
             `M.difference`
             stores
-    forM (M.toList primInsts) $ \([instTy], TypeclassInstance cs ty _) -> do
-        let argTy = head (tail (unAppsT ty))
-        sizeExpr <- [|
-            VarSize $ \x ->
-                I# $(primSizeOfExpr (ConT ''Int)) +
-                I# $(primSizeOfExpr argTy) * PV.length x
-            |]
-        peekExpr <- [| do
-            len <- peek
-            let sz = I# $(primSizeOfExpr argTy)
-            array <- peekByteArray $(lift ("Primitive Vector (" ++ pprint argTy ++ ")"))
-                                   (len * sz)
-            return (PV.Vector 0 len array)
-            |]
-        pokeExpr <- [| \(PV.Vector offset len (ByteArray array)) -> do
-            let sz = I# $(primSizeOfExpr argTy)
-            poke len
-            pokeByteArray array (offset * sz) (len * sz)
-            |]
-        return $ makeStoreInstance cs instTy sizeExpr peekExpr pokeExpr
+    forM (M.toList primInsts) $ \primInst -> case primInst of
+        ([instTy], TypeclassInstance cs ty _) -> do
+            let argTy = head (tail (unAppsT ty))
+            sizeExpr <- [|
+                VarSize $ \x ->
+                    I# $(primSizeOfExpr (ConT ''Int)) +
+                    I# $(primSizeOfExpr argTy) * PV.length x
+                |]
+            peekExpr <- [| do
+                len <- peek
+                let sz = I# $(primSizeOfExpr argTy)
+                array <- peekByteArray $(lift ("Primitive Vector (" ++ pprint argTy ++ ")"))
+                                       (len * sz)
+                return (PV.Vector 0 len array)
+                |]
+            pokeExpr <- [| \(PV.Vector offset len (ByteArray array)) -> do
+                let sz = I# $(primSizeOfExpr argTy)
+                poke len
+                pokeByteArray array (offset * sz) (len * sz)
+                |]
+            return $ makeStoreInstance cs instTy sizeExpr peekExpr pokeExpr
+        _ -> fail "Invariant violated in derivemanyStorePrimVector"
 
 
 primSizeOfExpr :: Type -> ExpQ
