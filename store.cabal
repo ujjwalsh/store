@@ -28,6 +28,7 @@ library
                      , Data.Store.TH
                      , Data.Store.TypeHash
   other-modules:       Data.Store.Impl
+                     , System.IO.ByteBuffer
   build-depends:       base >= 4.7 && < 5
                      , array
                      , bytestring
