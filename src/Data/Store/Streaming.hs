@@ -22,11 +22,16 @@ module Data.Store.Streaming
        , PeekMessage (..)
        , peekMessage
        , decodeMessage
+         -- * Conduits for encoding and decoding
+       , conduitEncode
+       , conduitDecode
        ) where
 
 import           Control.Monad.IO.Class
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
+import qualified Data.Conduit as C
+import qualified Data.Conduit.List as C
 import           Data.Store
 import           Data.Store.Impl (Peek (..), Poke (..), tooManyBytes, getSize)
 import           Data.Word
@@ -122,3 +127,18 @@ decodeSized bb getBs n =
 decodeFromPtr :: (MonadIO m, Store a) => Ptr Word8 -> Int -> m a
 decodeFromPtr ptr n =
     liftIO $ snd <$> runPeek peek (ptr `plusPtr` n) ptr
+
+-- | Conduit for encoding Messages to a ByteString.
+conduitEncode :: (Monad m, Store a) => C.Conduit (Message a) m ByteString
+conduitEncode = C.map encodeMessage
+
+-- | Conduit for decoding Messages from a ByteString.
+conduitDecode :: (MonadIO m, Store a) => Int -> C.Conduit ByteString m (Message a)
+conduitDecode bufSize = do
+    buffer <- new bufSize
+    let go = do
+            mmessage <- decodeMessage buffer C.await
+            case mmessage of
+                Nothing -> return ()
+                Just message -> C.yield message >> go
+    go
