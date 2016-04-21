@@ -3,7 +3,7 @@ version:             0.1.0.0
 synopsis:            Fast serialization
 description:         Please see README.md
 homepage:            http://github.com/fpco/store#readme
-license:             AllRightsReserved
+license:             MIT
 license-file:        LICENSE
 author:              FP Complete <dev@fpcomplete.com>
 maintainer:          FP Complete <dev@fpcomplete.com>
