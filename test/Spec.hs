@@ -5,15 +5,16 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short as SBS
 import           Data.Complex (Complex(..))
 import           Data.Containers (mapFromList, setFromList)
-import           Data.Hashable (Hashable)
 import           Data.HashMap.Strict (HashMap)
 import           Data.HashSet (HashSet)
+import           Data.Hashable (Hashable)
 import           Data.Int
 import           Data.IntMap (IntMap)
 import           Data.IntSet (IntSet)
@@ -28,9 +29,9 @@ import           Data.Store.TH
 import           Data.Text (Text)
 import qualified Data.Time as Time
 import qualified Data.Vector as V
+import qualified Data.Vector.Primitive as PV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
-import qualified Data.Vector.Primitive as PV
 import           Data.Void (Void)
 import           Data.Word
 import           Foreign.C.Types
@@ -39,6 +40,7 @@ import           GHC.Fingerprint.Type (Fingerprint(..))
 import           GHC.Generics
 import           GHC.Real (Ratio(..))
 import           Language.Haskell.TH
+import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
 import           Spec.TH
 import           System.Posix.Types
@@ -89,7 +91,10 @@ $(do tys <- getAllInstanceTypes1 ''PV.Prim
 
 -- Serial instances for (Generic a) types.
 
-$(do let ns = [ ''Any, ''All ]
+-- FIXME: generating for TH instances is probably just adding
+-- unnecessary compiletime + runtime overhead.
+$(do thNames <- reifyManyWithoutInstances ''Serial [''Info, ''Loc] (\_ -> True)
+     let ns = [ ''Any, ''All ] ++ thNames
          f n = [d| instance Monad m => Serial m $(conT n) |]
      concat <$> mapM f ns)
 
@@ -158,6 +163,9 @@ instance Monad m => Serial m Time.UTCTime where
 instance (Monad m) => Serial m Void where
     series = generate (\_ -> [])
 
+deriving instance Show NameFlavour
+deriving instance Show NameSpace
+
 ------------------------------------------------------------------------
 -- Test datatypes for generics support
 
@@ -181,14 +189,14 @@ main = hspec $ do
         $(do insts <- getAllInstanceTypes1 ''Store
              addrTy <- [t| PV.Vector Addr |]
              let f ty = isMonoType ty && ty /= addrTy
-             smallcheckManyStore verbose 3 . map return . filter f $ insts)
+             smallcheckManyStore verbose 2 . map return . filter f $ insts)
     describe "Store on all custom generic instances"
-        $(smallcheckManyStore verbose 3
+        $(smallcheckManyStore verbose 2
             [ [t| Test |]
             , [t| X |]
             ])
     describe "Manually listed polymorphic store instances"
-        $(smallcheckManyStore verbose 3
+        $(smallcheckManyStore verbose 2
             [ [t| SV.Vector Int8 |]
             , [t| V.Vector  Int8 |]
             , [t| Ratio     Int8 |]
