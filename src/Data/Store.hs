@@ -6,8 +6,6 @@ module Data.Store
     , Store(..), Size(..), Poke, Peek
     -- ** Exceptions thrown by Peek
     , PeekException(..), peekException
-    -- ** Statically sized data
-    , StaticSize, IsStaticSize(..)
     ) where
 
 import Data.Store.Internal
