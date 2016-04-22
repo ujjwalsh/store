@@ -39,3 +39,6 @@
   Fixed via custom instance, but a patch to base should maybe be made.
 
 * Make `encode` on Storable Vector and similar do 0 copy
+
+* Consider having lazy decoding utilities as mentioned in
+  https://github.com/fpco/store/issues/6
