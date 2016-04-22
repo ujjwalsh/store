@@ -27,6 +27,7 @@ library
                      , Data.Store.Internal
                      , Data.Store.TH
                      , Data.Store.TypeHash
+                     , Data.Store.TypeHash.Internal
   other-modules:       Data.Store.Impl
   build-depends:       base >= 4.7 && < 5
                      , array
@@ -62,6 +63,7 @@ test-suite store-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
+  other-modules:       Spec.TH
   build-depends:       base
                      , store
                      , hspec

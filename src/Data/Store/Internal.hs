@@ -200,7 +200,7 @@ peekMutableSequence
     -> (r -> Int -> a -> IO ())
     -> Peek r
 peekMutableSequence new write = do
-    n <- peekStorable
+    n <- peek
     mut <- liftIO (new n)
     forM_ [0..n-1] $ \i -> peek >>= liftIO . write mut i
     return mut
