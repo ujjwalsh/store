@@ -10,6 +10,7 @@ import qualified Data.ByteString as BS
 import           Data.Int
 import           Data.Store
 import           Data.Typeable
+import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
 import           Data.Word
 import           GHC.Generics
@@ -28,8 +29,9 @@ main = do
             [ benchEncode (0 :: Int)
 #if !COMPARISON_BENCH
             , benchEncode' "1kb storable" (SV.fromList ([1..256] :: [Int32]))
-            , benchEncode' "1mb storable" (SV.fromList ([1..(256 * 1024)] :: [Int32]))
-            , benchEncode' "10mb storable" (SV.fromList ([1..(256 * 1024 * 10)] :: [Int32]))
+            , benchEncode' "10kb storable" (SV.fromList ([1..(256 * 10)] :: [Int32]))
+            , benchEncode' "1kb normal" (V.fromList ([1..256] :: [Int32]))
+            , benchEncode' "10kb normal" (V.fromList ([1..(256 * 10 * 1024)] :: [Int32]))
 #endif
             , benchEncode (SmallProduct 0 1 2 3)
             , benchEncode (SmallProductManual 0 1 2 3)
@@ -40,8 +42,9 @@ main = do
             [ benchDecode (0 :: Int)
 #if !COMPARISON_BENCH
             , benchDecode' "1kb storable" (SV.fromList ([1..256] :: [Int32]))
-            , benchDecode' "1mb storable" (SV.fromList ([1..(256 * 1024)] :: [Int32]))
-            , benchDecode' "10mb storable" (SV.fromList ([1..(256 * 1024 * 10)] :: [Int32]))
+            , benchDecode' "10kb storable" (SV.fromList ([1..(256 * 10)] :: [Int32]))
+            , benchDecode' "1kb normal" (V.fromList ([1..256] :: [Int32]))
+            , benchDecode' "10kb normal" (V.fromList ([1..(256 * 10 * 1024)] :: [Int32]))
 #endif
             , benchDecode (SmallProduct 0 1 2 3)
             , benchDecode (SmallProductManual 0 1 2 3)
@@ -79,10 +82,12 @@ benchEncode' msg x0 =
 benchDecode :: Ctx a => a -> Benchmark
 benchDecode = benchEncode' ""
 
+-- TODO: comparison bench for decode
+
 benchDecode' :: forall a. Ctx a => String -> a -> Benchmark
 benchDecode' prefix x0 =
     env (return (encode x0)) $ \x ->
-        bench (prefix ++ "(" ++ show (typeOf x0) ++ ")") (nf (decodeEx :: BS.ByteString -> a) x)
+        bench (prefix ++ " (" ++ show (typeOf x0) ++ ")") (nf (decodeEx :: BS.ByteString -> a) x)
 
 ------------------------------------------------------------------------
 -- Serialized datatypes
