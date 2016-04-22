@@ -1,12 +1,14 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 
+import           Control.Monad (unless)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short as SBS
@@ -25,6 +27,7 @@ import           Data.Sequence (Seq)
 import           Data.Sequences (fromList)
 import           Data.Set (Set)
 import           Data.Store
+import           Data.Store.Internal
 import           Data.Store.TH
 import           Data.Text (Text)
 import qualified Data.Time as Time
@@ -239,6 +242,11 @@ main = hspec $ do
             , [t| HashSet Int8 |]
             , [t| HashSet Int64 |]
             ])
+    it "StaticSize roundtrips" $ do
+        let x :: StaticSize 17 BS.ByteString
+            x = toStaticSizeEx (BS.replicate 17 255)
+        unless (checkRoundtrip False x) $
+            (fail "Failed to roundtrip StaticSize ByteString" :: IO ())
     it "Size of generic instance for single fieldless constructor is 0" $ do
         case size :: Size X of
             ConstSize 0 -> (return () :: IO ())

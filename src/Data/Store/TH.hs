@@ -10,6 +10,7 @@ module Data.Store.TH
     , deriveManyStorePrimVector
     -- * TH functions for testing Store instances with hspec + smallcheck
     , smallcheckManyStore
+    , checkRoundtrip
     -- * Misc utilties used in Store test
     , getAllInstanceTypes1
     , isMonoType
@@ -215,11 +216,14 @@ smallcheckManyStore verbose depth = smallcheckMany . map testRoundtrip
   where
     testRoundtrip tyq = do
         ty <- tyq
-        expr <- [e| property $ changeDepth (\_ -> depth) $ \x ->
-            let encoded = verboseTrace verbose "encoded" (encode x)
-                decoded = verboseTrace verbose "decoded" (decode encoded)
-             in decoded == Right (x :: $(return ty)) |]
+        expr <- [e| property $ changeDepth (\_ -> depth) $ \x -> checkRoundtrip verbose (x :: $(return ty)) |]
         return ("Roundtrips (" ++ pprint ty ++ ")", expr)
+
+checkRoundtrip :: (Eq a, Show a, Store a) => Bool -> a -> Bool
+checkRoundtrip verbose x = decoded == Right x
+  where
+    encoded = verboseTrace verbose "encoded" (encode x)
+    decoded = verboseTrace verbose "decoded" (decode encoded)
 
 verboseTrace :: Show a => Bool -> String -> a -> a
 verboseTrace True msg x = trace (show (msg, x)) x
