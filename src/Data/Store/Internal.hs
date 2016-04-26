@@ -75,6 +75,7 @@ import           GHC.Types (Int (I#))
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
+import           TH.ReifyDataType
 
 ------------------------------------------------------------------------
 -- Utilities for defining list-like 'Store' instances in terms of 'IsSequence'
@@ -146,7 +147,7 @@ sizeMap
 sizeMap = VarSize $ \t ->
     case (size :: Size (ContainerKey t), size :: Size (MapValue t)) of
         (ConstSize nk, ConstSize na) -> (nk + na) * olength t + sizeOf (undefined :: Int)
-        (szk, sza) -> ofoldl' (\acc (k, a) -> acc + getSize szk k + getSize sza a)
+        (szk, sza) -> ofoldl' (\acc (k, a) -> acc + getSizeWith szk k + getSizeWith sza a)
                               (sizeOf (undefined :: Int))
                               (mapToList t)
 {-# INLINE sizeMap #-}
@@ -272,8 +273,8 @@ instance Store BS.ByteString where
         sizeOf (undefined :: Int) +
         BS.length x
     poke x = do
-        poke (BS.length x)
         let (sourceFp, sourceOffset, sourceLength) = BS.toForeignPtr x
+        poke sourceLength
         pokeForeignPtr sourceFp sourceOffset sourceLength
     peek = do
         len <- peek
@@ -421,9 +422,7 @@ instance (Eq a, Hashable a, Store a) => Store (HashSet a) where
 -- instance (Ix i, Bounded i, Store a) => Store (Array ix a) where
 --
 -- instance (Ix i, Bounded i, Store a) => Store (UA.UArray ix a) where
---
--- instance Store Natural where
---
+
 instance Store Integer where
     size = VarSize $ \ x ->
         sizeOf (undefined :: Word8) + case x of
@@ -455,7 +454,7 @@ instance Store Integer where
           return $ I.BN# arr
 
 -- instance Store GHC.Fingerprint.Types.Fingerprint where
---
+
 instance Store (Fixed a) where
     size = contramapSize (\(MkFixed x) -> x) (size :: Size Integer)
     poke (MkFixed x) = poke x
@@ -516,5 +515,6 @@ $(deriveManyStoreFromStorable (\_ -> True))
 
 $(deriveManyStorePrimVector)
 
-$(reifyManyWithoutInstances ''Store [''Info, ''Loc] (const True) >>=
-  mapM (\name -> return (InstanceD [] (AppT (ConT ''Store) (ConT name)) [])))
+$(reifyManyWithoutInstances ''Store [''Exp] (const True) >>=
+--   mapM (\name -> deriveStore [] (ConT name) .dtCons =<< reifyDataType name))
+   mapM (\name -> return (InstanceD [] (AppT (ConT ''Store) (ConT name)) [])))

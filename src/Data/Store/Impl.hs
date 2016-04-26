@@ -64,7 +64,7 @@ class Store a where
 
 encode :: Store a => a -> BS.ByteString
 encode x = BS.unsafeCreate
-    (getSize size x)
+    (getSize x)
     (\p -> runPoke (poke x) p 0 (\_ _ -> return ()))
 
 decode :: Store a => BS.ByteString -> Either PeekException a
@@ -201,7 +201,7 @@ instance (GStoreSum n a, GStoreSum (n + SumArity a) b, KnownNat n)
     {-# INLINE gpeekSum #-}
 
 instance (GStore a, KnownNat n) => GStoreSum n (C1 c a) where
-    gsizeSum x _ = getSize gsize x
+    gsizeSum x _ = getSizeWith gsize x
     {-# INLINE gsizeSum #-}
     gpokeSum x _ = do
         pokeStorable (fromInteger (natVal (Proxy :: Proxy n)) :: Word8)
@@ -405,9 +405,12 @@ combineSize' toA toB sizeA sizeB =
         (ConstSize n, VarSize g) -> VarSize (\x -> n + g (toB x))
         (ConstSize n, ConstSize m) -> ConstSize (n + m)
 
-getSize :: Size a -> a -> Int
-getSize (VarSize f) x = f x
-getSize (ConstSize n) _ = n
+getSize :: Store a => a -> Int
+getSize = getSizeWith size
+
+getSizeWith :: Size a -> a -> Int
+getSizeWith (VarSize f) x = f x
+getSizeWith (ConstSize n) _ = n
 
 scaleSize :: Int -> Size a -> Size a
 scaleSize s (ConstSize n) = ConstSize (s * n)

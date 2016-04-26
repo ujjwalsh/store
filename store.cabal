@@ -51,6 +51,7 @@ library
                      , text
                      , th-lift
                      , th-lift-instances
+                     , th-utilities
                      , th-reify-many
                      , time
                      , transformers

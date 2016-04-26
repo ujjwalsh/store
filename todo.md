@@ -42,3 +42,7 @@
 
 * Consider having lazy decoding utilities as mentioned in
   https://github.com/fpco/store/issues/6
+
+* Test with slices of bytestring / text / vector
+
+* Benchmark Word vs Int for tags

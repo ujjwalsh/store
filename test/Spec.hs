@@ -47,6 +47,7 @@ import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
 import           Spec.TH
 import           System.Posix.Types
+import           TH.ReifyDataType
 import           Test.Hspec hiding (runIO)
 import           Test.SmallCheck.Series
 
@@ -178,7 +179,8 @@ data Test
     | TestC
     | TestD BS.ByteString
     deriving (Eq, Show, Generic)
-instance Store Test
+$(return . (:[]) =<< deriveStore [] (ConT ''Test) . dtCons =<< reifyDataType ''Test)
+-- instance Store Test
 instance Monad m => Serial m Test
 
 data X = X
