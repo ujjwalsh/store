@@ -29,6 +29,7 @@ import           Data.Set (Set)
 import           Data.Store
 import           Data.Store.Internal
 import           Data.Store.TH
+import qualified Data.Store.StreamingSpec as S
 import           Data.Text (Text)
 import qualified Data.Time as Time
 import qualified Data.Vector as V
@@ -260,3 +261,4 @@ main = hspec $ do
               $(do insts <- getAllInstanceTypes1 ''Store
                    lift $ map pprint $ filter (not . isMonoType) insts)
     BB.spec
+    S.spec

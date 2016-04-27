@@ -72,6 +72,7 @@ test-suite store-test
                      , store
                      , hspec
                      , smallcheck
+                     , hspec-smallcheck
                      , vector
                      , bytestring
                      , containers
@@ -83,6 +84,7 @@ test-suite store-test
                      , hashable
                      , time
                      , th-reify-many
+                     , conduit
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -fwarn-identities -O2
   if flag(verbose-test)
       cpp-options:     -DVERBOSE_TEST

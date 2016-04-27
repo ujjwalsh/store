@@ -41,7 +41,7 @@ import           System.IO.ByteBuffer
 
 -- | If @a@ is an instance of 'Store', @Message a@ can be serialised
 -- and deserialised in a streaming fashion.
-newtype Message a = Message { fromMessage :: a } deriving Show
+newtype Message a = Message { fromMessage :: a } deriving (Eq, Show)
 
 -- | Type used to store the length of a 'Message'.
 type SizeTag = Int
