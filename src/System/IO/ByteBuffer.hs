@@ -40,6 +40,9 @@ import qualified Foreign.Marshal.Alloc as Alloc
 import           Foreign.Marshal.Utils hiding (new)
 import           GHC.Ptr
 
+{-@ assume Alloc.mallocBytes ::           v:Nat -> IO ( {p:Ptr a | plen p == v} ) @-}
+{-@ assume Alloc.reallocBytes :: Ptr a -> v:Nat -> IO ( {p:Ptr a | plen p == v} ) @-}
+
 -- | A buffer into which bytes can be written.
 --
 -- Invariants:
@@ -56,6 +59,14 @@ import           GHC.Ptr
 --   the range from @ptr `plusPtr` consumedBytes@ to @ptr `plusPtr`
 --   containedBytes@.
 
+{-@ data BBRef = BBRef {
+      size      :: Nat
+    , contained :: { n:Nat | n <= size }
+    , consumed  :: { m:Nat | m <= contained }
+    , ptr       :: { p:Ptr Word8 | plen p == size }
+    }
+@-}
+
 data BBRef = BBRef {
       size      :: {-# UNPACK #-} !Int
       -- ^ The amount of memory allocated.
@@ -67,6 +78,9 @@ data BBRef = BBRef {
       -- ^ This points to the beginning of the memory allocated for
       -- the 'ByteBuffer'
     }
+
+{-@ assume consumed  :: b:BBRef -> {v:Nat | v <= contained b && v <= size b && v <= plen (ptr b)} @-}
+{-@ assume contained :: b:BBRef -> {v:Nat | v >= consumed b && v <= size b && v <= plen (ptr b)} @-}
 
 type ByteBuffer = IORef BBRef
 
@@ -89,6 +103,7 @@ freeCapacity bb = do
 
 -- | Allocates a new ByteBuffer with a given buffer size filling from
 -- the given FillBuffer.
+{-@ new :: forall m . MonadIO m => Nat -> m (ByteBuffer) @-}
 new :: MonadIO m
     => Int -- ^ Size of buffer to allocate.
     -> m ByteBuffer -- ^ The byte buffer.
@@ -119,6 +134,7 @@ reset bb = do
 --
 -- In order to avoid havong to enlarge the buffer too often, we double
 -- its size until it is at least @minSize@ bytes long.
+{-@ enlargeByteBuffer :: ByteBuffer -> Nat -> IO () @-}
 enlargeByteBuffer :: ByteBuffer
                  -> Int
                  -- ^ minSize
