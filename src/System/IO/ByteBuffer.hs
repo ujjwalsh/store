@@ -55,17 +55,20 @@ import           GHC.Ptr
 --   data that have been copied to it, but not yet read.  They are in
 --   the range from @ptr `plusPtr` consumedBytes@ to @ptr `plusPtr`
 --   containedBytes@.
-data ByteBuffer = ByteBuffer
-    { ptr :: {-# UNPACK #-} !(IORef (Ptr Word8))
-      -- ^ This points to the beginning of the memory allocated for
-      -- the 'ByteBuffer'.
-    , size :: {-# UNPACK #-} !(IORef Int)
+
+data BBRef = BBRef {
+      size      :: {-# UNPACK #-} !Int
       -- ^ The amount of memory allocated.
-    , containedBytes :: {-# UNPACK #-} !(IORef Int)
+    , contained :: {-# UNPACK #-} !Int
       -- ^ The number of bytes that the 'ByteBuffer' currently holds.
-    , consumedBytes :: {-# UNPACK #-} !(IORef Int)
+    , consumed  :: {-# UNPACK #-} !Int
       -- ^ The number of bytes that have already been consumed.
-    } -- deriving Show
+    , ptr       :: {-# UNPACK #-} !(Ptr Word8)
+      -- ^ This points to the beginning of the memory allocated for
+      -- the 'ByteBuffer'
+    }
+
+type ByteBuffer = IORef BBRef
 
 isEmpty :: MonadIO m => ByteBuffer -> m Bool
 isEmpty bb = liftIO $ (==0) <$> availableBytes bb
@@ -73,49 +76,44 @@ isEmpty bb = liftIO $ (==0) <$> availableBytes bb
 -- | Number of available bytes in a 'ByteBuffer' (that is, bytes that
 -- have been copied to, but not yet read from the 'ByteBuffer'.
 availableBytes :: MonadIO m => ByteBuffer -> m Int
-availableBytes ByteBuffer{..} =
-    liftIO $ (-) <$> readIORef containedBytes
-                 <*> readIORef consumedBytes
+availableBytes bb = do
+    BBRef{..} <- liftIO $ readIORef bb
+    return $ contained - consumed
 
 -- | The number of bytes that can be appended to the buffer, without
 -- resetting it.
-freeCapacity :: ByteBuffer -> IO Int
-freeCapacity ByteBuffer{..} =
-    (-) <$> readIORef size
-        <*> readIORef containedBytes
+freeCapacity :: MonadIO m => ByteBuffer -> m Int
+freeCapacity bb = do
+    BBRef{..} <- liftIO $ readIORef bb
+    return $ size - contained
 
--- -- | Allocates a new ByteBuffer with a given buffer size filling from
--- -- the given FillBuffer.
+-- | Allocates a new ByteBuffer with a given buffer size filling from
+-- the given FillBuffer.
 new :: MonadIO m
     => Int -- ^ Size of buffer to allocate.
     -> m ByteBuffer -- ^ The byte buffer.
-new size = liftIO $ do
-    newPtr <- Alloc.mallocBytes size >>= newIORef
-    newSize <- newIORef size
-    contained <- newIORef 0
-    consumed <- newIORef 0
-    let !byteBuffer = ByteBuffer { ptr = newPtr
-                                 , size = newSize
-                                 , containedBytes = contained
-                                 , consumedBytes = consumed
-                                 }
-    return byteBuffer
+new l = liftIO $ do
+    newPtr <- Alloc.mallocBytes l
+    newIORef BBRef { ptr = newPtr
+                   , size = l
+                   , contained = 0
+                   , consumed = 0
+                   }
 
 -- | Free a byte buffer.
 free :: ByteBuffer -> IO ()
-free ByteBuffer{..} = readIORef ptr >>= Alloc.free
+free bb = readIORef bb >>= Alloc.free . ptr
 
 -- | Reset a 'ByteBuffer', i.e. copy all the bytes that have not yet
 -- been consumed to the front of the buffer.
 reset :: ByteBuffer -> IO ()
-reset ByteBuffer{..} = do
-    contained <- readIORef containedBytes
-    consumed <- readIORef consumedBytes
-    curPtr <- readIORef ptr
+reset bb = do
+    bbref@BBRef{..} <- readIORef bb
     let available = contained - consumed
-    moveBytes curPtr (curPtr `plusPtr` consumed) available
-    writeIORef containedBytes available
-    writeIORef consumedBytes 0
+    moveBytes ptr (ptr `plusPtr` consumed) available
+    writeIORef bb bbref { contained = available
+                        , consumed = 0
+                        }
 
 -- | Make sure the buffer is at least @minSize@ bytes long.
 --
@@ -125,29 +123,30 @@ enlargeByteBuffer :: ByteBuffer
                  -> Int
                  -- ^ minSize
                  -> IO ()
-enlargeByteBuffer ByteBuffer{..} minSize = do
-    curSize <- readIORef size
-    curPtr <- readIORef ptr
-    when (curSize < minSize) $ do
+enlargeByteBuffer bb minSize = do
+    bbref@BBRef{..} <- readIORef bb
+    when (size < minSize) $ do
         let newSize = head . dropWhile (<minSize) $
-                      iterate (ceiling . (*(1.5 :: Double)) . fromIntegral) curSize
+                      iterate (ceiling . (*(1.5 :: Double)) . fromIntegral) size
         -- possible optimisation: since reallocation might copy the
         -- bytes anyway, we could discard the consumed bytes,
         -- basically 'reset'ting the buffer on the fly.
-        ptr' <- Alloc.reallocBytes curPtr newSize
-        writeIORef ptr ptr'
-        writeIORef size newSize
+        -- ptr' <- Alloc.mallocBytes newSize
+        ptr' <- Alloc.reallocBytes ptr newSize
+        writeIORef bb bbref { ptr = ptr'
+                            , size = newSize
+                            }
 
 -- | Copy the contents of a 'ByteString' to a 'ByteBuffer'.
 --
 -- If necessary, the 'ByteBuffer' is enlarged and/or already consumed
 -- bytes are dropped.
 copyByteString :: MonadIO m => ByteBuffer -> ByteString -> m ()
-copyByteString bb@(ByteBuffer{..}) bs@(BS.PS _ _ bsSize) = liftIO $ do
+copyByteString bb bs@(BS.PS _ _ bsSize) = liftIO $ do
+    BBRef{..} <- readIORef bb
     -- if the byteBuffer is too small, resize it.
-    curSize <- readIORef size      -- total capacity
     available <- availableBytes bb -- bytes not yet consumed
-    when (curSize < bsSize + available) (enlargeByteBuffer bb (bsSize + available))
+    when (size < bsSize + available) (enlargeByteBuffer bb (bsSize + available))
     -- if it is currently too full, reset it
     capacity <- freeCapacity bb
     when (capacity < bsSize) (reset bb)
@@ -157,14 +156,13 @@ copyByteString bb@(ByteBuffer{..}) bs@(BS.PS _ _ bsSize) = liftIO $ do
 -- | Copy the contents of a 'ByteString' to a 'ByteBuffer'. No bounds
 -- checks are performed.
 unsafeCopyByteString :: ByteBuffer -> ByteString -> IO ()
-unsafeCopyByteString (ByteBuffer{..}) (BS.PS bsFptr bsOffset bsSize) = do
-    curPtr <- readIORef ptr
-    contained <- readIORef containedBytes
+unsafeCopyByteString bb (BS.PS bsFptr bsOffset bsSize) = do
+    bbref@BBRef{..} <- readIORef bb
     withForeignPtr bsFptr $ \ bsPtr ->
-        copyBytes (curPtr `plusPtr` contained)
+        copyBytes (ptr `plusPtr` contained)
                   (bsPtr `plusPtr` bsOffset)
                   bsSize
-    writeIORef containedBytes (contained + bsSize)
+    writeIORef bb bbref { contained = (contained + bsSize) }
 
 -- | Try to get a pointer to @n@ bytes from the 'ByteBuffer'.
 --
@@ -180,15 +178,14 @@ unsafeConsume :: MonadIO m
         -> m (Either Int (Ptr Word8))
         -- ^ Will be @Left missing@ when there are only @n-missing@
         -- bytes left in the 'ByteBuffer'.
-unsafeConsume bb@(ByteBuffer{..}) n = liftIO $ do
+unsafeConsume bb n = liftIO $ do
     available <- availableBytes bb
     if available < n
         then return $ Left (n - available)
         else do
-             curPtr <- readIORef ptr
-             consumed <- readIORef consumedBytes
-             writeIORef consumedBytes (consumed + n)
-             return $ Right (curPtr `plusPtr` consumed)
+             bbref@BBRef{..} <- readIORef bb
+             writeIORef bb bbref { consumed = (consumed + n) }
+             return $ Right (ptr `plusPtr` consumed)
 
 -- | As `unsafeConsume`, but instead of returning a `Ptr` into the
 -- contents of the `ByteBuffer`, it returns a `ByteString` containing
