@@ -127,7 +127,7 @@ enlargeByteBuffer bb minSize = do
     bbref@BBRef{..} <- readIORef bb
     when (size < minSize) $ do
         let newSize = head . dropWhile (<minSize) $
-                      iterate (ceiling . (*(1.5 :: Double)) . fromIntegral) size
+                      iterate (ceiling . (*(1.5 :: Double)) . fromIntegral) (max 1 (size))
         -- possible optimisation: since reallocation might copy the
         -- bytes anyway, we could discard the consumed bytes,
         -- basically 'reset'ting the buffer on the fly.
