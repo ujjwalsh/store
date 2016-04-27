@@ -46,6 +46,7 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
 import           Spec.TH
+import qualified System.IO.ByteBufferSpec as BB
 import           System.Posix.Types
 import           Test.Hspec hiding (runIO)
 import           Test.SmallCheck.Series
@@ -258,3 +259,4 @@ main = hspec $ do
         mapM_ putStrLn
               $(do insts <- getAllInstanceTypes1 ''Store
                    lift $ map pprint $ filter (not . isMonoType) insts)
+    BB.spec

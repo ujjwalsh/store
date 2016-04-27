@@ -22,7 +22,7 @@ module System.IO.ByteBuffer
          -- * Allocation and Deallocation
        , new, free
          -- * Query for number of available bytes
-       , isEmpty, availableBytes
+       , totalSize, isEmpty, availableBytes
          -- * Feeding new input
        , copyByteString
          -- * Consuming bytes from the buffer
@@ -69,6 +69,9 @@ data BBRef = BBRef {
     }
 
 type ByteBuffer = IORef BBRef
+
+totalSize :: MonadIO m => ByteBuffer -> m Int
+totalSize bb = liftIO $ size <$> readIORef bb
 
 isEmpty :: MonadIO m => ByteBuffer -> m Bool
 isEmpty bb = liftIO $ (==0) <$> availableBytes bb
