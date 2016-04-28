@@ -66,7 +66,7 @@ conduitIncomplete =
 -- second part and checks if the decoded result is the original
 -- message.
 askMore :: Int -> Integer -> Property IO
-askMore n x = monadic $ BB.withByteBuffer 10 $ \ bb -> do
+askMore n x = monadic $ BB.with 10 $ \ bb -> do
   let bs = encodeMessage (Message x)
       (start, end) = BS.splitAt n $ bs
   BB.copyByteString bb start
@@ -79,7 +79,7 @@ askMore n x = monadic $ BB.withByteBuffer 10 $ \ bb -> do
     _ -> return False
 
 peek :: Integer -> Property IO
-peek x = monadic $ BB.withByteBuffer 10 $ \ bb -> do
+peek x = monadic $ BB.with 10 $ \ bb -> do
   let bs = encodeMessage (Message x)
   BB.copyByteString bb bs
   peekResult <- peekMessage bb :: IO (PeekMessage IO Integer)
@@ -88,7 +88,7 @@ peek x = monadic $ BB.withByteBuffer 10 $ \ bb -> do
     Done (Message x') -> return $ x' == x
 
 decodeIncomplete :: IO ()
-decodeIncomplete = BB.withByteBuffer 0 $ \ bb -> do
+decodeIncomplete = BB.with 0 $ \ bb -> do
   BB.copyByteString bb (BS.take 1 incompleteInput)
   (decodeMessage bb (return Nothing) :: IO (Maybe (Message Integer)))
     `shouldThrow` peekException

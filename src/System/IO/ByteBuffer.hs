@@ -21,8 +21,7 @@ is being fed a 'ByteString' that is too large.
 module System.IO.ByteBuffer
        ( ByteBuffer
          -- * Allocation and Deallocation
-       , new, free
-       , withByteBuffer
+       , new, free, with
          -- * Query for number of available bytes
        , totalSize, isEmpty, availableBytes
          -- * Feeding new input
@@ -41,7 +40,7 @@ import           Data.IORef
 import           Data.Word
 import           Foreign.ForeignPtr
 import qualified Foreign.Marshal.Alloc as Alloc
-import           Foreign.Marshal.Utils hiding (new)
+import           Foreign.Marshal.Utils hiding (new, with)
 import           GHC.Ptr
 
 -- | A buffer into which bytes can be written.
@@ -99,7 +98,7 @@ freeCapacity bb = do
 --
 -- Note that 'ByteBuffer's created with 'new' have to be deallocated
 -- explicitly using 'free'.  For automatic deallocation, consider
--- using 'withByteBuffer' instead.
+-- using 'with' instead.
 new :: MonadIO m
     => Int -- ^ Size of buffer to allocate.
     -> m ByteBuffer -- ^ The byte buffer.
@@ -117,12 +116,12 @@ free bb = liftIO $ readIORef bb >>= Alloc.free . ptr
 
 -- | Perform some action with a bytebuffer, with automatic allocation
 -- and deallocation.
-withByteBuffer :: (MonadIO m, MonadBaseControl IO m)
-               => Int
-               -- ^ Initial length of the 'ByteBuffer'
-               -> (ByteBuffer -> m a)
-               -> m a
-withByteBuffer l action =
+with :: (MonadIO m, MonadBaseControl IO m)
+     => Int
+     -- ^ Initial length of the 'ByteBuffer'
+     -> (ByteBuffer -> m a)
+     -> m a
+with l action =
   bracket
     (new l)
     free

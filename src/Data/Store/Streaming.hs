@@ -39,7 +39,8 @@ import           Data.Store.Impl (Peek (..), Poke (..), tooManyBytes, getSize)
 import           Data.Word
 import           Foreign.Ptr
 import qualified Foreign.Storable as Storable
-import           System.IO.ByteBuffer
+import           System.IO.ByteBuffer (ByteBuffer)
+import qualified System.IO.ByteBuffer as BB
 
 -- | If @a@ is an instance of 'Store', @Message a@ can be serialised
 -- and deserialised in a streaming fashion.
@@ -67,9 +68,10 @@ data PeekMessage m a = Done (Message a)
 -- | Decode a 'Message' of known size from a 'ByteBuffer'.
 peekSized :: (MonadIO m, Store a) => ByteBuffer -> Int -> m (PeekMessage m a)
 peekSized bb n =
-    unsafeConsume bb n >>= \case
+    BB.unsafeConsume bb n >>= \case
         Right ptr -> Done . Message <$> decodeFromPtr ptr n
-        Left _ -> return $ NeedMoreInput (\ bs -> copyByteString bb bs >> peekSized bb n)
+        Left _ -> return $ NeedMoreInput (\ bs -> BB.copyByteString bb bs
+                                                  >> peekSized bb n)
 
 -- | Decode a 'SizeTag' from a 'ByteBuffer'.
 peekSizeTag :: MonadIO m => ByteBuffer -> m (PeekMessage m SizeTag)
@@ -82,7 +84,8 @@ peekMessage bb =
    peekSizeTag bb >>= \case
         (Done (Message n)) -> peekSized bb n
         NeedMoreInput _ ->
-            return $ NeedMoreInput (\ bs -> copyByteString bb bs >> peekMessage bb)
+            return $ NeedMoreInput (\ bs -> BB.copyByteString bb bs
+                                            >> peekMessage bb)
 
 -- | Decode a 'Message' from a 'ByteBuffer' and an action that can get
 -- additional 'ByteString's to refill the buffer when necessary.
@@ -106,8 +109,8 @@ decodeSizeTag bb getBs =
     peekSizeTag bb >>= \case
         (Done (Message n)) -> return (Just n)
         (NeedMoreInput _) -> getBs >>= \case
-            Just bs -> copyByteString bb bs >> decodeSizeTag bb getBs
-            Nothing -> availableBytes bb >>= \case
+            Just bs -> BB.copyByteString bb bs >> decodeSizeTag bb getBs
+            Nothing -> BB.availableBytes bb >>= \case
                 0 -> return Nothing
                 n -> liftIO $ tooManyBytes tagLength n "Data.Store.Message.SizeTag"
 
@@ -120,8 +123,8 @@ decodeSized bb getBs n =
     peekSized bb n >>= \case
         Done message -> return (Just message)
         NeedMoreInput _ -> getBs >>= \case
-            Just bs -> copyByteString bb bs >> decodeSized bb getBs n
-            Nothing -> availableBytes bb >>= \ available ->
+            Just bs -> BB.copyByteString bb bs >> decodeSized bb getBs n
+            Nothing -> BB.availableBytes bb >>= \ available ->
                 liftIO $ tooManyBytes n available "Data.Store.Message.Message"
 
 -- | Decode a value, given a 'Ptr' and the number of bytes that make
@@ -139,8 +142,8 @@ conduitDecode :: (MonadIO m, MonadResource m, Store a)
               => Int -> C.Conduit ByteString m (Message a)
 conduitDecode bufSize =
     C.bracketP
-      (new bufSize)
-      free
+      (BB.new bufSize)
+      BB.free
       go
   where
     go buffer = do
