@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-|
 Module: Data.Store.Streaming
 Description: A thin streaming layer that uses 'Store' for serialisation.
@@ -28,6 +29,7 @@ module Data.Store.Streaming
        ) where
 
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Resource (MonadResource)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import qualified Data.Conduit as C
@@ -133,12 +135,16 @@ conduitEncode :: (Monad m, Store a) => C.Conduit (Message a) m ByteString
 conduitEncode = C.map encodeMessage
 
 -- | Conduit for decoding Messages from a ByteString.
-conduitDecode :: (MonadIO m, Store a) => Int -> C.Conduit ByteString m (Message a)
-conduitDecode bufSize = do
-    buffer <- new bufSize
-    let go = do
-            mmessage <- decodeMessage buffer C.await
-            case mmessage of
-                Nothing -> return ()
-                Just message -> C.yield message >> go
-    go
+conduitDecode :: (MonadIO m, MonadResource m, Store a)
+              => Int -> C.Conduit ByteString m (Message a)
+conduitDecode bufSize =
+    C.bracketP
+      (new bufSize)
+      free
+      go
+  where
+    go buffer = do
+        mmessage <- decodeMessage buffer C.await
+        case mmessage of
+            Nothing -> return ()
+            Just message -> C.yield message >> go buffer

@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-|
 Module: System.IO.ByteBuffer
 Description: Provides an efficient buffering abstraction.
@@ -21,6 +22,7 @@ module System.IO.ByteBuffer
        ( ByteBuffer
          -- * Allocation and Deallocation
        , new, free
+       , withByteBuffer
          -- * Query for number of available bytes
        , totalSize, isEmpty, availableBytes
          -- * Feeding new input
@@ -29,8 +31,10 @@ module System.IO.ByteBuffer
        , consume, unsafeConsume
        ) where
 
+import           Control.Exception.Lifted (bracket)
 import           Control.Monad (when)
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import           Data.IORef
@@ -92,6 +96,10 @@ freeCapacity bb = do
 
 -- | Allocates a new ByteBuffer with a given buffer size filling from
 -- the given FillBuffer.
+--
+-- Note that 'ByteBuffer's created with 'new' have to be deallocated
+-- explicitly using 'free'.  For automatic deallocation, consider
+-- using 'withByteBuffer' instead.
 new :: MonadIO m
     => Int -- ^ Size of buffer to allocate.
     -> m ByteBuffer -- ^ The byte buffer.
@@ -104,8 +112,21 @@ new l = liftIO $ do
                    }
 
 -- | Free a byte buffer.
-free :: ByteBuffer -> IO ()
-free bb = readIORef bb >>= Alloc.free . ptr
+free :: MonadIO m => ByteBuffer -> m ()
+free bb = liftIO $ readIORef bb >>= Alloc.free . ptr
+
+-- | Perform some action with a bytebuffer, with automatic allocation
+-- and deallocation.
+withByteBuffer :: (MonadIO m, MonadBaseControl IO m)
+               => Int
+               -- ^ Initial length of the 'ByteBuffer'
+               -> (ByteBuffer -> m a)
+               -> m a
+withByteBuffer l action =
+  bracket
+    (new l)
+    free
+    action
 
 -- | Reset a 'ByteBuffer', i.e. copy all the bytes that have not yet
 -- been consumed to the front of the buffer.

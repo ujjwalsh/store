@@ -1,5 +1,6 @@
 module Data.Store.StreamingSpec where
 
+import Control.Monad.Trans.Resource
 import Data.Store.Streaming
 import Test.Hspec.SmallCheck
 import Test.SmallCheck
@@ -22,7 +23,7 @@ spec = do
 
 roundtrip :: [Int] -> Property IO
 roundtrip xs = monadic $ do
-  xs' <- C.sourceList xs
+  xs' <- runResourceT $ C.sourceList xs
     =$= C.map Message
     =$= conduitEncode
     =$= conduitDecode 1
@@ -41,15 +42,14 @@ roundtripChunked xs = monadic $ do
                     (chunk, _) | BS.null chunk -> Nothing
                     (chunk, rest) -> Just (chunk, rest))
                 bs
-  xs' <- C.sourceList chunks
+  xs' <- runResourceT $ C.sourceList chunks
     =$= conduitDecode 10
     =$= C.map fromMessage
     $$ C.consume
   return $ xs' == xs
 
 askMore :: Integer -> Property IO
-askMore x = monadic $ do
-  bb <- BB.new 10
+askMore x = monadic $ BB.withByteBuffer 10 $ \ bb -> do
   let bs = encodeMessage (Message x)
       bs' = snd . BS.splitAt (BS.length bs -2) $ bs
   BB.copyByteString bb bs'
@@ -59,8 +59,7 @@ askMore x = monadic $ do
     _ -> return False
 
 peek :: Integer -> Property IO
-peek x = monadic $ do
-  bb <- BB.new 10
+peek x = monadic $ BB.withByteBuffer 10 $ \ bb -> do
   let bs = encodeMessage (Message x)
   BB.copyByteString bb bs
   peekResult <- peekMessage bb :: IO (PeekMessage IO Integer)
