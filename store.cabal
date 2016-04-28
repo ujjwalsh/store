@@ -26,6 +26,7 @@ library
   exposed-modules:     Data.Store
                      , Data.Store.Internal
                      , Data.Store.TH
+                     , Data.Store.TH.Internal
                      , Data.Store.TypeHash
                      , Data.Store.TypeHash.Internal
   other-modules:       Data.Store.Impl
@@ -37,7 +38,6 @@ library
                      , deepseq
                      , fail
                      , ghc-prim
-                     , hashable
                      , hashable
                      , hspec
                      , hspec-smallcheck

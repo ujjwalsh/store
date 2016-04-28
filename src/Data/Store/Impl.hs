@@ -15,6 +15,10 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UnboxedTuples #-}
 
+-- This module is not exposed. The reason that it is split out from
+-- "Data.Store.Internal" is to allow "Data.Store.TH" to refer to these
+-- identifiers. "Data.Store.Internal" must be separate from
+-- "Data.Store.TH" due to Template Haskell's stage restriction.
 module Data.Store.Impl where
 
 import           Control.Exception (Exception(..), throwIO)
@@ -45,9 +49,24 @@ import           System.IO.Unsafe (unsafePerformIO)
 ------------------------------------------------------------------------
 -- Store class
 
+-- TODO: write down more elaborate laws
+
+-- | The 'Store' typeclass provides efficient serialization and
+-- deserialization to raw pointer addresses.
+--
+-- The 'peek' and 'poke' methods should be defined such that
+-- @ decodeEx (encode x) == x @.
 class Store a where
+    -- | Yields the 'Size' of the buffer, in bytes, required to store
+    -- the encoded representation of the type.
     size :: Size a
+    -- | Serializes a value to bytes. It is the responsibility of the
+    -- caller to ensure that at least the number of bytes required by
+    -- 'size' are available. These details are handled by 'encode' and
+    -- similar utilities.
     poke :: a -> Poke ()
+    -- | Serialized a value from bytes, throwing exceptions if it
+    -- encounters invalid data or runs out of input bytes.
     peek :: Peek a
 
     default size :: (Generic a, GStore (Rep a)) => Size a
@@ -62,29 +81,51 @@ class Store a where
 ------------------------------------------------------------------------
 -- Utilities for encoding / decoding strict ByteStrings
 
+-- | Serializes a value to a 'BS.ByteString'. In order to do this, it
+-- first allocates a 'BS.ByteString' of the correct size (based on
+-- 'size'), and then uses 'poke' to fill it.
 encode :: Store a => a -> BS.ByteString
 encode x = BS.unsafeCreate
     (getSize x)
     (\p -> runPoke (poke x) p 0 (\_ _ -> return ()))
 
+-- | Decodes a value from a 'BS.ByteString'. Returns an exception if
+-- there's an error while decoding, or if decoding undershoots /
+-- overshoots the end of the buffer.
 decode :: Store a => BS.ByteString -> Either PeekException a
 decode = unsafePerformIO . try . decodeIO
 
+-- | Decodes a value from a 'BS.ByteString', potentially throwing
+-- exceptions, and taking a 'Peek' to run. It is an exception to not
+-- consume all input.
+decodeWith :: Peek a -> BS.ByteString -> Either PeekException a
+decodeWith mypeek = unsafePerformIO . try . decodeIOWith mypeek
+
+-- | Decodes a value from a 'BS.ByteString', potentially throwing
+-- exceptions. It is an exception to not consume all input.
 decodeEx :: Store a => BS.ByteString -> a
 decodeEx = unsafePerformIO . decodeIO
 
+-- | Decodes a value from a 'BS.ByteString', potentially throwing
+-- exceptions, and taking a 'Peek' to run. It is an exception to not
+-- consume all input.
 decodeExWith :: Peek a -> BS.ByteString -> a
 decodeExWith f = unsafePerformIO . decodeIOWith f
 
-decodeExWithOffset :: Peek a -> BS.ByteString -> (Offset,a)
-decodeExWithOffset f = unsafePerformIO . decodeIOPortionWith f
+-- | Similar to 'decodeExWith', but it allows there to be more of the
+-- buffer remaining. The 'Offset' of the buffer contents immediately
+-- after the decoded value is returned.
+decodeExPortionWith :: Peek a -> BS.ByteString -> (Offset, a)
+decodeExPortionWith f = unsafePerformIO . decodeIOPortionWith f
 
+-- | Decodes a value from a 'BS.ByteString', potentially throwing
+-- exceptions. It is an exception to not consume all input.
 decodeIO :: Store a => BS.ByteString -> IO a
 decodeIO = decodeIOWith peek
 
-decodeWith :: (Peek a) -> BS.ByteString -> Either PeekException a
-decodeWith mypeek = unsafePerformIO . try . decodeIOWith mypeek
-
+-- | Decodes a value from a 'BS.ByteString', potentially throwing
+-- exceptions, and taking a 'Peek' to run. It is an exception to not
+-- consume all input.
 decodeIOWith :: Peek a -> BS.ByteString -> IO a
 decodeIOWith mypeek bs = do
     (offset, x) <- decodeIOPortionWith mypeek bs
@@ -93,7 +134,8 @@ decodeIOWith mypeek bs = do
         then throwIO $ PeekException remaining "Didn't consume all input."
         else return x
 
-decodeIOPortionWith :: Peek a -> BS.ByteString -> IO (Int, a)
+-- |
+decodeIOPortionWith :: Peek a -> BS.ByteString -> IO (Offset, a)
 decodeIOPortionWith mypeek (BS.PS x s len) =
     withForeignPtr x $ \ptr0 ->
         let ptr = ptr0 `plusPtr` s
@@ -363,16 +405,6 @@ instance Exception PeekException where
         " bytes from end : " ++
         T.unpack msg
 
-------------------------------------------------------------------------
--- Size type
-
--- | Info about a type's serialized length. Either the length is known
--- independently of the value, or the length depends on the value.
-data Size a
-    = VarSize (a -> Int)
-    | ConstSize Int
-    deriving Typeable
-
 peekException :: T.Text -> Peek a
 peekException msg = Peek $ \end ptr -> throwIO (PeekException (end `minusPtr` ptr) msg)
 
@@ -385,7 +417,22 @@ tooManyBytes needed remaining ty =
         show needed ++ ", but only " ++
         show remaining ++ " remain."
 
--- FIXME: export as utils?
+------------------------------------------------------------------------
+-- Size type
+
+-- | Info about a type's serialized length. Either the length is known
+-- independently of the value, or the length depends on the value.
+data Size a
+    = VarSize (a -> Int)
+    | ConstSize !Int
+    deriving Typeable
+
+getSize :: Store a => a -> Int
+getSize = getSizeWith size
+
+getSizeWith :: Size a -> a -> Int
+getSizeWith (VarSize f) x = f x
+getSizeWith (ConstSize n) _ = n
 
 -- TODO: depend on contravariant package? The ConstSize case is a little
 -- wonky due to type conversion
@@ -404,13 +451,6 @@ combineSize' toA toB sizeA sizeB =
         (VarSize f, ConstSize m) -> VarSize (\x -> f (toA x) + m)
         (ConstSize n, VarSize g) -> VarSize (\x -> n + g (toB x))
         (ConstSize n, ConstSize m) -> ConstSize (n + m)
-
-getSize :: Store a => a -> Int
-getSize = getSizeWith size
-
-getSizeWith :: Size a -> a -> Int
-getSizeWith (VarSize f) x = f x
-getSizeWith (ConstSize n) _ = n
 
 scaleSize :: Int -> Size a -> Size a
 scaleSize s (ConstSize n) = ConstSize (s * n)
