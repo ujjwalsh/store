@@ -7,7 +7,7 @@ packages:
   extra-dep: true
 - location:
     git: https://github.com/fpco/th-utilities
-    commit: ef14a07
+    commit: b519f38
   subdirs:
     - th-utilities
   extra-dep: true
