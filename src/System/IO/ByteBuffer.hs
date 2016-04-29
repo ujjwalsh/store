@@ -76,9 +76,11 @@ type ByteBuffer = IORef BBRef
 
 totalSize :: MonadIO m => ByteBuffer -> m Int
 totalSize bb = liftIO $ size <$> readIORef bb
+{-# INLINE totalSize #-}
 
 isEmpty :: MonadIO m => ByteBuffer -> m Bool
 isEmpty bb = liftIO $ (==0) <$> availableBytes bb
+{-# INLINE isEmpty #-}
 
 -- | Number of available bytes in a 'ByteBuffer' (that is, bytes that
 -- have been copied to, but not yet read from the 'ByteBuffer'.
@@ -86,6 +88,7 @@ availableBytes :: MonadIO m => ByteBuffer -> m Int
 availableBytes bb = do
     BBRef{..} <- liftIO $ readIORef bb
     return $ contained - consumed
+{-# INLINE availableBytes #-}
 
 -- | The number of bytes that can be appended to the buffer, without
 -- resetting it.
@@ -93,6 +96,7 @@ freeCapacity :: MonadIO m => ByteBuffer -> m Int
 freeCapacity bb = do
     BBRef{..} <- liftIO $ readIORef bb
     return $ size - contained
+{-# INLINE freeCapacity #-}
 
 -- | Allocates a new ByteBuffer with a given buffer size filling from
 -- the given FillBuffer.
@@ -114,10 +118,12 @@ new ml = liftIO $ do
                    , contained = 0
                    , consumed = 0
                    }
+{-# INLINE new #-}
 
 -- | Free a byte buffer.
 free :: MonadIO m => ByteBuffer -> m ()
 free bb = liftIO $ readIORef bb >>= Alloc.free . ptr
+{-# INLINE free #-}
 
 -- | Perform some action with a bytebuffer, with automatic allocation
 -- and deallocation.
@@ -132,6 +138,7 @@ with l action =
     (new l)
     free
     action
+{-# INLINE with #-}
 
 -- | Reset a 'ByteBuffer', i.e. copy all the bytes that have not yet
 -- been consumed to the front of the buffer.
@@ -143,6 +150,7 @@ reset bb = do
     writeIORef bb bbref { contained = available
                         , consumed = 0
                         }
+{-# INLINE reset #-}
 
 -- | Make sure the buffer is at least @minSize@ bytes long.
 --
@@ -165,6 +173,7 @@ enlargeByteBuffer bb minSize = do
         writeIORef bb bbref { ptr = ptr'
                             , size = newSize
                             }
+{-# INLINE enlargeByteBuffer #-}
 
 -- | Copy the contents of a 'ByteString' to a 'ByteBuffer'.
 --
@@ -181,6 +190,7 @@ copyByteString bb bs@(BS.PS _ _ bsSize) = liftIO $ do
     when (capacity < bsSize) (reset bb)
     -- now we can safely copy.
     unsafeCopyByteString bb bs
+{-# INLINE copyByteString #-}
 
 -- | Copy the contents of a 'ByteString' to a 'ByteBuffer'. No bounds
 -- checks are performed.
@@ -192,6 +202,7 @@ unsafeCopyByteString bb (BS.PS bsFptr bsOffset bsSize) = do
                   (bsPtr `plusPtr` bsOffset)
                   bsSize
     writeIORef bb bbref { contained = (contained + bsSize) }
+{-# INLINE unsafeCopyByteString #-}
 
 -- | Try to get a pointer to @n@ bytes from the 'ByteBuffer'.
 --
@@ -215,6 +226,7 @@ unsafeConsume bb n = liftIO $ do
              bbref@BBRef{..} <- readIORef bb
              writeIORef bb bbref { consumed = (consumed + n) }
              return $ Right (ptr `plusPtr` consumed)
+{-# INLINE unsafeConsume #-}
 
 -- | As `unsafeConsume`, but instead of returning a `Ptr` into the
 -- contents of the `ByteBuffer`, it returns a `ByteString` containing
@@ -232,3 +244,4 @@ consume bb n = do
                 copyBytes bsPtr ptr n
             return (Right bs)
         Left missing -> return (Left missing)
+{-# INLINE consume #-}

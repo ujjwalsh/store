@@ -51,6 +51,7 @@ type SizeTag = Int
 
 tagLength :: Int
 tagLength = Storable.sizeOf (undefined :: SizeTag)
+{-# INLINE tagLength #-}
 
 -- | Encode a 'Message' to a 'ByteString'.
 encodeMessage :: Store a => Message a -> ByteString
@@ -59,6 +60,7 @@ encodeMessage (Message x) =
     in BS.unsafeCreate
        (Storable.sizeOf (undefined :: SizeTag) + l)
        (\p -> runPoke (poke l >> poke x) p 0 (\_ _ -> return ()))
+{-# INLINE encodeMessage #-}
 
 -- | The result of peeking at the next message can either be a
 -- successfully deserialised 'Message', or a request for more input.
@@ -72,10 +74,12 @@ peekSized bb n =
         Right ptr -> Done . Message <$> decodeFromPtr ptr n
         Left _ -> return $ NeedMoreInput (\ bs -> BB.copyByteString bb bs
                                                   >> peekSized bb n)
+{-# INLINE peekSized #-}
 
 -- | Decode a 'SizeTag' from a 'ByteBuffer'.
 peekSizeTag :: MonadIO m => ByteBuffer -> m (PeekMessage m SizeTag)
 peekSizeTag bb = peekSized bb tagLength
+{-# INLINE peekSizeTag #-}
 
 -- | Decode some 'Message' from a 'ByteBuffer', by first reading its
 -- size, and then the actual 'Message'.
@@ -86,6 +90,7 @@ peekMessage bb =
         NeedMoreInput _ ->
             return $ NeedMoreInput (\ bs -> BB.copyByteString bb bs
                                             >> peekMessage bb)
+{-# INLINE peekMessage #-}
 
 -- | Decode a 'Message' from a 'ByteBuffer' and an action that can get
 -- additional 'ByteString's to refill the buffer when necessary.
@@ -100,6 +105,7 @@ decodeMessage bb getBs =
     decodeSizeTag bb getBs >>= \case
         Nothing -> return Nothing
         Just n -> decodeSized bb getBs n
+{-# INLINE decodeMessage #-}
 
 decodeSizeTag :: MonadIO m
               => ByteBuffer
@@ -113,6 +119,7 @@ decodeSizeTag bb getBs =
             Nothing -> BB.availableBytes bb >>= \case
                 0 -> return Nothing
                 n -> liftIO $ tooManyBytes tagLength n "Data.Store.Message.SizeTag"
+{-# INLINE decodeSizeTag #-}
 
 decodeSized :: (MonadIO m, Store a)
             => ByteBuffer
@@ -126,16 +133,19 @@ decodeSized bb getBs n =
             Just bs -> BB.copyByteString bb bs >> decodeSized bb getBs n
             Nothing -> BB.availableBytes bb >>= \ available ->
                 liftIO $ tooManyBytes n available "Data.Store.Message.Message"
+{-# INLINE decodeSized #-}
 
 -- | Decode a value, given a 'Ptr' and the number of bytes that make
 -- up the encoded message.
 decodeFromPtr :: (MonadIO m, Store a) => Ptr Word8 -> Int -> m a
 decodeFromPtr ptr n =
     liftIO $ snd <$> runPeek peek (ptr `plusPtr` n) ptr
+{-# INLINE decodeFromPtr #-}
 
 -- | Conduit for encoding 'Message's to 'ByteString's.
 conduitEncode :: (Monad m, Store a) => C.Conduit (Message a) m ByteString
 conduitEncode = C.map encodeMessage
+{-# INLINE conduitEncode #-}
 
 -- | Conduit for decoding 'Message's from 'ByteString's.
 conduitDecode :: (MonadIO m, MonadResource m, Store a)
@@ -155,3 +165,4 @@ conduitDecode bufSize =
         case mmessage of
             Nothing -> return ()
             Just message -> C.yield message >> go buffer
+{-# INLINE conduitDecode #-}
