@@ -1,7 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Data.Store.StreamingSpec where
 
 import           Control.Monad.Trans.Resource
+import Control.Exception (try)
 import qualified Data.ByteString as BS
 import           Data.Conduit ((=$=), ($$))
 import qualified Data.Conduit.List as C
@@ -19,13 +21,14 @@ spec = do
   describe "conduitEncode and conduitDecode" $ do
     it "Roundtrips ([Int])." $ property roundtrip
     it "Roundtrips ([Int]), with chunked transfer." $ property roundtripChunked
-    it "Throws an Exception on incomplete messages." $ conduitIncomplete
+    it "Throws an Exception on incomplete messages." conduitIncomplete
+    it "Throws an Exception on excess input." $ property conduitExcess
   describe "peekMessage" $ do
     it "demands more input when needed." $ property (askMore 8)
     it "demands more input on incomplete SizeTag." $ property (askMore 1)
     it "successfully decodes valid input." $ property peek
   describe "decodeMessage" $
-    it "Throws an Exception on incomplete messages." $ decodeIncomplete
+    it "Throws an Exception on incomplete messages." decodeIncomplete
 
 roundtrip :: [Int] -> Property IO
 roundtrip xs = monadic $ do
@@ -63,6 +66,19 @@ conduitIncomplete =
                   =$= conduitDecode (Just 10)
                   $$ C.consume)
     :: IO [Message Integer]) `shouldThrow` peekException
+
+conduitExcess :: [Int] -> Property IO
+conduitExcess xs = monadic $ do
+  bs <- C.sourceList xs
+    =$= C.map Message
+    =$= conduitEncode
+    $$ C.fold (<>) mempty
+  res <- try (runResourceT (C.sourceList [bs `BS.append` "excess bytes"]
+                            =$= conduitDecode (Just 10)
+                            $$ C.consume) :: IO [Message Int])
+  case res of
+      Right _ -> return False
+      Left (PeekException _ _) -> return True
 
 -- splits an encoded message after n bytes.  Feeds the first part to
 -- peekResult, expecting it to require more input.  Then, feeds the
