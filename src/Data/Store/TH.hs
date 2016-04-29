@@ -1,6 +1,19 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
+-- | This module exports TH utilities intended to be useful to users.
+--
+-- However, the visible exports do not show the main things that will be
+-- useful, which is using TH to generate 'Store' instances, via
+-- "TH.Derive".  It's used like this:
+--
+-- @
+--     data Foo = Foo Int | Bar Int
+--
+--     $($(derive [d|
+--         instance Deriving (Store Foo)
+--         |]))
+-- @
 module Data.Store.TH
     (
     -- * Testing Store instances

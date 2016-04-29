@@ -44,7 +44,11 @@ module Data.Store.Internal
     , sizeMap, pokeMap, peekMap
     -- ** Peek utilities
     , skip, isolate
-    -- ** Static Size type (WIP)
+    -- ** Static Size type
+    --
+    -- This portion of the library is still work-in-progress.
+    -- 'IsStaticSize' is only supported for strict ByteStrings, in order
+    -- to support the use case of 'TaggedTH'.
     , IsStaticSize(..), StaticSize(..), toStaticSizeEx, liftStaticSize
     ) where
 
