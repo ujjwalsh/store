@@ -69,7 +69,9 @@ import           Data.HashSet (HashSet)
 import           Data.Hashable (Hashable)
 import           Data.IntMap (IntMap)
 import           Data.IntSet (IntSet)
+import qualified Data.List.NonEmpty as NE
 import           Data.Map (Map)
+import           Data.Maybe (fromMaybe)
 import           Data.MonoTraversable
 import           Data.Monoid
 import           Data.Primitive.ByteArray
@@ -412,6 +414,11 @@ instance Store a => Store [a] where
     size = sizeSequence
     poke = pokeSequence
     peek = peekSequence
+
+instance Store a => Store (NE.NonEmpty a) where
+    size = contramapSize NE.toList (size :: Size [a])
+    poke = poke . NE.toList
+    peek = fromMaybe (error "found [] instead of NonEmpty in peek.") . NE.nonEmpty <$> peek
 
 instance Store a => Store (Seq a) where
     size = sizeSequence
