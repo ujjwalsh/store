@@ -38,21 +38,24 @@ roundtrip xs = monadic $ do
   return $ xs' == xs
 
 roundtripChunked :: [Int] -> Property IO
-roundtripChunked xs = monadic $ do
+roundtripChunked input = monadic $ do
+  let (xs, chunkLengths) = splitAt (length input `div` 2) input
   bs <- C.sourceList xs
     =$= C.map Message
     =$= conduitEncode
     $$ C.fold (<>) mempty
-  let chunks =
-        unfoldr (\x -> case BS.splitAt 3 x of
-                    (chunk, _) | BS.null chunk -> Nothing
-                    (chunk, rest) -> Just (chunk, rest))
-                bs
+  let chunks = unfoldr takeChunk (bs, chunkLengths)
   xs' <- runResourceT $ C.sourceList chunks
     =$= conduitDecode (Just 10)
     =$= C.map fromMessage
     $$ C.consume
   return $ xs' == xs
+  where
+    takeChunk (x, _) | BS.null x = Nothing
+    takeChunk (x, []) = Just (x, (BS.empty, []))
+    takeChunk (x, l:ls) =
+        let (chunk, rest) = BS.splitAt l x
+        in Just (chunk, (rest, ls))
 
 conduitIncomplete :: Expectation
 conduitIncomplete =
