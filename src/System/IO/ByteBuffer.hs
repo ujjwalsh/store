@@ -37,6 +37,7 @@ import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import           Data.IORef
+import           Data.Maybe (fromMaybe)
 import           Data.Word
 import           Foreign.ForeignPtr
 import qualified Foreign.Marshal.Alloc as Alloc
@@ -100,9 +101,13 @@ freeCapacity bb = do
 -- explicitly using 'free'.  For automatic deallocation, consider
 -- using 'with' instead.
 new :: MonadIO m
-    => Int -- ^ Size of buffer to allocate.
-    -> m ByteBuffer -- ^ The byte buffer.
-new l = liftIO $ do
+    => Maybe Int
+    -- ^ Size of buffer to allocate.  If 'Nothing', use the default
+    -- value of 4MB
+    -> m ByteBuffer
+    -- ^ The byte buffer.
+new ml = liftIO $ do
+    let l = fromMaybe (4*1024*1024) ml
     newPtr <- Alloc.mallocBytes l
     newIORef BBRef { ptr = newPtr
                    , size = l
@@ -117,8 +122,9 @@ free bb = liftIO $ readIORef bb >>= Alloc.free . ptr
 -- | Perform some action with a bytebuffer, with automatic allocation
 -- and deallocation.
 with :: (MonadIO m, MonadBaseControl IO m)
-     => Int
-     -- ^ Initial length of the 'ByteBuffer'
+     => Maybe Int
+     -- ^ Initial length of the 'ByteBuffer'.  If 'Nothing', use the
+     -- default value of 4MB.
      -> (ByteBuffer -> m a)
      -> m a
 with l action =

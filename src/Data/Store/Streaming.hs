@@ -133,13 +133,17 @@ decodeFromPtr :: (MonadIO m, Store a) => Ptr Word8 -> Int -> m a
 decodeFromPtr ptr n =
     liftIO $ snd <$> runPeek peek (ptr `plusPtr` n) ptr
 
--- | Conduit for encoding Messages to a ByteString.
+-- | Conduit for encoding 'Message's to 'ByteString's.
 conduitEncode :: (Monad m, Store a) => C.Conduit (Message a) m ByteString
 conduitEncode = C.map encodeMessage
 
--- | Conduit for decoding Messages from a ByteString.
+-- | Conduit for decoding 'Message's from 'ByteString's.
 conduitDecode :: (MonadIO m, MonadResource m, Store a)
-              => Int -> C.Conduit ByteString m (Message a)
+              => Maybe Int
+              -- ^ Initial length of the 'ByteBuffer' used for
+              -- buffering the incoming 'ByteString's.  If 'Nothing',
+              -- use the default value of 4MB.
+              -> C.Conduit ByteString m (Message a)
 conduitDecode bufSize =
     C.bracketP
       (BB.new bufSize)

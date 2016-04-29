@@ -32,7 +32,7 @@ roundtrip xs = monadic $ do
   xs' <- runResourceT $ C.sourceList xs
     =$= C.map Message
     =$= conduitEncode
-    =$= conduitDecode 1
+    =$= conduitDecode Nothing
     =$= C.map fromMessage
     $$ C.consume
   return $ xs' == xs
@@ -49,7 +49,7 @@ roundtripChunked xs = monadic $ do
                     (chunk, rest) -> Just (chunk, rest))
                 bs
   xs' <- runResourceT $ C.sourceList chunks
-    =$= conduitDecode 10
+    =$= conduitDecode (Just 10)
     =$= C.map fromMessage
     $$ C.consume
   return $ xs' == xs
@@ -57,7 +57,7 @@ roundtripChunked xs = monadic $ do
 conduitIncomplete :: Expectation
 conduitIncomplete =
     (runResourceT (C.sourceList [incompleteInput]
-                  =$= conduitDecode 10
+                  =$= conduitDecode (Just 10)
                   $$ C.consume)
     :: IO [Message Integer]) `shouldThrow` peekException
 
@@ -66,7 +66,7 @@ conduitIncomplete =
 -- second part and checks if the decoded result is the original
 -- message.
 askMore :: Int -> Integer -> Property IO
-askMore n x = monadic $ BB.with 10 $ \ bb -> do
+askMore n x = monadic $ BB.with (Just 10) $ \ bb -> do
   let bs = encodeMessage (Message x)
       (start, end) = BS.splitAt n $ bs
   BB.copyByteString bb start
@@ -79,7 +79,7 @@ askMore n x = monadic $ BB.with 10 $ \ bb -> do
     _ -> return False
 
 peek :: Integer -> Property IO
-peek x = monadic $ BB.with 10 $ \ bb -> do
+peek x = monadic $ BB.with (Just 10) $ \ bb -> do
   let bs = encodeMessage (Message x)
   BB.copyByteString bb bs
   peekResult <- peekMessage bb :: IO (PeekMessage IO Integer)
@@ -88,7 +88,7 @@ peek x = monadic $ BB.with 10 $ \ bb -> do
     Done (Message x') -> return $ x' == x
 
 decodeIncomplete :: IO ()
-decodeIncomplete = BB.with 0 $ \ bb -> do
+decodeIncomplete = BB.with (Just 0) $ \ bb -> do
   BB.copyByteString bb (BS.take 1 incompleteInput)
   (decodeMessage bb (return Nothing) :: IO (Maybe (Message Integer)))
     `shouldThrow` peekException

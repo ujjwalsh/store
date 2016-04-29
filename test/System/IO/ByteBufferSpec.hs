@@ -7,13 +7,13 @@ import           Test.Hspec
 
 spec :: Spec
 spec = describe "ByteBuffer" $ do
-    it "can grow to store a value and return it." $ BB.with 0 $ \ bb -> do
+    it "can grow to store a value and return it." $ BB.with (Just 0) $ \ bb -> do
         let bs = "some bytestring"
         BB.copyByteString bb bs
         bs' <- BB.consume bb (BS.length bs)
         bs' `shouldBe` Right bs
         bbIsEmpty bb
-    it "should request more input when needed." $ BB.with 0 $ \ bb -> do
+    it "should request more input when needed." $ BB.with (Just 0) $ \ bb -> do
         let bs = "some bytestring"
         BB.copyByteString bb bs
         bs' <- BB.consume bb (2 * BS.length bs)
@@ -25,7 +25,7 @@ spec = describe "ByteBuffer" $ do
     it "should not grow if bytes can be freed." $
         let bs1 = "12345"
             bs2 = "67810" -- what about nine? 7 8 9!
-        in BB.with (BS.length bs1) $ \ bb -> do
+        in BB.with (Just $ BS.length bs1) $ \ bb -> do
             BB.copyByteString bb bs1
             bs1' <- BB.consume bb (BS.length bs1)
             BB.copyByteString bb bs2
