@@ -30,6 +30,8 @@ library
                      , Data.Store.TH.Internal
                      , Data.Store.TypeHash
                      , Data.Store.TypeHash.Internal
+                     , Data.Store.Streaming
+                     , System.IO.ByteBuffer
   other-modules:       Data.Store.Impl
   build-depends:       base >= 4.7 && < 5
                      , array
@@ -58,6 +60,10 @@ library
                      , transformers
                      , unordered-containers
                      , vector
+                     , conduit
+                     , lifted-base
+                     , monad-control
+                     , resourcet
   default-language:    Haskell2010
   ghc-options:         -Wall -O2
 
@@ -66,10 +72,12 @@ test-suite store-test
   hs-source-dirs:      test
   main-is:             Spec.hs
   other-modules:       Spec.TH
+                     , System.IO.ByteBufferSpec
   build-depends:       base
                      , store
                      , hspec
                      , smallcheck
+                     , hspec-smallcheck
                      , vector
                      , bytestring
                      , containers
@@ -81,6 +89,8 @@ test-suite store-test
                      , hashable
                      , time
                      , th-reify-many
+                     , conduit
+                     , resourcet
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -fwarn-identities -O2
   if flag(verbose-test)
       cpp-options:     -DVERBOSE_TEST

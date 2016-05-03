@@ -29,6 +29,7 @@ import           Data.Set (Set)
 import           Data.Store
 import           Data.Store.Internal
 import           Data.Store.TH
+import qualified Data.Store.StreamingSpec as S
 import           Data.Text (Text)
 import qualified Data.Time as Time
 import qualified Data.Vector as V
@@ -46,6 +47,7 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
 import           Spec.TH
+import qualified System.IO.ByteBufferSpec as BB
 import           System.Posix.Types
 import           TH.ReifyDataType
 import           Test.Hspec hiding (runIO)
@@ -260,3 +262,5 @@ main = hspec $ do
         mapM_ putStrLn
               $(do insts <- getAllInstanceTypes1 ''Store
                    lift $ map pprint $ filter (not . isMonoType) insts)
+    BB.spec
+    S.spec
