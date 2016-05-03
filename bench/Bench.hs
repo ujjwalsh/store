@@ -31,7 +31,7 @@ main = do
             , benchEncode' "1kb storable" (SV.fromList ([1..256] :: [Int32]))
             , benchEncode' "10kb storable" (SV.fromList ([1..(256 * 10)] :: [Int32]))
             , benchEncode' "1kb normal" (V.fromList ([1..256] :: [Int32]))
-            , benchEncode' "10kb normal" (V.fromList ([1..(256 * 10 * 1024)] :: [Int32]))
+            , benchEncode' "10kb normal" (V.fromList ([1..(256 * 10)] :: [Int32]))
 #endif
             , benchEncode (SmallProduct 0 1 2 3)
             , benchEncode (SmallProductManual 0 1 2 3)
@@ -44,7 +44,7 @@ main = do
             , benchDecode' "1kb storable" (SV.fromList ([1..256] :: [Int32]))
             , benchDecode' "10kb storable" (SV.fromList ([1..(256 * 10)] :: [Int32]))
             , benchDecode' "1kb normal" (V.fromList ([1..256] :: [Int32]))
-            , benchDecode' "10kb normal" (V.fromList ([1..(256 * 10 * 1024)] :: [Int32]))
+            , benchDecode' "10kb normal" (V.fromList ([1..(256 * 10)] :: [Int32]))
 #endif
             , benchDecode (SmallProduct 0 1 2 3)
             , benchDecode (SmallProductManual 0 1 2 3)
@@ -80,7 +80,7 @@ benchEncode' msg x0 =
 #endif
 
 benchDecode :: Ctx a => a -> Benchmark
-benchDecode = benchEncode' ""
+benchDecode = benchDecode' ""
 
 -- TODO: comparison bench for decode
 
