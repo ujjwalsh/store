@@ -28,6 +28,7 @@ module Data.Store.Streaming
        , conduitDecode
        ) where
 
+import           Control.Monad (void)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource (MonadResource)
 import           Data.ByteString (ByteString)
@@ -59,7 +60,7 @@ encodeMessage (Message x) =
     let l = getSize x
     in BS.unsafeCreate
        (tagLength + l)
-       (\p -> runPoke (poke l >> poke x) p 0 (\_ _ -> return ()))
+       (\p -> void $ runPoke (poke l >> poke x) p 0)
 {-# INLINE encodeMessage #-}
 
 -- | The result of peeking at the next message can either be a
