@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -21,7 +22,7 @@
 -- "Data.Store.TH" due to Template Haskell's stage restriction.
 module Data.Store.Impl where
 
-import           Control.Exception (Exception(..), throwIO)
+import           Control.Exception (Exception(..), throwIO, assert)
 import           Control.Exception (try)
 import           Control.Monad
 import qualified Control.Monad.Fail as Fail
@@ -86,8 +87,10 @@ class Store a where
 -- 'size'), and then uses 'poke' to fill it.
 encode :: Store a => a -> BS.ByteString
 encode x = BS.unsafeCreate
-    (getSize x)
-    (\p -> runPoke (poke x) p 0 (\_ _ -> return ()))
+    l
+    (\p -> do (offset, ()) <- (runPoke (poke x) p 0)
+              assert (offset == l) (return ()))
+  where l = getSize x
 
 -- | Decodes a value from a 'BS.ByteString'. Returns an exception if
 -- there's an error while decoding, or if decoding undershoots /
@@ -271,9 +274,10 @@ sizeStorable = ConstSize (sizeOf (error msg :: a))
 
 -- | A @Poke@ implementation based on an instance of @Storable@
 pokeStorable :: Storable a => a -> Poke ()
-pokeStorable x = Poke $ \ptr offset k -> do
+pokeStorable x = Poke $ \ptr offset -> do
     y <- pokeByteOff ptr offset x
-    (k $! offset + sizeOf x) y
+    let !newOffset = offset + sizeOf x
+    return (newOffset, y)
 {-# INLINE pokeStorable #-}
 
 -- FIXME: make it the responsibility of the caller to check this.
@@ -304,26 +308,24 @@ type Offset = Int
 -- Poke monad
 
 newtype Poke a = Poke
-    { runPoke :: forall byte r.
-        Ptr byte
-     -> Offset
-     -> (Offset -> a -> IO r)
-     -> IO r
+    { runPoke :: forall byte.
+        Ptr byte -- ^ `Ptr` to which data is poked.
+     -> Offset   -- ^ `Offset` before this poke.
+     -> IO (Offset, a) -- ^ Pass around `Offset` after the poke.
     }
     deriving Functor
 
 instance Applicative Poke where
-    pure x = Poke $ \_ offset k -> k offset x
+    pure x = Poke $ \_ptr offset -> pure (offset, x)
     {-# INLINE pure #-}
-    Poke f <*> Poke g = Poke $ \ptr offset1 k ->
-        f ptr offset1 $ \offset2 f' ->
-        g ptr offset2 $ \offset3 g' ->
-        k offset3 (f' g')
+    Poke f <*> Poke g = Poke $ \ptr offset1 -> do
+        (offset2, f') <- f ptr offset1
+        (offset3, g') <- g ptr offset2
+        return (offset3, f' g')
     {-# INLINE (<*>) #-}
-    Poke f *> Poke g = Poke $ \ptr offset1 k ->
-        f ptr offset1 $ \offset2 _ ->
-        g ptr offset2 $ \offset3 g' ->
-        k offset3 g'
+    Poke f *> Poke g = Poke $ \ptr offset1 -> do
+        (offset2, _) <- f ptr offset1
+        g ptr offset2
     {-# INLINE (*>) #-}
 
 instance Monad Poke where
@@ -331,13 +333,13 @@ instance Monad Poke where
     {-# INLINE return #-}
     (>>) = (*>)
     {-# INLINE (>>) #-}
-    Poke x >>= f = Poke $ \ptr offset1 k ->
-        x ptr offset1 $ \offset2 x' ->
-        runPoke (f x') ptr offset2 k
+    Poke x >>= f = Poke $ \ptr offset1 -> do
+        (offset2, x') <- x ptr offset1
+        runPoke (f x') ptr offset2
     {-# INLINE (>>=) #-}
 
 instance MonadIO Poke where
-    liftIO f = Poke $ \_ offset k -> f >>= k offset
+    liftIO f = Poke $ \_ offset -> (offset, ) <$> f
     {-# INLINE liftIO #-}
 
 ------------------------------------------------------------------------
@@ -465,12 +467,13 @@ addSize x (VarSize f) = VarSize ((x +) . f)
 
 pokeForeignPtr :: ForeignPtr a -> Int -> Int -> Poke ()
 pokeForeignPtr sourceFp sourceOffset len =
-    Poke $ \targetPtr targetOffset k -> do
+    Poke $ \targetPtr targetOffset -> do
         withForeignPtr sourceFp $ \sourcePtr ->
             BS.memcpy (targetPtr `plusPtr` targetOffset)
                       (sourcePtr `plusPtr` sourceOffset)
                       len
-        k (targetOffset + len) ()
+        let !newOffset = targetOffset + len
+        return (newOffset, ())
 
 peekPlainForeignPtr :: String -> Int -> Peek (ForeignPtr a)
 peekPlainForeignPtr ty len =
@@ -485,18 +488,20 @@ peekPlainForeignPtr ty len =
 
 pokePtr :: Ptr a -> Int -> Int -> Poke ()
 pokePtr sourcePtr sourceOffset len =
-    Poke $ \targetPtr targetOffset k -> do
+    Poke $ \targetPtr targetOffset -> do
         BS.memcpy (targetPtr `plusPtr` targetOffset)
                   (sourcePtr `plusPtr` sourceOffset)
                   len
-        k (targetOffset + len) ()
+        let !newOffset = targetOffset + len
+        return (newOffset, ())
 
 pokeByteArray :: ByteArray# -> Int -> Int -> Poke ()
 pokeByteArray sourceArr sourceOffset len =
-    Poke $ \targetPtr targetOffset k -> do
+    Poke $ \targetPtr targetOffset -> do
         let target = targetPtr `plusPtr` targetOffset
         copyByteArrayToAddr sourceArr sourceOffset target len
-        k (targetOffset + len) ()
+        let !newOffset = targetOffset + len
+        return (newOffset, ())
 
 peekByteArray :: String -> Int -> Peek ByteArray
 peekByteArray ty len =
