@@ -58,7 +58,7 @@ encodeMessage :: Store a => Message a -> ByteString
 encodeMessage (Message x) =
     let l = getSize size x
     in BS.unsafeCreate
-       (Storable.sizeOf (undefined :: SizeTag) + l)
+       (tagLength + l)
        (\p -> runPoke (poke l >> poke x) p 0 (\_ _ -> return ()))
 {-# INLINE encodeMessage #-}
 
