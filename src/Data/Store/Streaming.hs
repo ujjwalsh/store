@@ -56,7 +56,7 @@ tagLength = Storable.sizeOf (undefined :: SizeTag)
 -- | Encode a 'Message' to a 'ByteString'.
 encodeMessage :: Store a => Message a -> ByteString
 encodeMessage (Message x) =
-    let l = getSize size x
+    let l = getSize x
     in BS.unsafeCreate
        (tagLength + l)
        (\p -> runPoke (poke l >> poke x) p 0 (\_ _ -> return ()))
