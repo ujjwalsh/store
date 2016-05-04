@@ -22,7 +22,7 @@
 -- "Data.Store.TH" due to Template Haskell's stage restriction.
 module Data.Store.Impl where
 
-import           Control.Exception (Exception(..), throwIO)
+import           Control.Exception (Exception(..), throwIO, assert)
 import           Control.Exception (try)
 import           Control.Monad
 import qualified Control.Monad.Fail as Fail
@@ -87,9 +87,10 @@ class Store a where
 -- 'size'), and then uses 'poke' to fill it.
 encode :: Store a => a -> BS.ByteString
 encode x = BS.unsafeCreate
-    (getSize x)
-    (\p -> void (runPoke (poke x) p 0))
-    -- TODO: how about checking if the size is correct?
+    l
+    (\p -> do (offset, ()) <- (runPoke (poke x) p 0)
+              assert (offset == l) (return ()))
+  where l = getSize x
 
 -- | Decodes a value from a 'BS.ByteString'. Returns an exception if
 -- there's an error while decoding, or if decoding undershoots /

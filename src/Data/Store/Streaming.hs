@@ -28,7 +28,7 @@ module Data.Store.Streaming
        , conduitDecode
        ) where
 
-import           Control.Monad (void)
+import           Control.Exception (assert)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource (MonadResource)
 import           Data.ByteString (ByteString)
@@ -58,9 +58,11 @@ tagLength = Storable.sizeOf (undefined :: SizeTag)
 encodeMessage :: Store a => Message a -> ByteString
 encodeMessage (Message x) =
     let l = getSize x
+        totalLength = tagLength + l
     in BS.unsafeCreate
-       (tagLength + l)
-       (\p -> void $ runPoke (poke l >> poke x) p 0)
+       totalLength
+       (\p -> do (offset, ()) <- runPoke (poke l >> poke x) p 0
+                 assert (offset == totalLength) (return ()))
 {-# INLINE encodeMessage #-}
 
 -- | The result of peeking at the next message can either be a
