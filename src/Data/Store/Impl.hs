@@ -275,7 +275,8 @@ sizeStorable = ConstSize (sizeOf (error msg :: a))
 pokeStorable :: Storable a => a -> Poke ()
 pokeStorable x = Poke $ \ptr offset -> do
     y <- pokeByteOff ptr offset x
-    return (offset + sizeOf x, y)
+    let !newOffset = offset + sizeOf x
+    return (newOffset, y)
 {-# INLINE pokeStorable #-}
 
 -- FIXME: make it the responsibility of the caller to check this.
