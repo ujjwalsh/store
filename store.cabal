@@ -71,7 +71,9 @@ test-suite store-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
-  other-modules:       Spec.TH
+  other-modules:       Data.StoreSpec
+                     , Data.Store.StreamingSpec
+                     , Spec.TH
                      , System.IO.ByteBufferSpec
   build-depends:       base
                      , store
@@ -89,6 +91,7 @@ test-suite store-test
                      , hashable
                      , time
                      , th-reify-many
+                     , th-utilities
                      , conduit
                      , resourcet
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -fwarn-identities -O2
