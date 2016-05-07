@@ -19,11 +19,13 @@ module Data.Store.TH
     -- * Testing Store instances
       smallcheckManyStore
     , checkRoundtrip
+    , assertRoundtrip
     ) where
 
 import           Data.Complex ()
 import           Data.Store.Impl
 import           Data.Store.TH.Internal (deriveStore)
+import           Data.Typeable (Typeable, typeOf)
 import           Debug.Trace (trace)
 import           Language.Haskell.TH
 import           TH.Derive (Deriver(..))
@@ -50,6 +52,11 @@ smallcheckManyStore verbose depth = smallcheckMany . map testRoundtrip
         ty <- tyq
         expr <- [e| property $ changeDepth (\_ -> depth) $ \x -> checkRoundtrip verbose (x :: $(return ty)) |]
         return ("Roundtrips (" ++ pprint ty ++ ")", expr)
+
+assertRoundtrip :: (Eq a, Show a, Store a, Monad m, Typeable a) => Bool -> a -> m ()
+assertRoundtrip verbose x
+    | checkRoundtrip verbose x = return ()
+    | otherwise = fail $ "Failed to roundtrip "  ++ show (typeOf x)
 
 -- | Check if a given value succeeds in decoding its encoded
 -- representation.

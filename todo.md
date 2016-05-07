@@ -10,6 +10,4 @@
 
 * Add remaining unboxed vector instances (via TH)
 
-* Test with slices of bytestring / text / vector
-
 * Benchmark Word vs Int for tags
