@@ -16,7 +16,7 @@ quite a different niche from packages like 'binary' or 'cereal'. In particular:
 
 * `Store` will not work at all on architectures which lack unaligned memory
   access (for example, older ARM processors).  This is not a fundamental
-  implementation, but we do not currently require ARM support.
+  limitation, but we do not currently require ARM support.
 
 See
 [this blog post](https://www.fpcomplete.com/blog/2016/03/efficient-binary-serialization)
