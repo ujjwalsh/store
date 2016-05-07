@@ -69,6 +69,7 @@ import           Data.HashSet (HashSet)
 import           Data.Hashable (Hashable)
 import           Data.IntMap (IntMap)
 import           Data.IntSet (IntSet)
+import qualified Data.List.NonEmpty as NE
 import           Data.Map (Map)
 import           Data.MonoTraversable
 import           Data.Monoid
@@ -412,6 +413,8 @@ instance Store a => Store [a] where
     size = sizeSequence
     poke = pokeSequence
     peek = peekSequence
+
+instance Store a => Store (NE.NonEmpty a)
 
 instance Store a => Store (Seq a) where
     size = sizeSequence

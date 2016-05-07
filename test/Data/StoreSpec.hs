@@ -21,6 +21,7 @@ import           Data.Hashable (Hashable)
 import           Data.Int
 import           Data.IntMap (IntMap)
 import           Data.IntSet (IntSet)
+import qualified Data.List.NonEmpty as NE
 import           Data.Map (Map)
 import           Data.Monoid
 import           Data.Primitive.Types (Addr)
@@ -166,8 +167,10 @@ instance Monad m => Serial m Time.DiffTime where
 instance Monad m => Serial m Time.UTCTime where
     series = uncurry Time.UTCTime <$> (series >< series)
 
+instance (Monad m, Serial m a) => Serial m (NE.NonEmpty a)
+
 -- Should probably get added to smallcheck :)
-instance (Monad m) => Serial m Void where
+instance Monad m => Serial m Void where
     series = generate (\_ -> [])
 
 deriving instance Show NameFlavour
@@ -252,6 +255,8 @@ spec = do
             , [t| HashMap Int64 Int64 |]
             , [t| HashSet Int8 |]
             , [t| HashSet Int64 |]
+            , [t| NE.NonEmpty Int8 |]
+            , [t| NE.NonEmpty Int64 |]
             ])
     it "StaticSize roundtrips" $ do
         let x :: StaticSize 17 BS.ByteString

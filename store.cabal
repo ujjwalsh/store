@@ -64,6 +64,7 @@ library
                      , lifted-base
                      , monad-control
                      , resourcet
+                     , semigroups
   default-language:    Haskell2010
   ghc-options:         -Wall -O2
 
@@ -94,6 +95,7 @@ test-suite store-test
                      , th-utilities
                      , conduit
                      , resourcet
+                     , semigroups
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -fwarn-identities -O2
   if flag(verbose-test)
       cpp-options:     -DVERBOSE_TEST
