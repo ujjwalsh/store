@@ -73,8 +73,8 @@ test-suite store-test
   hs-source-dirs:      test
   main-is:             Spec.hs
   other-modules:       Data.StoreSpec
+                     , Data.StoreSpec.TH
                      , Data.Store.StreamingSpec
-                     , Spec.TH
                      , System.IO.ByteBufferSpec
   build-depends:       base
                      , store

@@ -2,7 +2,7 @@
 
 -- Just exists due to TH stage restriction... The actual testing TH code
 -- is in "Data.Store.TH".
-module Spec.TH where
+module Data.StoreSpec.TH where
 
 verbose :: Bool
 verbose =

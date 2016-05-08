@@ -51,7 +51,7 @@ import           GHC.Real (Ratio(..))
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
-import           Spec.TH
+import           Data.StoreSpec.TH
 import           System.Posix.Types
 import           TH.ReifyDataType
 import           Test.Hspec hiding (runIO)
