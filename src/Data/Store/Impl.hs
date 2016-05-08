@@ -60,6 +60,13 @@ import           System.IO.Unsafe (unsafePerformIO)
 class Store a where
     -- | Yields the 'Size' of the buffer, in bytes, required to store
     -- the encoded representation of the type.
+    --
+    -- Note that the correctness of this function is crucial for the
+    -- safety of 'poke', as it does not do any bounds checking. It is
+    -- the responsibility of the invoker of 'poke' ('encode' and similar
+    -- functions) to ensure that there's enough space in the output
+    -- buffer. If 'poke' writes beyond, then arbitrary memory can be
+    -- overwritten, causing undefined behavior and segmentation faults.
     size :: Size a
     -- | Serializes a value to bytes. It is the responsibility of the
     -- caller to ensure that at least the number of bytes required by
