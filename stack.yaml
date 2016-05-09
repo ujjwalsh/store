@@ -1,18 +1,8 @@
 resolver: lts-5.8
-extra-deps:
-- smallcheck-series-0.5.1
 packages:
 - .
 - location: deps/smallcheck
   extra-dep: true
-- location:
-    git: https://github.com/fpco/th-utilities
-    commit: ab45904
-  subdirs:
-    - th-utilities
-  extra-dep: true
 extra-deps:
 - th-lift-instances-0.1.6
-
-# cbor has overly tight constraint on time
-allow-newer: true
+- th-utilities-0.1.0.0
