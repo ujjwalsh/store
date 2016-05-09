@@ -6,7 +6,7 @@
 -- This portion of the store package is still under development and will
 -- likely change.
 module Data.Store.TypeHash
-    ( TaggedTH(..)
+    ( Tagged(..)
     , TypeHash
     , HasTypeHash(..)
     -- * TH for generating HasTypeHash instances

@@ -25,19 +25,19 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany (reifyMany)
 import           Language.Haskell.TH.Syntax (Lift(lift))
 
-newtype TaggedTH a = TaggedTH { unTaggedTH :: a }
+newtype Tagged a = Tagged { unTagged :: a }
     deriving (Eq, Ord, Show, Data, Typeable, Generic)
 
-instance NFData a => NFData (TaggedTH a)
+instance NFData a => NFData (Tagged a)
 
-instance (Store a, HasTypeHash a) => Store (TaggedTH a) where
-    size = addSize 20 (contramapSize unTaggedTH size)
+instance (Store a, HasTypeHash a) => Store (Tagged a) where
+    size = addSize 20 (contramapSize unTagged size)
     peek = do
         tag <- peek
         let expected = typeHash (Proxy :: Proxy a)
         when (tag /= expected) $ fail "Mismatched type hash"
-        TaggedTH <$> peek
-    poke (TaggedTH x) = do
+        Tagged <$> peek
+    poke (Tagged x) = do
         poke (typeHash (Proxy :: Proxy a))
         poke x
 

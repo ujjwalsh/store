@@ -277,14 +277,14 @@ deriveManyStorePrimVector = do
             peekExpr <- [| do
                 len <- peek
                 let sz = I# $(primSizeOfExpr argTy)
-                array <- peekByteArray $(lift ("Primitive Vector (" ++ pprint argTy ++ ")"))
-                                       (len * sz)
+                array <- peekToByteArray $(lift ("Primitive Vector (" ++ pprint argTy ++ ")"))
+                                         (len * sz)
                 return (PV.Vector 0 len array)
                 |]
             pokeExpr <- [| \(PV.Vector offset len (ByteArray array)) -> do
                 let sz = I# $(primSizeOfExpr argTy)
                 poke len
-                pokeByteArray array (offset * sz) (len * sz)
+                pokeFromByteArray array (offset * sz) (len * sz)
                 |]
             return $ makeStoreInstance cs instTy sizeExpr peekExpr pokeExpr
         _ -> fail "Invariant violated in derivemanyStorePrimVector"

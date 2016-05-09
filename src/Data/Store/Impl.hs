@@ -516,8 +516,8 @@ addSize x (VarSize f) = VarSize ((x +) . f)
 ------------------------------------------------------------------------
 -- Utilities for implementing 'Store' instances via memcpy
 
-pokeForeignPtr :: ForeignPtr a -> Int -> Int -> Poke ()
-pokeForeignPtr sourceFp sourceOffset len =
+pokeFromForeignPtr :: ForeignPtr a -> Int -> Int -> Poke ()
+pokeFromForeignPtr sourceFp sourceOffset len =
     Poke $ \targetPtr targetOffset -> do
         withForeignPtr sourceFp $ \sourcePtr ->
             BS.memcpy (targetPtr `plusPtr` targetOffset)
@@ -526,8 +526,8 @@ pokeForeignPtr sourceFp sourceOffset len =
         let !newOffset = targetOffset + len
         return (newOffset, ())
 
-peekPlainForeignPtr :: String -> Int -> Peek (ForeignPtr a)
-peekPlainForeignPtr ty len =
+peekToPlainForeignPtr :: String -> Int -> Peek (ForeignPtr a)
+peekToPlainForeignPtr ty len =
     Peek $ \end sourcePtr -> do
         let ptr2 = sourcePtr `plusPtr` len
         when (ptr2 > end) $
@@ -537,8 +537,8 @@ peekPlainForeignPtr ty len =
             BS.memcpy targetPtr (castPtr sourcePtr) len
         return (ptr2, castForeignPtr fp)
 
-pokePtr :: Ptr a -> Int -> Int -> Poke ()
-pokePtr sourcePtr sourceOffset len =
+pokeFromPtr :: Ptr a -> Int -> Int -> Poke ()
+pokeFromPtr sourcePtr sourceOffset len =
     Poke $ \targetPtr targetOffset -> do
         BS.memcpy (targetPtr `plusPtr` targetOffset)
                   (sourcePtr `plusPtr` sourceOffset)
@@ -546,16 +546,16 @@ pokePtr sourcePtr sourceOffset len =
         let !newOffset = targetOffset + len
         return (newOffset, ())
 
-pokeByteArray :: ByteArray# -> Int -> Int -> Poke ()
-pokeByteArray sourceArr sourceOffset len =
+pokeFromByteArray :: ByteArray# -> Int -> Int -> Poke ()
+pokeFromByteArray sourceArr sourceOffset len =
     Poke $ \targetPtr targetOffset -> do
         let target = targetPtr `plusPtr` targetOffset
         copyByteArrayToAddr sourceArr sourceOffset target len
         let !newOffset = targetOffset + len
         return (newOffset, ())
 
-peekByteArray :: String -> Int -> Peek ByteArray
-peekByteArray ty len =
+peekToByteArray :: String -> Int -> Peek ByteArray
+peekToByteArray ty len =
     Peek $ \end sourcePtr -> do
         let ptr2 = sourcePtr `plusPtr` len
         when (ptr2 > end) $

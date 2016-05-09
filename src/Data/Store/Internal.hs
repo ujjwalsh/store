@@ -50,7 +50,7 @@ module Data.Store.Internal
     --
     -- This portion of the library is still work-in-progress.
     -- 'IsStaticSize' is only supported for strict ByteStrings, in order
-    -- to support the use case of 'TaggedTH'.
+    -- to support the use case of 'Tagged'.
     , IsStaticSize(..), StaticSize(..), toStaticSizeEx, liftStaticSize
     ) where
 
@@ -296,10 +296,10 @@ instance Storable a => Store (SV.Vector a) where
     poke x = do
         let (fptr, len) = SV.unsafeToForeignPtr0 x
         poke len
-        pokeForeignPtr fptr 0 (sizeOf (undefined :: a) * len)
+        pokeFromForeignPtr fptr 0 (sizeOf (undefined :: a) * len)
     peek = do
         len <- peek
-        fp <- peekPlainForeignPtr "Data.Storable.Vector.Vector" (sizeOf (undefined :: a) * len)
+        fp <- peekToPlainForeignPtr "Data.Storable.Vector.Vector" (sizeOf (undefined :: a) * len)
         liftIO $ SV.unsafeFreeze (MSV.MVector len fp)
 
 instance Store BS.ByteString where
@@ -309,10 +309,10 @@ instance Store BS.ByteString where
     poke x = do
         let (sourceFp, sourceOffset, sourceLength) = BS.toForeignPtr x
         poke sourceLength
-        pokeForeignPtr sourceFp sourceOffset sourceLength
+        pokeFromForeignPtr sourceFp sourceOffset sourceLength
     peek = do
         len <- peek
-        fp <- peekPlainForeignPtr "Data.ByteString.ByteString" len
+        fp <- peekToPlainForeignPtr "Data.ByteString.ByteString" len
         return (BS.PS fp 0 len)
 
 instance Store SBS.ShortByteString where
@@ -322,10 +322,10 @@ instance Store SBS.ShortByteString where
     poke x@(SBS.SBS arr) = do
         let len = SBS.length x
         poke len
-        pokeByteArray arr 0 len
+        pokeFromByteArray arr 0 len
     peek = do
         len <- peek
-        ByteArray array <- peekByteArray "Data.ByteString.Short.ShortByteString" len
+        ByteArray array <- peekToByteArray "Data.ByteString.Short.ShortByteString" len
         return (SBS.SBS array)
 
 instance Store LBS.ByteString where
@@ -347,10 +347,10 @@ instance Store T.Text where
     poke x = do
         let !(T.Text (TA.Array array) w16Off w16Len) = x
         poke w16Len
-        pokeByteArray array (2 * w16Off) (2 * w16Len)
+        pokeFromByteArray array (2 * w16Off) (2 * w16Len)
     peek = do
         w16Len <- peek
-        ByteArray array <- peekByteArray "Data.Text.Text" (2 * w16Len)
+        ByteArray array <- peekToByteArray "Data.Text.Text" (2 * w16Len)
         return (T.Text (TA.Array array) 0 w16Len)
 
 {-
@@ -394,10 +394,10 @@ instance KnownNat n => Store (StaticSize n BS.ByteString) where
     poke (StaticSize x) = do
         -- TODO: worth it to put an assert here?
         let (sourceFp, sourceOffset, sourceLength) = BS.toForeignPtr x
-        pokeForeignPtr sourceFp sourceOffset sourceLength
+        pokeFromForeignPtr sourceFp sourceOffset sourceLength
     peek = do
         let len = fromInteger (natVal (Proxy :: Proxy n))
-        fp <- peekPlainForeignPtr ("StaticSize " ++ show len ++ " Data.ByteString") len
+        fp <- peekToPlainForeignPtr ("StaticSize " ++ show len ++ " Data.ByteString") len
         return (StaticSize (BS.PS fp 0 len))
 
 -- NOTE: this could be a 'Lift' instance, but we can't use type holes in
@@ -470,12 +470,12 @@ instance Store Integer where
         let len = I# (sizeofByteArray# arr)
         poke (1 :: Word8)
         poke len
-        pokeByteArray arr 0 len
+        pokeFromByteArray arr 0 len
     poke (I.Jn# (I.BN# arr)) = do
         let len = I# (sizeofByteArray# arr)
         poke (2 :: Word8)
         poke len
-        pokeByteArray arr 0 len
+        pokeFromByteArray arr 0 len
     peek = do
         tag <- peek :: Peek Word8
         case tag of
@@ -486,7 +486,7 @@ instance Store Integer where
       where
         peekBN = do
           len <- peek :: Peek Int
-          ByteArray arr <- peekByteArray "GHC>Integer" len
+          ByteArray arr <- peekToByteArray "GHC>Integer" len
           return $ I.BN# arr
 
 -- instance Store GHC.Fingerprint.Types.Fingerprint where

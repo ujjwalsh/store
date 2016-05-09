@@ -174,7 +174,7 @@ instance Monad m => Serial m Time.UTCTime where
 
 instance (Monad m, Serial m a) => Serial m (NE.NonEmpty a)
 
-instance (Monad m, Serial m a) => Serial m (TaggedTH a)
+instance (Monad m, Serial m a) => Serial m (Tagged a)
 
 -- Should probably get added to smallcheck :)
 instance Monad m => Serial m Void where
@@ -266,7 +266,7 @@ spec = do
             , [t| HashSet Int64 |]
             , [t| NE.NonEmpty Int8 |]
             , [t| NE.NonEmpty Int64 |]
-            , [t| TaggedTH Int32 |]
+            , [t| Tagged Int32 |]
             ])
     it "Slices roundtrip" $ do
         assertRoundtrip False $ T.drop 3 $ T.take 3 "Hello world!"
