@@ -22,7 +22,7 @@
 -- "Data.Store.TH" due to Template Haskell's stage restriction.
 module Data.Store.Impl where
 
-import           Control.Exception (Exception(..), throwIO, assert)
+import           Control.Exception (Exception(..), throwIO)
 import           Control.Exception (try)
 import           Control.Monad
 import qualified Control.Monad.Fail as Fail
@@ -30,6 +30,7 @@ import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Primitive (PrimMonad (..))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
+import           Data.Monoid ((<>))
 import           Data.Primitive.ByteArray
 import           Data.Proxy
 import qualified Data.Text as T
@@ -93,11 +94,23 @@ class Store a where
 -- first allocates a 'BS.ByteString' of the correct size (based on
 -- 'size'), and then uses 'poke' to fill it.
 encode :: Store a => a -> BS.ByteString
-encode x = BS.unsafeCreate
-    l
-    (\p -> do (offset, ()) <- (runPoke (poke x) p 0)
-              assert (offset == l) (return ()))
-  where l = getSize x
+encode x = BS.unsafeCreate l $ \p -> do
+    (o, ()) <- runPoke (poke x) p 0
+    checkOffset o l
+  where
+    l = getSize x
+
+checkOffset :: Int -> Int -> IO ()
+checkOffset o l
+    | o > l = throwIO $ PokeException o $
+        "encode overshot end of " <>
+        T.pack (show l) <>
+        " byte long buffer"
+    | o < l = throwIO $ PokeException o $
+        "encode undershot end of " <>
+        T.pack (show l) <>
+        " byte long buffer"
+    | otherwise = return ()
 
 -- | Decodes a value from a 'BS.ByteString'. Returns an exception if
 -- there's an error while decoding, or if decoding undershoots /
@@ -344,10 +357,38 @@ instance Monad Poke where
         (offset2, x') <- x ptr offset1
         runPoke (f x') ptr offset2
     {-# INLINE (>>=) #-}
+    fail = Fail.fail
+    {-# INLINE fail #-}
+
+instance Fail.MonadFail Poke where
+    fail = pokeException . T.pack
+    {-# INLINE fail #-}
 
 instance MonadIO Poke where
     liftIO f = Poke $ \_ offset -> (offset, ) <$> f
     {-# INLINE liftIO #-}
+
+-- | Exception thrown while running 'poke'. Note that other types of
+-- exceptions could also be thrown. Invocations of 'fail' in the 'Poke'
+-- monad causes this exception to be thrown.
+--
+-- 'PokeException's are not expected to occur in ordinary circumstances,
+-- and usually indicate a programming error.
+data PokeException = PokeException
+    { pokeExByteIndex :: Offset
+    , pokeExMessage :: T.Text
+    }
+    deriving (Eq, Show, Typeable)
+
+instance Exception PokeException where
+    displayException (PokeException offset msg) =
+        "Exception while poking, at byte index " ++
+        show offset ++
+        " : " ++
+        T.unpack msg
+
+pokeException :: T.Text -> Poke a
+pokeException msg = Poke $ \_ off -> throwIO (PokeException off msg)
 
 ------------------------------------------------------------------------
 -- Peek monad
@@ -400,18 +441,21 @@ instance MonadIO Peek where
     liftIO f = Peek $ \_ ptr -> (ptr, ) <$> f
     {-# INLINE liftIO #-}
 
--- TODO: custom Show instance which clarifies meaning of offset
-
 -- | Exception thrown while running 'peek'. Note that other types of
--- exceptions can also be thrown.
-data PeekException = PeekException Offset T.Text
-    deriving (Eq, Show, Typeable)
+-- exceptions can also be thrown. Invocations of 'fail' in the 'Poke'
+-- monad causes this exception to be thrown.
+--
+-- 'PeekException' is thrown when the data being decoded is invalid.
+data PeekException = PeekException
+    { peekExBytesFromEnd :: Offset
+    , peekExMessage :: T.Text
+    } deriving (Eq, Show, Typeable)
 
 instance Exception PeekException where
     displayException (PeekException offset msg) =
         "Exception while peeking, " ++
         show offset ++
-        " bytes from end : " ++
+        " bytes from end: " ++
         T.unpack msg
 
 peekException :: T.Text -> Peek a

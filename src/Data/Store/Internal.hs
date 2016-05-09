@@ -30,6 +30,8 @@ module Data.Store.Internal
     , decodeIO, decodeIOWith, decodeIOPortionWith
     -- * Store class and related types.
     , Store(..), Poke, Peek
+    -- ** Exceptions thrown by Poke
+    , PokeException(..), pokeException
     -- ** Exceptions thrown by Peek
     , PeekException(..), peekException, tooManyBytes
     -- ** Size type
