@@ -33,6 +33,8 @@ import           Data.Store
 import           Data.Store.Internal
 import           Data.Store.TH
 import           Data.Store.TH.Internal
+import           Data.Store.TypeHash
+import           Data.StoreSpec.TH
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Time as Time
@@ -51,7 +53,6 @@ import           GHC.Real (Ratio(..))
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
-import           Data.StoreSpec.TH
 import           System.Posix.Types
 import           TH.ReifyDataType
 import           Test.Hspec hiding (runIO)
@@ -67,6 +68,8 @@ addMinAndMaxBounds :: forall a. (Bounded a, Eq a, Num a) => [a] -> [a]
 addMinAndMaxBounds xs =
     (if (minBound :: a) `notElem` xs then [minBound] else []) ++
     (if (maxBound :: a) `notElem` xs && (maxBound :: a) /= minBound then maxBound : xs else xs)
+
+$(mkManyHasTypeHash [ [t| Int32 |] ])
 
 -- Serial instances for (Num a, Bounded a) types. Only really
 -- appropriate for the use here.
@@ -171,6 +174,8 @@ instance Monad m => Serial m Time.UTCTime where
 
 instance (Monad m, Serial m a) => Serial m (NE.NonEmpty a)
 
+instance (Monad m, Serial m a) => Serial m (TaggedTH a)
+
 -- Should probably get added to smallcheck :)
 instance Monad m => Serial m Void where
     series = generate (\_ -> [])
@@ -187,8 +192,8 @@ data Test
     | TestC
     | TestD BS.ByteString
     deriving (Eq, Show, Generic)
-$(return . (:[]) =<< deriveStore [] (ConT ''Test) . dtCons =<< reifyDataType ''Test)
--- instance Store Test
+-- $(return . (:[]) =<< deriveStore [] (ConT ''Test) . dtCons =<< reifyDataType ''Test)
+instance Store Test
 instance Monad m => Serial m Test
 
 data X = X
@@ -206,6 +211,8 @@ spec = do
                  , [t| CIntPtr |]
                  , [t| IntPtr |]
                  , [t| WordPtr |]
+                 , [t| TypeHash |]
+                 , [t| Fd |]
                  ]
              let f ty = isMonoType ty && ty `notElem` omitTys
              smallcheckManyStore verbose 2 . map return . filter f $ insts)
@@ -259,6 +266,7 @@ spec = do
             , [t| HashSet Int64 |]
             , [t| NE.NonEmpty Int8 |]
             , [t| NE.NonEmpty Int64 |]
+            , [t| TaggedTH Int32 |]
             ])
     it "Slices roundtrip" $ do
         assertRoundtrip False $ T.drop 3 $ T.take 3 "Hello world!"

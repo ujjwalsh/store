@@ -11,3 +11,11 @@
 * Add remaining unboxed vector instances (via TH)
 
 * Benchmark Word vs Int for tags
+
+* Based on speed of test, UTCTime seems to be slow
+
+* Renamings:
+
+  - Rename TaggedTH to something better? How about just Tagged?
+
+  - Rename utilities like "pokeForeignPtr" to "pokeFromForeignPtr"

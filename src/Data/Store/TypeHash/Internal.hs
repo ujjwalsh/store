@@ -36,8 +36,8 @@ instance (Store a, HasTypeHash a) => Store (TaggedTH a) where
         tag <- peek
         let expected = typeHash (Proxy :: Proxy a)
         when (tag /= expected) $ fail "Mismatched type hash"
-        peek
-    poke x = do
+        TaggedTH <$> peek
+    poke (TaggedTH x) = do
         poke (typeHash (Proxy :: Proxy a))
         poke x
 
