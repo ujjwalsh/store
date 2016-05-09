@@ -30,6 +30,7 @@ module System.IO.ByteBuffer
        , consume, unsafeConsume
        ) where
 
+import           Control.Applicative
 import           Control.Exception.Lifted (bracket)
 import           Control.Monad (when)
 import           Control.Monad.IO.Class
@@ -43,6 +44,7 @@ import           Foreign.ForeignPtr
 import qualified Foreign.Marshal.Alloc as Alloc
 import           Foreign.Marshal.Utils hiding (new, with)
 import           GHC.Ptr
+import           Prelude
 
 -- | A buffer into which bytes can be written.
 --

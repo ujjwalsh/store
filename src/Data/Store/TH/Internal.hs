@@ -1,8 +1,9 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ParallelListComp #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ParallelListComp #-}
 
 module Data.Store.TH.Internal
     (
@@ -17,6 +18,7 @@ module Data.Store.TH.Internal
     , isMonoType
     ) where
 
+import           Control.Applicative
 import           Data.Complex ()
 import           Data.Generics.Schemes (listify)
 import           Data.List (find)
@@ -36,6 +38,7 @@ import           GHC.Types (Int(..))
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany.Internal (TypeclassInstance(..), getInstances, unAppsT)
 import           Language.Haskell.TH.Syntax (lift)
+import           Prelude
 import           Safe (headMay)
 import           TH.ReifyDataType
 import           TH.Utilities (freeVarsT)
@@ -223,10 +226,16 @@ instance Store Bar where
 
 deriveTupleStoreInstance :: Int -> Dec
 deriveTupleStoreInstance n =
-    deriveGenericInstance (map (AppT (ConT ''Store)) tvs)
+    deriveGenericInstance (map storeCxt tvs)
                           (foldl1 AppT (TupleT n : tvs))
   where
     tvs = take n (map (VarT . mkName . (:[])) ['a'..'z'])
+    storeCxt ty =
+#if MIN_VERSION_template_haskell(2,10,0)
+        AppT (ConT ''Store) ty
+#else
+        ClassP ''Store [ty]
+#endif
 
 deriveGenericInstance :: Cxt -> Type -> Dec
 deriveGenericInstance cs ty = InstanceD cs (AppT (ConT ''Store) ty) []
@@ -253,7 +262,12 @@ deriveManyStoreFromStorable p = do
 
 -- Necessitated by the Typeable constraint on peekStorable
 everythingTypeable :: Type -> Cxt
-everythingTypeable = map (AppT (ConT ''Typeable) . VarT) . freeVarsT
+everythingTypeable =
+#if MIN_VERSION_template_haskell(2,10,0)
+  map (AppT (ConT ''Typeable) . VarT) . freeVarsT
+#else
+  map (ClassP ''Typeable . (:[]) . VarT) . freeVarsT
+#endif
 
 ------------------------------------------------------------------------
 -- Vector

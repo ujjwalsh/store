@@ -1,6 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -22,6 +24,7 @@
 -- "Data.Store.TH" due to Template Haskell's stage restriction.
 module Data.Store.Impl where
 
+import           Control.Applicative
 import           Control.Exception (Exception(..), throwIO)
 import           Control.Exception (try)
 import           Control.Monad
@@ -46,6 +49,7 @@ import           GHC.Prim (copyByteArrayToAddr#, copyAddrToByteArray#)
 import           GHC.Ptr (Ptr(..))
 import           GHC.TypeLits
 import           GHC.Types (IO(..), Int(..))
+import           Prelude
 import           System.IO.Unsafe (unsafePerformIO)
 
 ------------------------------------------------------------------------
@@ -283,16 +287,21 @@ instance (GStore a, KnownNat n) => GStoreSum n (C1 c a) where
 ------------------------------------------------------------------------
 -- Utilities for defining 'Store' instances based on 'Storable'
 
+-- | A 'size' implementation based on an instance of 'Storable' and
+-- 'Typeable'.
 sizeStorable :: forall a. (Storable a, Typeable a) => Size a
-sizeStorable = ConstSize (sizeOf (error msg :: a))
-  where
-    msg =
-        "In Data.Store.storableSize: " ++
-        show (typeRep (Proxy :: Proxy a)) ++
-        "'s sizeOf evaluated its argument."
+sizeStorable = sizeStorableTy (show (typeRep (Proxy :: Proxy a)))
 {-# INLINE sizeStorable #-}
 
--- | A @Poke@ implementation based on an instance of @Storable@
+-- | A 'size' implementation based on an instance of 'Storable'. Use this
+-- if the type is not 'Typeable'.
+sizeStorableTy :: forall a. Storable a => String -> Size a
+sizeStorableTy ty = ConstSize (sizeOf (error msg :: a))
+  where
+    msg = "In Data.Store.storableSize: " ++ ty ++ "'s sizeOf evaluated its argument."
+{-# INLINE sizeStorableTy #-}
+
+-- | A 'poke' implementation based on an instance of 'Storable'.
 pokeStorable :: Storable a => a -> Poke ()
 pokeStorable x = Poke $ \ptr offset -> do
     y <- pokeByteOff ptr offset x
@@ -302,18 +311,25 @@ pokeStorable x = Poke $ \ptr offset -> do
 
 -- FIXME: make it the responsibility of the caller to check this.
 
--- | A @Peek@ implementation based on an instance of @Storable@
+-- | A 'peek' implementation based on an instance of 'Storable' and
+-- 'Typeable'.
 peekStorable :: forall a. (Storable a, Typeable a) => Peek a
-peekStorable = Peek $ \end ptr ->
+peekStorable = peekStorableTy (show (typeRep (Proxy :: Proxy a)))
+{-# INLINE peekStorable #-}
+
+-- | A 'peek' implementation based on an instance of 'Storable'. Use
+-- this if the type is not 'Typeable'.
+peekStorableTy :: forall a. Storable a => String -> Peek a
+peekStorableTy ty = Peek $ \end ptr ->
     let ptr' = ptr `plusPtr` needed
         needed = sizeOf (undefined :: a)
         remaining = end `minusPtr` ptr
      in do
         when (ptr' > end) $
-            tooManyBytes needed remaining (show (typeRep (Proxy :: Proxy a)))
+            tooManyBytes needed remaining ty
         x <- Storable.peek (castPtr ptr)
         return (ptr', x)
-{-# INLINE peekStorable #-}
+{-# INLINE peekStorableTy #-}
 
 ------------------------------------------------------------------------
 -- Helpful Type Synonyms
@@ -381,11 +397,13 @@ data PokeException = PokeException
     deriving (Eq, Show, Typeable)
 
 instance Exception PokeException where
+#if MIN_VERSION_base(4,8,0)
     displayException (PokeException offset msg) =
         "Exception while poking, at byte index " ++
         show offset ++
         " : " ++
         T.unpack msg
+#endif
 
 pokeException :: T.Text -> Poke a
 pokeException msg = Poke $ \_ off -> throwIO (PokeException off msg)
@@ -452,11 +470,13 @@ data PeekException = PeekException
     } deriving (Eq, Show, Typeable)
 
 instance Exception PeekException where
+#if MIN_VERSION_base(4,8,0)
     displayException (PeekException offset msg) =
         "Exception while peeking, " ++
         show offset ++
         " bytes from end: " ++
         T.unpack msg
+#endif
 
 peekException :: T.Text -> Peek a
 peekException msg = Peek $ \end ptr -> throwIO (PeekException (end `minusPtr` ptr) msg)

@@ -22,18 +22,20 @@ module Data.Store.TH
     , assertRoundtrip
     ) where
 
-import           Data.Complex ()
-import           Data.Store.Impl
-import           Data.Store.TH.Internal (deriveStore)
-import           Data.Typeable (Typeable, typeOf)
-import           Debug.Trace (trace)
-import           Language.Haskell.TH
-import           TH.Derive (Deriver(..))
-import           TH.ReifyDataType (reifyDataTypeSubstituted, dtCons)
-import           TH.Utilities (expectTyCon1)
-import           Test.Hspec
-import           Test.Hspec.SmallCheck (property)
-import           Test.SmallCheck
+import Control.Applicative
+import Data.Complex ()
+import Data.Store.Impl
+import Data.Store.TH.Internal (deriveStore)
+import Data.Typeable (Typeable, typeOf)
+import Debug.Trace (trace)
+import Language.Haskell.TH
+import Prelude
+import TH.Derive (Deriver(..))
+import TH.ReifyDataType (reifyDataTypeSubstituted, dtCons)
+import TH.Utilities (expectTyCon1)
+import Test.Hspec
+import Test.Hspec.SmallCheck (property)
+import Test.SmallCheck
 
 instance Deriver (Store a) where
     runDeriver _ preds ty = do

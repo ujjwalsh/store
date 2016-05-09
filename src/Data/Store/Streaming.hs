@@ -29,6 +29,7 @@ module Data.Store.Streaming
        ) where
 
 import           Control.Exception (assert)
+import           Control.Monad (liftM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource (MonadResource)
 import           Data.ByteString (ByteString)
@@ -40,6 +41,7 @@ import           Data.Store.Impl (Peek (..), Poke (..), tooManyBytes, getSize)
 import           Data.Word
 import           Foreign.Ptr
 import qualified Foreign.Storable as Storable
+import           Prelude
 import           System.IO.ByteBuffer (ByteBuffer)
 import qualified System.IO.ByteBuffer as BB
 
@@ -74,7 +76,7 @@ data PeekMessage m a = Done (Message a)
 peekSized :: (MonadIO m, Store a) => ByteBuffer -> Int -> m (PeekMessage m a)
 peekSized bb n =
     BB.unsafeConsume bb n >>= \case
-        Right ptr -> Done . Message <$> decodeFromPtr ptr n
+        Right ptr -> liftM (Done . Message) $ decodeFromPtr ptr n
         Left _ -> return $ NeedMoreInput (\ bs -> BB.copyByteString bb bs
                                                   >> peekSized bb n)
 {-# INLINE peekSized #-}
@@ -142,7 +144,7 @@ decodeSized bb getBs n =
 -- up the encoded message.
 decodeFromPtr :: (MonadIO m, Store a) => Ptr Word8 -> Int -> m a
 decodeFromPtr ptr n =
-    liftIO $ snd <$> runPeek peek (ptr `plusPtr` n) ptr
+    liftIO (liftM snd $ runPeek peek (ptr `plusPtr` n) ptr)
 {-# INLINE decodeFromPtr #-}
 
 -- | Conduit for encoding 'Message's to 'ByteString's.

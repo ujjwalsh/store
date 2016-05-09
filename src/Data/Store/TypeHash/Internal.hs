@@ -1,12 +1,15 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Data.Store.TypeHash.Internal where
 
+import           Control.Applicative
 import           Control.DeepSeq (NFData)
 import           Control.Monad (when)
 import qualified Crypto.Hash.SHA1 as SHA1
@@ -24,6 +27,7 @@ import           Instances.TH.Lift ()
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany (reifyMany)
 import           Language.Haskell.TH.Syntax (Lift(lift))
+import           Prelude
 
 newtype Tagged a = Tagged { unTagged :: a }
     deriving (Eq, Ord, Show, Data, Typeable, Generic)
@@ -42,7 +46,12 @@ instance (Store a, HasTypeHash a) => Store (Tagged a) where
         poke x
 
 newtype TypeHash = TypeHash { unTypeHash :: StaticSize 20 BS.ByteString }
-    deriving (Eq, Ord, Show, Store, Data, Typeable, Generic)
+    deriving (Eq, Ord, Show, Store, Generic)
+
+#if __GLASGOW_HASKELL__ >= 710
+deriving instance Typeable TypeHash
+deriving instance Data TypeHash
+#endif
 
 instance NFData TypeHash
 

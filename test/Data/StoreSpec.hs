@@ -10,6 +10,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Data.StoreSpec where
 
+import           Control.Applicative
 import           Control.Monad (unless)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -53,8 +54,8 @@ import           GHC.Real (Ratio(..))
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
+import           Prelude
 import           System.Posix.Types
-import           TH.ReifyDataType
 import           Test.Hspec hiding (runIO)
 import           Test.SmallCheck.Series
 
@@ -102,11 +103,21 @@ $(do tys <- getAllInstanceTypes1 ''PV.Prim
                       series = fmap PV.fromList series |]
      concat <$> mapM f tys)
 
+-- Instance needed for generic TH instances
+
+-- Needs to be done manually because in GHC 7.8's TH, NameFlavour uses
+-- unboxed values and cannot use generic deriving. So we skip having an
+-- instance for it.
+instance Monad m => Serial m Name where series = fmap mkName series
+
 -- Serial instances for (Generic a) types.
 
 -- FIXME: generating for TH instances is probably just adding
 -- unnecessary compiletime + runtime overhead.
-$(do thNames <- reifyManyWithoutInstances ''Serial [''Info, ''Loc] (\_ -> True)
+$(do thNames <- reifyManyWithoutInstances
+         ''Serial
+         [''Info, ''Loc, ''ModName, ''PkgName, ''NameSpace, ''OccName]
+         (`notElem` [''NameFlavour])
      let ns = [ ''Any, ''All ] ++ thNames
          f n = [d| instance Monad m => Serial m $(conT n) |]
      concat <$> mapM f ns)
@@ -213,6 +224,7 @@ spec = do
                  , [t| WordPtr |]
                  , [t| TypeHash |]
                  , [t| Fd |]
+                 , [t| NameFlavour |]
                  ]
              let f ty = isMonoType ty && ty `notElem` omitTys
              smallcheckManyStore verbose 2 . map return . filter f $ insts)
