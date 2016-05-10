@@ -56,7 +56,7 @@ library
                      , th-lift
                      , th-lift-instances >= 0.1.6
                      , th-utilities
-                     , th-reify-many >= 0.1.5
+                     , th-reify-many >= 0.1.6
                      , time
                      , transformers
                      , unordered-containers

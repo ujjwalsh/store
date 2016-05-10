@@ -14,6 +14,7 @@ import           Control.DeepSeq (NFData)
 import           Control.Monad (when)
 import qualified Crypto.Hash.SHA1 as SHA1
 import qualified Data.ByteString as BS
+import           Data.Char (isUpper)
 import           Data.Data (Data)
 import           Data.Generics (listify)
 import           Data.List (sortBy)
@@ -89,15 +90,18 @@ typeHashForNames ns = do
 -- The resulting expression is a literal of type 'Int'.
 hashOfType :: Type -> Q Exp
 hashOfType ty = do
-    infos <- getTypeInfosRecursively (listify (\_ -> True) ty)
+    infos <- getTypeInfosRecursively (getInfoConcreteNames ty)
     lift $ TypeHash $ toStaticSizeEx $ SHA1.hash $ encode (ty, infos)
 
 getTypeInfosRecursively :: [Name] -> Q [(Name, Info)]
 getTypeInfosRecursively names = do
-    allInfos <- reifyManyTyDecls (\(_, info) -> return (True, listify (\_ -> True) info)) names
+    allInfos <- reifyManyTyDecls (\(_, info) -> return (True, getInfoConcreteNames info)) names
     -- Sorting step probably unnecessary because this should be
     -- deterministic, but hey why not.
     return (sortBy (comparing fst) allInfos)
+
+getInfoConcreteNames :: Data a => a -> [Name]
+getInfoConcreteNames = listify (isUpper . head . nameBase)
 
 -- TODO: Generic instance for polymorphic types, or have TH generate
 -- polymorphic instances.
