@@ -4,7 +4,7 @@
 -- deserialization issues can be anticipated.
 --
 -- This portion of the store package is still under development and will
--- likely change.
+-- likely change in interface and behavior.
 module Data.Store.TypeHash
     ( Tagged(..)
     , TypeHash

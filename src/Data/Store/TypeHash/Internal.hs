@@ -11,13 +11,14 @@ module Data.Store.TypeHash.Internal where
 
 import           Control.Applicative
 import           Control.DeepSeq (NFData)
-import           Control.Monad (when)
+import           Control.Monad (when, unless)
 import qualified Crypto.Hash.SHA1 as SHA1
 import qualified Data.ByteString as BS
-import           Data.Char (isUpper)
+import           Data.Char (isUpper, isLower)
 import           Data.Data (Data)
 import           Data.Generics (listify)
 import           Data.List (sortBy)
+import           Data.Monoid ((<>))
 import           Data.Ord (comparing)
 import           Data.Proxy (Proxy(..))
 import           Data.Store
@@ -90,18 +91,22 @@ typeHashForNames ns = do
 -- The resulting expression is a literal of type 'Int'.
 hashOfType :: Type -> Q Exp
 hashOfType ty = do
-    infos <- getTypeInfosRecursively (getInfoConcreteNames ty)
+    unless (null (getVarNames ty)) $ fail $ "hashOfType cannot handle polymorphic type " <> pprint ty
+    infos <- getTypeInfosRecursively (getConNames ty)
     lift $ TypeHash $ toStaticSizeEx $ SHA1.hash $ encode (ty, infos)
 
 getTypeInfosRecursively :: [Name] -> Q [(Name, Info)]
 getTypeInfosRecursively names = do
-    allInfos <- reifyManyTyDecls (\(_, info) -> return (True, getInfoConcreteNames info)) names
+    allInfos <- reifyManyTyDecls (\(_, info) -> return (True, getConNames info)) names
     -- Sorting step probably unnecessary because this should be
     -- deterministic, but hey why not.
     return (sortBy (comparing fst) allInfos)
 
-getInfoConcreteNames :: Data a => a -> [Name]
-getInfoConcreteNames = listify (isUpper . head . nameBase)
+getConNames :: Data a => a -> [Name]
+getConNames = listify (isUpper . head . nameBase)
+
+getVarNames :: Data a => a -> [Name]
+getVarNames = listify (isLower . head . nameBase)
 
 -- TODO: Generic instance for polymorphic types, or have TH generate
 -- polymorphic instances.
