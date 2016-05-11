@@ -83,3 +83,6 @@ benchmarks:
         dependencies:
           - cereal
           - binary
+          - vector-binary-instances
+          - cereal-vector
+        cpp-options: -DCOMPARISON_BENCH
