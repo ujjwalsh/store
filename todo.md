@@ -13,3 +13,7 @@
 * Benchmark Word vs Int for tags
 
 * Based on speed of test, UTCTime seems to be slow
+
+* Something like Packer's holes?  What about holes for parsing too?
+
+* Have an option to avoid copies and instead pin the input BS memory
