@@ -19,6 +19,7 @@ import           GHC.Generics
 #if COMPARISON_BENCH
 import qualified Data.Binary as Binary
 import qualified Data.Serialize as Cereal
+import qualified Data.ByteString.Lazy as BL
 #endif
 
 main :: IO ()
@@ -84,9 +85,22 @@ benchDecode = benchDecode' ""
 -- TODO: comparison bench for decode
 
 benchDecode' :: forall a. Ctx a => String -> a -> Benchmark
+#if COMPARISON_BENCH
+benchDecode' prefix x0 =
+    bgroup label
+        [ env (return (encode x0)) $ \x -> bench "store" (nf (decodeEx :: BS.ByteString -> a) x)
+        , env (return (Binary.encode x0)) $ \x -> bench "binary" (nf (Binary.decode :: BL.ByteString -> a) x)
+        , env (return (Cereal.encode x0)) $ \x -> bench "cereal" (nf ((ensureRight . Cereal.decode) :: BS.ByteString -> a) x)
+        ]
+  where
+    label = prefix ++ " (" ++ show (typeOf x0) ++ ")"
+    ensureRight (Left x) = error "left!"
+    ensureRight (Right x) = x
+#else
 benchDecode' prefix x0 =
     env (return (encode x0)) $ \x ->
         bench (prefix ++ " (" ++ show (typeOf x0) ++ ")") (nf (decodeEx :: BS.ByteString -> a) x)
+#endif
 
 ------------------------------------------------------------------------
 -- Serialized datatypes
