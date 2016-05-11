@@ -30,7 +30,7 @@ module Data.Store.Internal
       decodeEx, decodeExWith, decodeExPortionWith
     , decodeIO, decodeIOWith, decodeIOPortionWith
     -- * Store class and related types.
-    , Store(..), Poke, Peek
+    , Store(..), Poke, Peek, runPeek
     -- ** Exceptions thrown by Poke
     , PokeException(..), pokeException
     -- ** Exceptions thrown by Peek
