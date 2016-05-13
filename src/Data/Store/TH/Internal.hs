@@ -4,6 +4,7 @@
 {-# LANGUAGE ParallelListComp #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Data.Store.TH.Internal
     (
@@ -40,8 +41,15 @@ import           Language.Haskell.TH.ReifyMany.Internal (TypeclassInstance(..), 
 import           Language.Haskell.TH.Syntax (lift)
 import           Prelude
 import           Safe (headMay)
+import           TH.Derive (Deriver(..))
 import           TH.ReifyDataType
-import           TH.Utilities (freeVarsT)
+import           TH.Utilities (freeVarsT, expectTyCon1)
+
+instance Deriver (Store a) where
+    runDeriver _ preds ty = do
+        argTy <- expectTyCon1 ''Store ty
+        dt <- reifyDataTypeSubstituted argTy
+        (:[]) <$> deriveStore preds argTy (dtCons dt)
 
 deriveStore :: Cxt -> Type -> [DataCon] -> Q Dec
 deriveStore preds headTy cons0 =
