@@ -19,7 +19,6 @@ import           GHC.Generics
 #if COMPARISON_BENCH
 import qualified Data.Binary as Binary
 import qualified Data.Serialize as Cereal
-import qualified Data.Binary.Serialise.CBOR as CBOR
 #endif
 
 main :: IO ()

@@ -1,129 +1,183 @@
+-- This file has been generated from package.yaml by hpack version 0.14.0.
+--
+-- see: https://github.com/sol/hpack
+
 name:                store
 version:             0.1.0.0
-synopsis:            Fast serialization
-description:         Please see README.md
-homepage:            http://github.com/fpco/store#readme
+synopsis:            Fast binary serialization
+homepage:            https://github.com/fpco/store#readme
+bug-reports:         https://github.com/fpco/store/issues
 license:             MIT
 license-file:        LICENSE
-author:              FP Complete <dev@fpcomplete.com>
-maintainer:          FP Complete <dev@fpcomplete.com>
+maintainer:          Michael Sloan <sloan@fpcomplete.com>
 copyright:           2016 FP Complete
-category:            Serialization Data
+category:            Serialization, Data
 build-type:          Simple
-extra-source-files:  ChangeLog.md
-                     README.md
-cabal-version:       >=1.10
+cabal-version:       >= 1.10
 
-flag verbose-test
-    default: False
-    manual: True
-
-flag comparison-bench
-    default: False
-    manual: True
-
-library
-  hs-source-dirs:      src
-  exposed-modules:     Data.Store
-                     , Data.Store.Internal
-                     , Data.Store.TH
-                     , Data.Store.TH.Internal
-                     , Data.Store.TypeHash
-                     , Data.Store.TypeHash.Internal
-                     , Data.Store.Streaming
-                     , System.IO.ByteBuffer
-  other-modules:       Data.Store.Impl
-  build-depends:       base >= 4.7 && < 5
-                     , array
-                     , base-orphans >= 0.5.1
-                     , bytestring
-                     , containers
-                     , cryptohash
-                     , deepseq
-                     , fail
-                     , ghc-prim
-                     , hashable
-                     , hspec
-                     , hspec-smallcheck
-                     , integer-gmp
-                     , mono-traversable
-                     , primitive
-                     , safe
-                     , smallcheck
-                     , syb
-                     , template-haskell
-                     , text
-                     , th-lift
-                     , th-lift-instances >= 0.1.6
-                     , th-utilities
-                     , th-reify-many >= 0.1.6
-                     , time
-                     , transformers
-                     , unordered-containers
-                     , vector
-                     , conduit
-                     , lifted-base
-                     , monad-control
-                     , resourcet
-                     , semigroups
-                     , void
-                     , th-orphans >= 0.13.1
-  default-language:    Haskell2010
-  ghc-options:         -Wall -O2
-
-test-suite store-test
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Spec.hs
-  other-modules:       Data.StoreSpec
-                     , Data.StoreSpec.TH
-                     , Data.Store.StreamingSpec
-                     , System.IO.ByteBufferSpec
-  build-depends:       base
-                     , store
-                     , hspec
-                     , smallcheck
-                     , hspec-smallcheck
-                     , vector
-                     , bytestring
-                     , containers
-                     , mono-traversable
-                     , text
-                     , template-haskell
-                     , primitive
-                     , unordered-containers
-                     , hashable
-                     , time
-                     , th-reify-many
-                     , th-utilities
-                     , conduit
-                     , resourcet
-                     , semigroups
-                     , void
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -fwarn-identities -O2
-  if flag(verbose-test)
-      cpp-options:     -DVERBOSE_TEST
-  default-language:    Haskell2010
-
-benchmark store-bench
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      bench
-  main-is:             Bench.hs
-  build-depends:       base
-                     , criterion
-                     , template-haskell
-                     , store
-                     , deepseq
-                     , vector
-                     , bytestring
-  if flag(comparison-bench)
-      build-depends:   cereal
-                     , binary
-                     , binary-serialise-cbor
-      cpp-options:     -DCOMPARISON_BENCH
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N1 -with-rtsopts=-s -with-rtsopts=-qg -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -fwarn-identities -O2
-  default-language:    Haskell2010
+extra-source-files:
+    ChangeLog.md
+    README.md
 
 source-repository head
-  type:     git
+  type: git
   location: https://github.com/fpco/store
+
+flag comparison-bench
+  manual: True
+  default: False
+
+library
+  hs-source-dirs:
+      src
+  exposed-modules:
+      Data.Store
+      Data.Store.Internal
+      Data.Store.Streaming
+      Data.Store.TH
+      Data.Store.TH.Internal
+      Data.Store.TypeHash
+      Data.Store.TypeHash.Internal
+      System.IO.ByteBuffer
+  other-modules:
+      Data.Store.Impl
+  build-depends:
+      base >= 4.7 && < 5
+    , array
+    , base-orphans >= 0.5.1
+    , bytestring
+    , containers
+    , cryptohash
+    , deepseq
+    , fail
+    , ghc-prim
+    , hashable
+    , hspec
+    , hspec-smallcheck
+    , integer-gmp
+    , mono-traversable
+    , primitive
+    , safe
+    , smallcheck
+    , syb
+    , template-haskell
+    , text
+    , th-lift
+    , th-lift-instances >= 0.1.6
+    , th-utilities
+    , th-reify-many >= 0.1.6
+    , time
+    , transformers
+    , unordered-containers
+    , vector
+    , conduit
+    , lifted-base
+    , monad-control
+    , resourcet
+    , semigroups
+    , void
+    , th-orphans >= 0.13.1
+  default-language: Haskell2010
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2
+
+test-suite store-test
+  type: exitcode-stdio-1.0
+  hs-source-dirs:
+      test
+  main-is: Main.hs
+  other-modules:
+      Data.Store.StreamingSpec
+      Data.StoreSpec
+      Data.StoreSpec.TH
+      Spec
+      System.IO.ByteBufferSpec
+  build-depends:
+      base >= 4.7 && < 5
+    , array
+    , base-orphans >= 0.5.1
+    , bytestring
+    , containers
+    , cryptohash
+    , deepseq
+    , fail
+    , ghc-prim
+    , hashable
+    , hspec
+    , hspec-smallcheck
+    , integer-gmp
+    , mono-traversable
+    , primitive
+    , safe
+    , smallcheck
+    , syb
+    , template-haskell
+    , text
+    , th-lift
+    , th-lift-instances >= 0.1.6
+    , th-utilities
+    , th-reify-many >= 0.1.6
+    , time
+    , transformers
+    , unordered-containers
+    , vector
+    , conduit
+    , lifted-base
+    , monad-control
+    , resourcet
+    , semigroups
+    , void
+    , th-orphans >= 0.13.1
+    , hspec
+    , smallcheck
+    , hspec-smallcheck
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N
+  default-language: Haskell2010
+
+benchmark store-bench
+  type: exitcode-stdio-1.0
+  hs-source-dirs:
+      bench
+  main-is: Bench.hs
+  build-depends:
+      base >= 4.7 && < 5
+    , array
+    , base-orphans >= 0.5.1
+    , bytestring
+    , containers
+    , cryptohash
+    , deepseq
+    , fail
+    , ghc-prim
+    , hashable
+    , hspec
+    , hspec-smallcheck
+    , integer-gmp
+    , mono-traversable
+    , primitive
+    , safe
+    , smallcheck
+    , syb
+    , template-haskell
+    , text
+    , th-lift
+    , th-lift-instances >= 0.1.6
+    , th-utilities
+    , th-reify-many >= 0.1.6
+    , time
+    , transformers
+    , unordered-containers
+    , vector
+    , conduit
+    , lifted-base
+    , monad-control
+    , resourcet
+    , semigroups
+    , void
+    , th-orphans >= 0.13.1
+    , criterion
+  if flag(comparison-bench)
+    build-depends:
+        cereal
+      , binary
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N1 -with-rtsopts=-s -with-rtsopts=-qg
+  default-language: Haskell2010

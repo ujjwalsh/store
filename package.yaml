@@ -1,0 +1,83 @@
+name: store
+version: 0.1.0.0
+synopsis: Fast binary serialization
+maintainer: Michael Sloan <sloan@fpcomplete.com>
+license: MIT
+copyright: 2016 FP Complete
+github: fpco/store
+category: Serialization, Data
+extra-source-files:
+  - ChangeLog.md
+  - README.md
+
+flags:
+  comparison-bench:
+    default: false
+    manual: true
+
+ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2
+
+dependencies:
+  - base >= 4.7 && < 5
+  - array
+  - base-orphans >= 0.5.1
+  - bytestring
+  - containers
+  - cryptohash
+  - deepseq
+  - fail
+  - ghc-prim
+  - hashable
+  - hspec
+  - hspec-smallcheck
+  - integer-gmp
+  - mono-traversable
+  - primitive
+  - safe
+  - smallcheck
+  - syb
+  - template-haskell
+  - text
+  - th-lift
+  - th-lift-instances >= 0.1.6
+  - th-utilities
+  - th-reify-many >= 0.1.6
+  - time
+  - transformers
+  - unordered-containers
+  - vector
+  - conduit
+  - lifted-base
+  - monad-control
+  - resourcet
+  - semigroups
+  - void
+  - th-orphans >= 0.13.1
+
+library:
+  source-dirs: src
+  other-modules:
+    - Data.Store.Impl
+
+tests:
+  store-test:
+    source-dirs: test
+    main: Main.hs
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N
+    dependencies:
+      - hspec
+      - smallcheck
+      - hspec-smallcheck
+
+benchmarks:
+  store-bench:
+    source-dirs: bench
+    main: Bench.hs
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N1 -with-rtsopts=-s -with-rtsopts=-qg
+    dependencies:
+      - criterion
+    when:
+      - condition: flag(comparison-bench)
+        dependencies:
+          - cereal
+          - binary
