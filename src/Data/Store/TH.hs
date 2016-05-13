@@ -13,6 +13,12 @@
 --         instance Deriving (Store Foo)
 --         |]))
 -- @
+--
+-- One advantage of using this Template Haskell definition of Store
+-- instances is that in some cases they can be faster than the instances
+-- defined via Generics. Specifically, datatypes which can yield
+-- 'ConstSize' from 'size' will be faster when used in array-like types.
+-- The instances generated via generics always use 'VarSize'.
 module Data.Store.TH
     (
     -- * Testing Store instances

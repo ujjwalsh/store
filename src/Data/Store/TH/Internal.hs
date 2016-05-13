@@ -96,14 +96,21 @@ deriveStore preds headTy cons0 =
         matchConstSize :: MatchQ
         matchConstSize = do
             let sz0 = VarE (mkName "sz0")
+                sizeDecls =
+                    if null sizeNames
+                        then [valD (varP (mkName "sz0")) (normalB [| 0 |]) []]
+                        else zipWith constSizeDec sizeNames cons
             sameSizeExpr <-
-                foldl (\l r -> [| $(l) && $(r) |]) [| True |] $
-                map (\szn -> [| $(return sz0) == $(varE szn) |]) (tail sizeNames)
+                case sizeNames of
+                    (_ : tailSizeNames) ->
+                        foldl (\l r -> [| $(l) && $(r) |]) [| True |] $
+                        map (\szn -> [| $(return sz0) == $(varE szn) |]) tailSizeNames
+                    _ -> [| True |]
             result <- [| ConstSize (tagSize + $(return sz0)) |]
             match (tupP (map (\(n, _) -> conP 'ConstSize [varP n])
                              (concatMap snd cons)))
                   (guardedB [return (NormalG sameSizeExpr, result)])
-                  (zipWith constSizeDec sizeNames cons)
+                  sizeDecls
         constSizeDec :: Name -> (Name, [(Name, Type)]) -> DecQ
         constSizeDec szn (_, []) =
             valD (varP szn) (normalB [| 0 |]) []
