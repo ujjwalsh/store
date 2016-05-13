@@ -35,7 +35,17 @@ instance Binary.Binary SomeData
 
 main :: IO ()
 main = do
-    let sds = (\i -> SomeData i (fromIntegral i) (fromIntegral i))
+#if SMALL_BENCH
+    let is = 0::Int
+        sds = SomeData 1 1 1
+        smallprods = (SmallProduct 0 1 2 3)
+        smallmanualprods = (SmallProductManual 0 1 2 3)
+        sss = [SS1 1, SS2 2, SS3 3, SS4 4]
+        ssms = [SSM1 1, SSM2 2, SSM3 3, SSM4 4]
+        nestedTuples = ((1,2),(3,4)) :: ((Int,Int),(Int,Int))
+#else
+    let is = V.enumFromTo 1 100 :: V.Vector Int
+        sds = (\i -> SomeData i (fromIntegral i) (fromIntegral i))
             <$> V.enumFromTo 1 100
         smallprods = (\ i -> SmallProduct i (i+1) (i+2) (i+3))
             <$> V.enumFromTo 1 100
@@ -46,21 +56,26 @@ main = do
                       1 -> SS2 (fromIntegral i)
                       2 -> SS3 (fromIntegral i)
                       3 -> SS4 (fromIntegral i)
+                      _ -> error "This does not compute."
               ) <$> V.enumFromTo 1 100
         ssms = (\i -> case i `mod` 4 of
                        0 -> SSM1 (fromIntegral i)
                        1 -> SSM2 (fromIntegral i)
                        2 -> SSM3 (fromIntegral i)
                        3 -> SSM4 (fromIntegral i)
+                       _ -> error "This does not compute."
                ) <$> V.enumFromTo 1 100
         nestedTuples = (\i -> ((i,i+1),(i+2,i+3))) <$> V.enumFromTo (1::Int) 100
+#endif
     defaultMain
         [ bgroup "encode"
-            [ benchEncode (0 :: Int)
+            [ benchEncode is
+#if !SMALL_BENCH
             , benchEncode' "1kb storable" (SV.fromList ([1..256] :: [Int32]))
             , benchEncode' "10kb storable" (SV.fromList ([1..(256 * 10)] :: [Int32]))
             , benchEncode' "1kb normal" (V.fromList ([1..256] :: [Int32]))
             , benchEncode' "10kb normal" (V.fromList ([1..(256 * 10)] :: [Int32]))
+#endif
             , benchEncode smallprods
             , benchEncode smallmanualprods
             , benchEncode sss
@@ -69,11 +84,13 @@ main = do
             , benchEncode sds
             ]
         , bgroup "decode"
-            [ benchDecode (0 :: Int)
+            [ benchDecode is
+#if !SMALL_BENCH
             , benchDecode' "1kb storable" (SV.fromList ([1..256] :: [Int32]))
             , benchDecode' "10kb storable" (SV.fromList ([1..(256 * 10)] :: [Int32]))
             , benchDecode' "1kb normal" (V.fromList ([1..256] :: [Int32]))
             , benchDecode' "10kb normal" (V.fromList ([1..(256 * 10)] :: [Int32]))
+#endif
             , benchDecode smallprods
             , benchDecode smallmanualprods
             , benchDecode sss

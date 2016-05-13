@@ -15,6 +15,11 @@ flags:
     default: false
     manual: true
 
+
+  small-bench:
+    default: false
+    manual: true
+
 ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2
 
 dependencies:
@@ -86,3 +91,5 @@ benchmarks:
           - vector-binary-instances
           - cereal-vector
         cpp-options: -DCOMPARISON_BENCH
+      - condition: flag(small-bench)
+        cpp-options: -DSMALL_BENCH
