@@ -119,8 +119,8 @@ benchEncode' msg x0 =
 #if COMPARISON_BENCH
         bgroup label
             [ benchStore "store"
-            , bench "binary" (nf Binary.encode x)
             , bench "cereal" (nf Cereal.encode x)
+            , bench "binary" (nf Binary.encode x)
             ]
 #else
         benchStore label
@@ -136,8 +136,8 @@ benchDecode' :: forall a. Ctx a => String -> a -> Benchmark
 benchDecode' prefix x0 =
     bgroup label
         [ env (return (encode x0)) $ \x -> bench "store" (nf (decodeEx :: BS.ByteString -> a) x)
-        , env (return (Binary.encode x0)) $ \x -> bench "binary" (nf (Binary.decode :: BL.ByteString -> a) x)
         , env (return (Cereal.encode x0)) $ \x -> bench "cereal" (nf ((ensureRight . Cereal.decode) :: BS.ByteString -> a) x)
+        , env (return (Binary.encode x0)) $ \x -> bench "binary" (nf (Binary.decode :: BL.ByteString -> a) x)
         ]
   where
     label = prefix ++ " (" ++ show (typeOf x0) ++ ")"
