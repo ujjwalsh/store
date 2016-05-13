@@ -284,6 +284,9 @@ instance Store a => Store (V.Vector a) where
     size = sizeSequence
     poke = pokeSequence
     peek = V.unsafeFreeze =<< peekMutableSequence MV.new MV.write
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 -- NOTE: soon we'll have TH generation for all of the unbox instances.
 instance Store (UV.Vector Word) where
@@ -292,6 +295,9 @@ instance Store (UV.Vector Word) where
         sizeOf (undefined :: Word) * UV.length x
     poke !(UV.V_Word pv) = poke pv
     peek = UV.V_Word <$> peek
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Store (UV.Vector Word8) where
     size = VarSize $ \x ->
@@ -299,6 +305,9 @@ instance Store (UV.Vector Word8) where
         sizeOf (undefined :: Word8) * UV.length x
     poke !(UV.V_Word8 pv) = poke pv
     peek = UV.V_Word8 <$> peek
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Storable a => Store (SV.Vector a) where
     size = VarSize $ \x ->
@@ -312,6 +321,9 @@ instance Storable a => Store (SV.Vector a) where
         len <- peek
         fp <- peekToPlainForeignPtr "Data.Storable.Vector.Vector" (sizeOf (undefined :: a) * len)
         liftIO $ SV.unsafeFreeze (MSV.MVector len fp)
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Store BS.ByteString where
     size = VarSize $ \x ->
@@ -325,6 +337,9 @@ instance Store BS.ByteString where
         len <- peek
         fp <- peekToPlainForeignPtr "Data.ByteString.ByteString" len
         return (BS.PS fp 0 len)
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Store SBS.ShortByteString where
     size = VarSize $ \x ->
@@ -338,6 +353,9 @@ instance Store SBS.ShortByteString where
         len <- peek
         ByteArray array <- peekToByteArray "Data.ByteString.Short.ShortByteString" len
         return (SBS.SBS array)
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Store LBS.ByteString where
     -- FIXME: faster conversion? Is this ever going to be a problem?
@@ -350,6 +368,9 @@ instance Store LBS.ByteString where
     -- FIXME: more efficient implementation that avoids the double copy
     poke = poke . LBS.toStrict
     peek = fmap LBS.fromStrict peek
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Store T.Text where
     size = VarSize $ \x ->
@@ -363,6 +384,9 @@ instance Store T.Text where
         w16Len <- peek
         ByteArray array <- peekToByteArray "Data.Text.Text" (2 * w16Len)
         return (T.Text (TA.Array array) 0 w16Len)
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 {-
 -- Gets a little tricky to compute size due to size of storing indices.
@@ -410,6 +434,9 @@ instance KnownNat n => Store (StaticSize n BS.ByteString) where
         let len = fromInteger (natVal (Proxy :: Proxy n))
         fp <- peekToPlainForeignPtr ("StaticSize " ++ show len ++ " Data.ByteString") len
         return (StaticSize (BS.PS fp 0 len))
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 -- NOTE: this could be a 'Lift' instance, but we can't use type holes in
 -- TH. Alternatively we'd need a (TypeRep -> Type) function and Typeable
@@ -426,6 +453,9 @@ instance Store a => Store [a] where
     size = sizeSequence
     poke = pokeSequence
     peek = peekSequence
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Store a => Store (NE.NonEmpty a)
 
@@ -433,36 +463,57 @@ instance Store a => Store (Seq a) where
     size = sizeSequence
     poke = pokeSequence
     peek = peekSequence
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance (Store a, Ord a) => Store (Set a) where
     size = sizeSet
     poke = pokeSet
     peek = peekSet
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Store IntSet where
     size = sizeSet
     poke = pokeSet
     peek = peekSet
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Store a => Store (IntMap a) where
     size = sizeMap
     poke = pokeMap
     peek = peekMap
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance (Ord k, Store k, Store a) => Store (Map k a) where
     size = sizeMap
     poke = pokeMap
     peek = peekMap
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance (Eq k, Hashable k, Store k, Store a) => Store (HashMap k a) where
     size = sizeMap
     poke = pokeMap
     peek = peekMap
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance (Eq a, Hashable a, Store a) => Store (HashSet a) where
     size = sizeSet
     poke = pokeSet
     peek = peekSet
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 -- FIXME: implement
 --
@@ -545,6 +596,9 @@ instance Store (Fixed a) where
     size = contramapSize (\(MkFixed x) -> x) (size :: Size Integer)
     poke (MkFixed x) = poke x
     peek = MkFixed <$> peek
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 -- instance Store a => Store (Tree a) where
 
@@ -563,21 +617,33 @@ instance Store a => Store (Ratio a) where
     size = combineSize (\(x :% _) -> x) (\(_ :% y) -> y)
     poke (x :% y) = poke (x, y)
     peek = uncurry (:%) <$> peek
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Store Time.Day where
     size = contramapSize Time.toModifiedJulianDay (size :: Size Integer)
     poke = poke . Time.toModifiedJulianDay
     peek = Time.ModifiedJulianDay <$> peek
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Store Time.DiffTime where
     size = contramapSize (realToFrac :: Time.DiffTime -> Pico) (size :: Size Pico)
     poke = (poke :: Pico -> Poke ()) . realToFrac
     peek = Time.picosecondsToDiffTime <$> peek
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Store Time.UTCTime where
     size = combineSize Time.utctDay Time.utctDayTime
     poke (Time.UTCTime day time) = poke (day, time)
     peek = uncurry Time.UTCTime <$> peek
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
 
 instance Store ()
 instance Store a => Store (Dual a)

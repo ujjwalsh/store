@@ -103,6 +103,7 @@ encode x = BS.unsafeCreate l $ \p -> do
     checkOffset o l
   where
     l = getSize x
+{-# INLINE encode #-}
 
 checkOffset :: Int -> Int -> IO ()
 checkOffset o l
@@ -121,34 +122,40 @@ checkOffset o l
 -- overshoots the end of the buffer.
 decode :: Store a => BS.ByteString -> Either PeekException a
 decode = unsafePerformIO . try . decodeIO
+{-# INLINE decode #-}
 
 -- | Decodes a value from a 'BS.ByteString', potentially throwing
 -- exceptions, and taking a 'Peek' to run. It is an exception to not
 -- consume all input.
 decodeWith :: Peek a -> BS.ByteString -> Either PeekException a
 decodeWith mypeek = unsafePerformIO . try . decodeIOWith mypeek
+{-# INLINE decodeWith #-}
 
 -- | Decodes a value from a 'BS.ByteString', potentially throwing
 -- exceptions. It is an exception to not consume all input.
 decodeEx :: Store a => BS.ByteString -> a
 decodeEx = unsafePerformIO . decodeIO
+{-# INLINE decodeEx #-}
 
 -- | Decodes a value from a 'BS.ByteString', potentially throwing
 -- exceptions, and taking a 'Peek' to run. It is an exception to not
 -- consume all input.
 decodeExWith :: Peek a -> BS.ByteString -> a
 decodeExWith f = unsafePerformIO . decodeIOWith f
+{-# INLINE decodeExWith #-}
 
 -- | Similar to 'decodeExWith', but it allows there to be more of the
 -- buffer remaining. The 'Offset' of the buffer contents immediately
 -- after the decoded value is returned.
 decodeExPortionWith :: Peek a -> BS.ByteString -> (Offset, a)
 decodeExPortionWith f = unsafePerformIO . decodeIOPortionWith f
+{-# INLINE decodeExPortionWith #-}
 
 -- | Decodes a value from a 'BS.ByteString', potentially throwing
 -- exceptions. It is an exception to not consume all input.
 decodeIO :: Store a => BS.ByteString -> IO a
 decodeIO = decodeIOWith peek
+{-# INLINE decodeIO #-}
 
 -- | Decodes a value from a 'BS.ByteString', potentially throwing
 -- exceptions, and taking a 'Peek' to run. It is an exception to not
@@ -160,6 +167,7 @@ decodeIOWith mypeek bs = do
     if remaining > 0
         then throwIO $ PeekException remaining "Didn't consume all input."
         else return x
+{-# INLINE decodeIOWith #-}
 
 -- |
 decodeIOPortionWith :: Peek a -> BS.ByteString -> IO (Offset, a)
@@ -172,6 +180,7 @@ decodeIOPortionWith mypeek (BS.PS x s len) =
              if ptr2 > end
                  then throwIO $ PeekException (end `minusPtr` ptr2) "Overshot end of buffer"
                  else return (ptr2 `minusPtr` ptr, x')
+{-# INLINE decodeIOPortionWith #-}
 
 ------------------------------------------------------------------------
 -- Generics
@@ -502,10 +511,12 @@ data Size a
 
 getSize :: Store a => a -> Int
 getSize = getSizeWith size
+{-# INLINE getSize #-}
 
 getSizeWith :: Size a -> a -> Int
 getSizeWith (VarSize f) x = f x
 getSizeWith (ConstSize n) _ = n
+{-# INLINE getSizeWith #-}
 
 -- TODO: depend on contravariant package? The ConstSize case is a little
 -- wonky due to type conversion
@@ -513,9 +524,11 @@ getSizeWith (ConstSize n) _ = n
 contramapSize :: (a -> b) -> Size b -> Size a
 contramapSize f (VarSize g) = VarSize (g . f)
 contramapSize _ (ConstSize n) = ConstSize n
+{-# INLINE contramapSize #-}
 
 combineSize :: forall a b c. (Store a, Store b) => (c -> a) -> (c -> b) -> Size c
 combineSize toA toB = combineSize' toA toB size size
+{-# INLINE combineSize #-}
 
 combineSize' :: forall a b c. (c -> a) -> (c -> b) -> Size a -> Size b -> Size c
 combineSize' toA toB sizeA sizeB =
@@ -524,14 +537,17 @@ combineSize' toA toB sizeA sizeB =
         (VarSize f, ConstSize m) -> VarSize (\x -> f (toA x) + m)
         (ConstSize n, VarSize g) -> VarSize (\x -> n + g (toB x))
         (ConstSize n, ConstSize m) -> ConstSize (n + m)
+{-# INLINE combineSize' #-}
 
 scaleSize :: Int -> Size a -> Size a
 scaleSize s (ConstSize n) = ConstSize (s * n)
 scaleSize s (VarSize f) = VarSize ((s *) . f)
+{-# INLINE scaleSize #-}
 
 addSize :: Int -> Size a -> Size a
 addSize x (ConstSize n) = ConstSize (x + n)
 addSize x (VarSize f) = VarSize ((x +) . f)
+{-# INLINE addSize #-}
 
 ------------------------------------------------------------------------
 -- Utilities for implementing 'Store' instances via memcpy
