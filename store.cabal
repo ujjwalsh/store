@@ -175,6 +175,7 @@ benchmark store-bench
     , void
     , th-orphans >= 0.13.1
     , criterion
+    , store
   if flag(comparison-bench)
     build-depends:
         cereal
