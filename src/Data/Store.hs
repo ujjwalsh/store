@@ -5,8 +5,8 @@
 -- instead can rely on either using the 'Generic' deriving approach or
 -- "Data.Store.TH" for defining 'Store' instances for your datatypes.
 -- There are some tradeoffs here - the generics instances do not require
--- @-XTemplateHaskell@, but they do not optimize as well for types that
--- only require a constant number of bytes.
+-- @-XTemplateHaskell@, but they do not optimize as well for sum types
+-- that only require a constant number of bytes.
 module Data.Store
     (
     -- * Encoding and decoding strict ByteStrings.

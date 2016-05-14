@@ -16,9 +16,10 @@
 --
 -- One advantage of using this Template Haskell definition of Store
 -- instances is that in some cases they can be faster than the instances
--- defined via Generics. Specifically, datatypes which can yield
+-- defined via Generics. Specifically, sum types which can yield
 -- 'ConstSize' from 'size' will be faster when used in array-like types.
--- The instances generated via generics always use 'VarSize'.
+-- The instances generated via generics always use 'VarSize' for sum
+-- types.
 module Data.Store.TH
     (
     -- * Testing Store instances
