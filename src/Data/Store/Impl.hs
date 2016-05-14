@@ -82,14 +82,18 @@ class Store a where
     -- encounters invalid data or runs out of input bytes.
     peek :: Peek a
 
-    default size :: (Generic a, GStore (Rep a)) => Size a
-    size = contramapSize from gsize
+    default size :: (Generic a, GStoreSize (Rep a)) => Size a
+    size = genericSize
+    {-# INLINE size #-}
 
-    default poke :: (Generic a, GStore (Rep a)) => a -> Poke ()
+    default poke :: (Generic a, GStorePoke (Rep a)) => a -> Poke ()
     poke = genericPoke
+    {-# INLINE poke #-}
 
-    default peek :: (Generic a , GStore (Rep a)) => Peek a
+    default peek :: (Generic a , GStorePeek (Rep a)) => Peek a
     peek = genericPeek
+    {-# INLINE peek #-}
+
 
 ------------------------------------------------------------------------
 -- Utilities for encoding / decoding strict ByteStrings
@@ -185,11 +189,15 @@ decodeIOPortionWith mypeek (BS.PS x s len) =
 ------------------------------------------------------------------------
 -- Generics
 
-genericPoke :: (Generic a, GStore (Rep a)) => a -> Poke ()
+genericSize :: (Generic a, GStoreSize (Rep a)) => Size a
+genericSize = contramapSize from gsize
+{-# INLINE genericSize #-}
+
+genericPoke :: (Generic a, GStorePoke (Rep a)) => a -> Poke ()
 genericPoke = gpoke . from
 {-# INLINE genericPoke #-}
 
-genericPeek :: (Generic a , GStore (Rep a)) => Peek a
+genericPeek :: (Generic a , GStorePeek (Rep a)) => Peek a
 genericPeek = to <$> gpeek
 {-# INLINE genericPeek #-}
 
@@ -197,48 +205,62 @@ type family SumArity (a :: * -> *) :: Nat where
     SumArity (C1 c a) = 1
     SumArity (x :+: y) = SumArity x + SumArity y
 
-class GStore f where
-    gsize :: Size (f a)
-    gpoke :: f a -> Poke ()
-    gpeek :: Peek (f a)
+-- This could be just one typeclass, but currently compile times are
+-- better with things split up.
+-- https://github.com/bos/aeson/pull/335
+--
 
-instance GStore f => GStore (M1 i c f) where
+class GStoreSize f where gsize :: Size (f a)
+class GStorePoke f where gpoke :: f a -> Poke ()
+class GStorePeek f where gpeek :: Peek (f a)
+
+instance GStoreSize f => GStoreSize (M1 i c f) where
     gsize = contramapSize unM1 gsize
     {-# INLINE gsize #-}
+instance GStorePoke f => GStorePoke (M1 i c f) where
     gpoke = gpoke . unM1
     {-# INLINE gpoke #-}
+instance GStorePeek f => GStorePeek (M1 i c f) where
     gpeek = fmap M1 gpeek
     {-# INLINE gpeek #-}
 
-instance Store a => GStore (K1 i a) where
+instance Store a => GStoreSize (K1 i a) where
     gsize = contramapSize unK1 size
     {-# INLINE gsize #-}
+instance Store a => GStorePoke (K1 i a) where
     gpoke = poke . unK1
     {-# INLINE gpoke #-}
+instance Store a => GStorePeek (K1 i a) where
     gpeek = fmap K1 peek
     {-# INLINE gpeek #-}
 
-instance GStore U1 where
+instance GStoreSize U1 where
     gsize = ConstSize 0
     {-# INLINE gsize #-}
+instance GStorePoke U1 where
     gpoke _ = return ()
     {-# INLINE gpoke #-}
+instance GStorePeek U1 where
     gpeek = return U1
     {-# INLINE gpeek #-}
 
-instance GStore V1 where
+instance GStoreSize V1 where
     gsize = ConstSize 0
     {-# INLINE gsize #-}
+instance GStorePoke V1 where
     gpoke x = case x of {}
     {-# INLINE gpoke #-}
+instance GStorePeek V1 where
     gpeek = undefined
     {-# INLINE gpeek #-}
 
-instance (GStore a, GStore b) => GStore (a :*: b) where
+instance (GStoreSize a, GStoreSize b) => GStoreSize (a :*: b) where
     gsize = combineSize' (\(x :*: _) -> x) (\(_ :*: y) -> y) gsize gsize
     {-# INLINE gsize #-}
+instance (GStorePoke a, GStorePoke b) => GStorePoke (a :*: b) where
     gpoke (a :*: b) = gpoke a >> gpoke b
     {-# INLINE gpoke #-}
+instance (GStorePeek a, GStorePeek b) => GStorePeek (a :*: b) where
     gpeek = (:*:) <$> gpeek <*> gpeek
     {-# INLINE gpeek #-}
 
@@ -247,30 +269,40 @@ instance (GStore a, GStore b) => GStore (a :*: b) where
 -- FIXME: check that this type level stuff dosen't get turned into
 -- costly runtime computation
 
-instance (SumArity (a :+: b) <= 255, GStoreSum 0 (a :+: b))
-         => GStore (a :+: b) where
+instance (SumArity (a :+: b) <= 255, GStoreSizeSum 0 (a :+: b))
+         => GStoreSize (a :+: b) where
     gsize = VarSize $ \x -> sizeOf (undefined :: Word8) + gsizeSum x (Proxy :: Proxy 0)
     {-# INLINE gsize #-}
+instance (SumArity (a :+: b) <= 255, GStorePokeSum 0 (a :+: b))
+         => GStorePoke (a :+: b) where
     gpoke x = gpokeSum x (Proxy :: Proxy 0)
     {-# INLINE gpoke #-}
+instance (SumArity (a :+: b) <= 255, GStorePeekSum 0 (a :+: b))
+         => GStorePeek (a :+: b) where
     gpeek = do
         tag <- peekStorable
         gpeekSum tag (Proxy :: Proxy 0)
     {-# INLINE gpeek #-}
 
-class KnownNat n => GStoreSum (n :: Nat) (f :: * -> *) where
-    gsizeSum :: f a -> Proxy n -> Int
-    gpokeSum :: f p -> Proxy n -> Poke ()
-    gpeekSum :: Word8 -> Proxy n -> Peek (f p)
+-- Similarly to splitting up the generic class into multiple classes, we
+-- also split up the one for sum types.
 
-instance (GStoreSum n a, GStoreSum (n + SumArity a) b, KnownNat n)
-         => GStoreSum n (a :+: b) where
+class KnownNat n => GStoreSizeSum (n :: Nat) (f :: * -> *) where gsizeSum :: f a -> Proxy n -> Int
+class KnownNat n => GStorePokeSum (n :: Nat) (f :: * -> *) where gpokeSum :: f p -> Proxy n -> Poke ()
+class KnownNat n => GStorePeekSum (n :: Nat) (f :: * -> *) where gpeekSum :: Word8 -> Proxy n -> Peek (f p)
+
+instance (GStoreSizeSum n a, GStoreSizeSum (n + SumArity a) b, KnownNat n)
+         => GStoreSizeSum n (a :+: b) where
     gsizeSum (L1 l) _ = gsizeSum l (Proxy :: Proxy n)
     gsizeSum (R1 r) _ = gsizeSum r (Proxy :: Proxy (n + SumArity a))
     {-# INLINE gsizeSum #-}
+instance (GStorePokeSum n a, GStorePokeSum (n + SumArity a) b, KnownNat n)
+         => GStorePokeSum n (a :+: b) where
     gpokeSum (L1 l) _ = gpokeSum l (Proxy :: Proxy n)
     gpokeSum (R1 r) _ = gpokeSum r (Proxy :: Proxy (n + SumArity a))
     {-# INLINE gpokeSum #-}
+instance (GStorePeekSum n a, GStorePeekSum (n + SumArity a) b, KnownNat n)
+         => GStorePeekSum n (a :+: b) where
     gpeekSum tag proxyL
         | tag < sizeL = L1 <$> gpeekSum tag proxyL
         | otherwise = R1 <$> gpeekSum tag (Proxy :: Proxy (n + SumArity a))
@@ -278,13 +310,15 @@ instance (GStoreSum n a, GStoreSum (n + SumArity a) b, KnownNat n)
         sizeL = fromInteger (natVal (Proxy :: Proxy (n + SumArity a)))
     {-# INLINE gpeekSum #-}
 
-instance (GStore a, KnownNat n) => GStoreSum n (C1 c a) where
+instance (GStoreSize a, KnownNat n) => GStoreSizeSum n (C1 c a) where
     gsizeSum x _ = getSizeWith gsize x
     {-# INLINE gsizeSum #-}
+instance (GStorePoke a, KnownNat n) => GStorePokeSum n (C1 c a) where
     gpokeSum x _ = do
         pokeStorable (fromInteger (natVal (Proxy :: Proxy n)) :: Word8)
         gpoke x
     {-# INLINE gpokeSum #-}
+instance (GStorePeek a, KnownNat n) => GStorePeekSum n (C1 c a) where
     gpeekSum tag _
         | tag == cur = gpeek
         | tag > cur = peekException "Sum tag invalid"
