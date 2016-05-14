@@ -169,7 +169,7 @@ decodeIOWith mypeek bs = do
         else return x
 {-# INLINE decodeIOWith #-}
 
--- |
+-- | Similar to 'decodeExPortionWith', but runs in the 'IO' monad.
 decodeIOPortionWith :: Peek a -> BS.ByteString -> IO (Offset, a)
 decodeIOPortionWith mypeek (BS.PS x s len) =
     withForeignPtr x $ \ptr0 ->
