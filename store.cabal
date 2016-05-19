@@ -44,7 +44,7 @@ library
   build-depends:
       base >= 4.7 && < 5
     , array
-    , base-orphans >= 0.5.1
+    , base-orphans
     , bytestring
     , containers
     , cryptohash
@@ -65,7 +65,7 @@ library
     , th-lift
     , th-lift-instances >= 0.1.6
     , th-utilities
-    , th-reify-many >= 0.1.6
+    , th-reify-many
     , time
     , transformers
     , unordered-containers
@@ -76,7 +76,7 @@ library
     , resourcet
     , semigroups
     , void
-    , th-orphans >= 0.13.1
+    , th-orphans
   default-language: Haskell2010
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2
 
@@ -93,7 +93,7 @@ test-suite store-test
   build-depends:
       base >= 4.7 && < 5
     , array
-    , base-orphans >= 0.5.1
+    , base-orphans
     , bytestring
     , containers
     , cryptohash
@@ -114,7 +114,7 @@ test-suite store-test
     , th-lift
     , th-lift-instances >= 0.1.6
     , th-utilities
-    , th-reify-many >= 0.1.6
+    , th-reify-many
     , time
     , transformers
     , unordered-containers
@@ -125,7 +125,7 @@ test-suite store-test
     , resourcet
     , semigroups
     , void
-    , th-orphans >= 0.13.1
+    , th-orphans
     , hspec
     , smallcheck
     , hspec-smallcheck
@@ -141,7 +141,7 @@ benchmark store-bench
   build-depends:
       base >= 4.7 && < 5
     , array
-    , base-orphans >= 0.5.1
+    , base-orphans
     , bytestring
     , containers
     , cryptohash
@@ -162,7 +162,7 @@ benchmark store-bench
     , th-lift
     , th-lift-instances >= 0.1.6
     , th-utilities
-    , th-reify-many >= 0.1.6
+    , th-reify-many
     , time
     , transformers
     , unordered-containers
@@ -173,7 +173,7 @@ benchmark store-bench
     , resourcet
     , semigroups
     , void
-    , th-orphans >= 0.13.1
+    , th-orphans
     , criterion
     , store
   if flag(comparison-bench)
