@@ -136,9 +136,17 @@ sizeSequence = VarSize $ \t ->
 -- Note that many monomorphic containers have more efficient
 -- implementations (for example, via memcpy).
 pokeSequence :: (IsSequence t, Store (Element t)) => t -> Poke ()
-pokeSequence t = do
-    pokeStorable (olength t)
-    omapM_ poke t
+pokeSequence t =
+  do pokeStorable len
+     Poke (\ptr offset ->
+             do offset' <-
+                  ofoldlM (\offset' a ->
+                             do (offset'',_) <- runPoke (poke a) ptr offset'
+                                return offset'')
+                          offset
+                          t
+                return (offset',()))
+  where len = olength t
 {-# INLINE pokeSequence #-}
 
 -- | Implement 'peek' for an 'IsSequence' of 'Store' instances.
