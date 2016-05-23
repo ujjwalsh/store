@@ -25,7 +25,7 @@ ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-
 dependencies:
   - base >= 4.7 && < 5
   - array
-  - base-orphans >= 0.5.1
+  - base-orphans
   - bytestring
   - containers
   - cryptohash
@@ -46,7 +46,7 @@ dependencies:
   - th-lift
   - th-lift-instances >= 0.1.6
   - th-utilities
-  - th-reify-many >= 0.1.6
+  - th-reify-many
   - time
   - transformers
   - unordered-containers
@@ -57,7 +57,7 @@ dependencies:
   - resourcet
   - semigroups
   - void
-  - th-orphans >= 0.13.1
+  - th-orphans
 
 library:
   source-dirs: src

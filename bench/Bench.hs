@@ -4,6 +4,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+#if !MIN_VERSION_base(4,8,0)
+{-# LANGUAGE DeriveDataTypeable #-}
+import Control.Applicative ((<$>), (<*>), (*>))
+#endif
+
 import           Control.DeepSeq
 import           Criterion.Main
 import qualified Data.ByteString as BS
