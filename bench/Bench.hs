@@ -19,36 +19,84 @@ import           GHC.Generics
 #if COMPARISON_BENCH
 import qualified Data.Binary as Binary
 import qualified Data.Serialize as Cereal
+import qualified Data.ByteString.Lazy as BL
+import           Data.Vector.Serialize ()
+#endif
+
+data SomeData = SomeData !Int64 !Word8 !Double
+    deriving (Eq, Show, Generic)
+instance NFData SomeData where
+    rnf x = x `seq` ()
+instance Store SomeData
+#if COMPARISON_BENCH
+instance Cereal.Serialize SomeData
+instance Binary.Binary SomeData
 #endif
 
 main :: IO ()
 main = do
+#if SMALL_BENCH
+    let is = 0::Int
+        sds = SomeData 1 1 1
+        smallprods = (SmallProduct 0 1 2 3)
+        smallmanualprods = (SmallProductManual 0 1 2 3)
+        sss = [SS1 1, SS2 2, SS3 3, SS4 4]
+        ssms = [SSM1 1, SSM2 2, SSM3 3, SSM4 4]
+        nestedTuples = ((1,2),(3,4)) :: ((Int,Int),(Int,Int))
+#else
+    let is = V.enumFromTo 1 100 :: V.Vector Int
+        sds = (\i -> SomeData i (fromIntegral i) (fromIntegral i))
+            <$> V.enumFromTo 1 100
+        smallprods = (\ i -> SmallProduct i (i+1) (i+2) (i+3))
+            <$> V.enumFromTo 1 100
+        smallmanualprods = (\ i -> SmallProductManual i (i+1) (i+2) (i+3))
+            <$> V.enumFromTo 1 100
+        sss = (\i -> case i `mod` 4 of
+                      0 -> SS1 (fromIntegral i)
+                      1 -> SS2 (fromIntegral i)
+                      2 -> SS3 (fromIntegral i)
+                      3 -> SS4 (fromIntegral i)
+                      _ -> error "This does not compute."
+              ) <$> V.enumFromTo 1 100
+        ssms = (\i -> case i `mod` 4 of
+                       0 -> SSM1 (fromIntegral i)
+                       1 -> SSM2 (fromIntegral i)
+                       2 -> SSM3 (fromIntegral i)
+                       3 -> SSM4 (fromIntegral i)
+                       _ -> error "This does not compute."
+               ) <$> V.enumFromTo 1 100
+        nestedTuples = (\i -> ((i,i+1),(i+2,i+3))) <$> V.enumFromTo (1::Int) 100
+#endif
     defaultMain
         [ bgroup "encode"
-            [ benchEncode (0 :: Int)
-#if !COMPARISON_BENCH
+            [ benchEncode is
+#if !SMALL_BENCH
             , benchEncode' "1kb storable" (SV.fromList ([1..256] :: [Int32]))
             , benchEncode' "10kb storable" (SV.fromList ([1..(256 * 10)] :: [Int32]))
             , benchEncode' "1kb normal" (V.fromList ([1..256] :: [Int32]))
             , benchEncode' "10kb normal" (V.fromList ([1..(256 * 10)] :: [Int32]))
 #endif
-            , benchEncode (SmallProduct 0 1 2 3)
-            , benchEncode (SmallProductManual 0 1 2 3)
-            , benchEncode [SS1 1, SS2 2, SS3 3, SS4 4]
-            , benchEncode [SSM1 1, SSM2 2, SSM3 3, SSM4 4]
+            , benchEncode smallprods
+            , benchEncode smallmanualprods
+            , benchEncode sss
+            , benchEncode ssms
+            , benchEncode nestedTuples
+            , benchEncode sds
             ]
         , bgroup "decode"
-            [ benchDecode (0 :: Int)
-#if !COMPARISON_BENCH
+            [ benchDecode is
+#if !SMALL_BENCH
             , benchDecode' "1kb storable" (SV.fromList ([1..256] :: [Int32]))
             , benchDecode' "10kb storable" (SV.fromList ([1..(256 * 10)] :: [Int32]))
             , benchDecode' "1kb normal" (V.fromList ([1..256] :: [Int32]))
             , benchDecode' "10kb normal" (V.fromList ([1..(256 * 10)] :: [Int32]))
 #endif
-            , benchDecode (SmallProduct 0 1 2 3)
-            , benchDecode (SmallProductManual 0 1 2 3)
-            , benchDecode [SS1 1, SS2 2, SS3 3, SS4 4]
-            , benchDecode [SSM1 1, SSM2 2, SSM3 3, SSM4 4]
+            , benchDecode smallprods
+            , benchDecode smallmanualprods
+            , benchDecode sss
+            , benchDecode ssms
+            , benchDecode nestedTuples
+            , benchDecode sds
             ]
         ]
 
@@ -71,8 +119,8 @@ benchEncode' msg x0 =
 #if COMPARISON_BENCH
         bgroup label
             [ benchStore "store"
-            , bench "binary" (nf Binary.encode x)
             , bench "cereal" (nf Cereal.encode x)
+            , bench "binary" (nf Binary.encode x)
             ]
 #else
         benchStore label
@@ -84,9 +132,22 @@ benchDecode = benchDecode' ""
 -- TODO: comparison bench for decode
 
 benchDecode' :: forall a. Ctx a => String -> a -> Benchmark
+#if COMPARISON_BENCH
+benchDecode' prefix x0 =
+    bgroup label
+        [ env (return (encode x0)) $ \x -> bench "store" (nf (decodeEx :: BS.ByteString -> a) x)
+        , env (return (Cereal.encode x0)) $ \x -> bench "cereal" (nf ((ensureRight . Cereal.decode) :: BS.ByteString -> a) x)
+        , env (return (Binary.encode x0)) $ \x -> bench "binary" (nf (Binary.decode :: BL.ByteString -> a) x)
+        ]
+  where
+    label = prefix ++ " (" ++ show (typeOf x0) ++ ")"
+    ensureRight (Left x) = error "left!"
+    ensureRight (Right x) = x
+#else
 benchDecode' prefix x0 =
     env (return (encode x0)) $ \x ->
         bench (prefix ++ " (" ++ show (typeOf x0) ++ ")") (nf (decodeEx :: BS.ByteString -> a) x)
+#endif
 
 ------------------------------------------------------------------------
 -- Serialized datatypes
