@@ -387,10 +387,10 @@ type Offset = Int
 -- Poke monad
 
 newtype Poke a = Poke
-    { runPoke :: forall byte.
-        Ptr byte -- ^ `Ptr` to which data is poked.
-     -> Offset   -- ^ `Offset` before this poke.
-     -> IO (Offset, a) -- ^ Pass around `Offset` after the poke.
+    { runPoke :: forall byte. Ptr byte -> Offset -> IO (Offset, a)
+      -- ^ Run the 'Poke' action, with the 'Ptr' to the buffer where
+      -- data is poked, and the current 'Offset'. The result is the new
+      -- offset, along with a return value.
     }
     deriving Functor
 
@@ -455,10 +455,10 @@ pokeException msg = Poke $ \_ off -> throwIO (PokeException off msg)
 -- Peek monad
 
 newtype Peek a = Peek
-    { runPeek :: forall byte.
-        Ptr byte
-     -> Ptr byte
-     -> IO (Ptr byte, a)
+    { runPeek :: forall byte. Ptr byte -> Ptr byte -> IO (Ptr byte, a)
+      -- ^ Run the 'Peek' action, with a 'Ptr' to the end of the buffer
+      -- where data is poked, and a 'Ptr' to the current position. The
+      -- result is the 'Ptr', along with a return value.
     }
    deriving Functor
 
