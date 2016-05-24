@@ -91,7 +91,7 @@ import qualified Data.Text.Array as TA
 import qualified Data.Text.Foreign as T
 import qualified Data.Text.Internal as T
 import qualified Data.Time as Time
-import           Data.Typeable.Internal (Typeable, Fingerprint)
+import           Data.Typeable.Internal (Typeable)
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable as SV
@@ -638,13 +638,6 @@ instance Store a => Store (First a)
 instance Store a => Store (Last a)
 instance Store a => Store (Maybe a)
 instance (Store a, Store b) => Store (Either a b)
-
--- Explicit definition needed because in base <= 4.7 (GHC 7.8),
--- Fingerprint is not Typeable.
-instance Store Fingerprint where
-    size = sizeStorableTy "GHC.Fingerprint.Type.Fingerprint"
-    poke = pokeStorable
-    peek = peekStorableTy "GHC.Fingerprint.Type.Fingerprint"
 
 -- FIXME: have TH deriving handle unboxed fields?
 

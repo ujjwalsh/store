@@ -33,7 +33,6 @@ import           Data.Primitive.Types
 import           Data.Store.Impl
 import qualified Data.Text as T
 import           Data.Traversable (forM)
-import           Data.Typeable (Typeable)
 import qualified Data.Vector.Primitive as PV
 import qualified Data.Vector.Unboxed as UV
 import           Data.Word
@@ -46,7 +45,7 @@ import           Prelude
 import           Safe (headMay)
 import           TH.Derive (Deriver(..))
 import           TH.ReifyDataType
-import           TH.Utilities (freeVarsT, expectTyCon1, dequalify)
+import           TH.Utilities (expectTyCon1, dequalify, plainInstanceD)
 
 instance Deriver (Store a) where
     runDeriver _ preds ty = do
@@ -256,7 +255,7 @@ deriveTupleStoreInstance n =
 #endif
 
 deriveGenericInstance :: Cxt -> Type -> Dec
-deriveGenericInstance cs ty = InstanceD cs (AppT (ConT ''Store) ty) []
+deriveGenericInstance cs ty = plainInstanceD cs (AppT (ConT ''Store) ty) []
 
 ------------------------------------------------------------------------
 -- Storable
@@ -269,23 +268,14 @@ deriveManyStoreFromStorable p = do
     stores <- postprocess . instancesMap <$> getInstances ''Store
     return $ M.elems $ flip M.mapMaybe (storables `M.difference` stores) $
         \(TypeclassInstance cs ty _) ->
-        let argTy = head (tail (unAppsT ty)) in
+        let argTy = head (tail (unAppsT ty))
+            tyNameLit = LitE (StringL (pprint ty)) in
         if p argTy
-            then Just $ makeStoreInstance (cs ++ everythingTypeable ty)
-                                          argTy
-                                          (VarE 'sizeStorable)
-                                          (VarE 'peekStorable)
-                                          (VarE 'pokeStorable)
+            then Just $ makeStoreInstance cs argTy
+                (AppE (VarE 'sizeStorableTy) tyNameLit)
+                (AppE (VarE 'peekStorableTy) tyNameLit)
+                (VarE 'pokeStorable)
             else Nothing
-
--- Necessitated by the Typeable constraint on peekStorable
-everythingTypeable :: Type -> Cxt
-everythingTypeable =
-#if MIN_VERSION_template_haskell(2,10,0)
-  map (AppT (ConT ''Typeable) . VarT) . freeVarsT
-#else
-  map (ClassP ''Typeable . (:[]) . VarT) . freeVarsT
-#endif
 
 ------------------------------------------------------------------------
 -- Vector
@@ -345,8 +335,13 @@ deriveManyStoreUnboxVector = do
                     filter (not . isMonoType) $
                     concatMap (map snd . dcFields) cons
             -}
-            let extraPreds =
-                    map (AppT (ConT ''Store) . AppT (ConT ''UV.Vector)) $ listify isVarT ty
+            let extraPreds = map (storePred . AppT (ConT ''UV.Vector)) $ listify isVarT ty
+                storePred =
+#if MIN_VERSION_template_haskell(2,10,0)
+                    AppT (ConT ''Store)
+#else
+                    ClassP ''Store . (:[])
+#endif
             deriveStore (nub (preds ++ extraPreds)) ty cons
         _ -> fail "impossible case in deriveManyStoreUnboxVector"
 
@@ -357,10 +352,13 @@ getUnboxInfo = do
     FamilyI _ insts <- reify ''UV.Vector
     return (map (everywhere (id `extT` dequalVarT) . go) insts)
   where
-    go (NewtypeInstD preds _ [ty] con _) =
-        (preds, ty, conToDataCons con)
-    go (DataInstD preds _ [ty] cons _) =
-        (preds, ty, concatMap conToDataCons cons)
+#if MIN_VERSION_template_haskell(2,11,0)
+    go (NewtypeInstD preds _ [ty] _ con _) = (preds, ty, conToDataCons con)
+    go (DataInstD preds _ [ty] _ cons _) = (preds, ty, concatMap conToDataCons cons)
+#else
+    go (NewtypeInstD preds _ [ty] con _) = (preds, ty, conToDataCons con)
+    go (DataInstD preds _ [ty] cons _) = (preds, ty, concatMap conToDataCons cons)
+#endif
     go x = error ("Unexpected result from reifying Unboxed Vector instances: " ++ pprint x)
     dequalVarT (VarT n) = VarT (dequalify n)
     dequalVarT ty = ty
@@ -379,15 +377,16 @@ postprocess =
 
 makeStoreInstance :: Cxt -> Type -> Exp -> Exp -> Exp -> Dec
 makeStoreInstance cs ty sizeExpr peekExpr pokeExpr =
-    InstanceD cs
-              (AppT (ConT ''Store) ty)
-              [ ValD (VarP 'size) (NormalB sizeExpr) []
-              , PragmaD (InlineP 'size Inline FunLike AllPhases)
-              , ValD (VarP 'peek) (NormalB peekExpr) []
-              , PragmaD (InlineP 'peek Inline FunLike AllPhases)
-              , ValD (VarP 'poke) (NormalB pokeExpr) []
-              , PragmaD (InlineP 'poke Inline FunLike AllPhases)
-              ]
+    plainInstanceD
+        cs
+        (AppT (ConT ''Store) ty)
+        [ ValD (VarP 'size) (NormalB sizeExpr) []
+        , PragmaD (InlineP 'size Inline FunLike AllPhases)
+        , ValD (VarP 'peek) (NormalB peekExpr) []
+        , PragmaD (InlineP 'peek Inline FunLike AllPhases)
+        , ValD (VarP 'poke) (NormalB pokeExpr) []
+        , PragmaD (InlineP 'poke Inline FunLike AllPhases)
+        ]
 
 -- TODO: either generate random types that satisfy instances with
 -- variables in them, or have a check that there's at least a manual

@@ -68,7 +68,7 @@ library
     , text
     , th-lift
     , th-lift-instances >= 0.1.6
-    , th-utilities
+    , th-utilities >= 0.1.1.0
     , th-reify-many
     , time
     , transformers
@@ -117,7 +117,7 @@ test-suite store-test
     , text
     , th-lift
     , th-lift-instances >= 0.1.6
-    , th-utilities
+    , th-utilities >= 0.1.1.0
     , th-reify-many
     , time
     , transformers
@@ -166,7 +166,7 @@ benchmark store-bench
     , text
     , th-lift
     , th-lift-instances >= 0.1.6
-    , th-utilities
+    , th-utilities >= 0.1.1.0
     , th-reify-many
     , time
     , transformers
