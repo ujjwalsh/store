@@ -3,7 +3,7 @@
 -- see: https://github.com/sol/hpack
 
 name:                store
-version:             0.1.0.0
+version:             0.1.0.1
 synopsis:            Fast binary serialization
 homepage:            https://github.com/fpco/store#readme
 bug-reports:         https://github.com/fpco/store/issues
