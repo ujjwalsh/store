@@ -96,8 +96,6 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
-import qualified Data.Vector.Unboxed as UV
-import qualified Data.Vector.Unboxed.Base as UV
 import           Data.Void
 import           Data.Word
 import           Foreign.Ptr (plusPtr, minusPtr)
@@ -292,27 +290,6 @@ instance Store a => Store (V.Vector a) where
     size = sizeSequence
     poke = pokeSequence
     peek = V.unsafeFreeze =<< peekMutableSequence MV.new MV.write
-    {-# INLINE size #-}
-    {-# INLINE peek #-}
-    {-# INLINE poke #-}
-
--- NOTE: soon we'll have TH generation for all of the unbox instances.
-instance Store (UV.Vector Word) where
-    size = VarSize $ \x ->
-        sizeOf (undefined :: Int) +
-        sizeOf (undefined :: Word) * UV.length x
-    poke !(UV.V_Word pv) = poke pv
-    peek = UV.V_Word <$> peek
-    {-# INLINE size #-}
-    {-# INLINE peek #-}
-    {-# INLINE poke #-}
-
-instance Store (UV.Vector Word8) where
-    size = VarSize $ \x ->
-        sizeOf (undefined :: Int) +
-        sizeOf (undefined :: Word8) * UV.length x
-    poke !(UV.V_Word8 pv) = poke pv
-    peek = UV.V_Word8 <$> peek
     {-# INLINE size #-}
     {-# INLINE peek #-}
     {-# INLINE poke #-}
@@ -685,6 +662,8 @@ $($(derive [d|
 
 -- TODO: higher arities?  Limited now by Generics instances for tuples
 $(return $ map deriveTupleStoreInstance [2..7])
+
+$(deriveManyStoreUnboxVector)
 
 $(deriveManyStoreFromStorable (\_ -> True))
 

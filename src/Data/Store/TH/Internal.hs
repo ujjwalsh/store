@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE ParallelListComp #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -13,6 +14,7 @@ module Data.Store.TH.Internal
     , deriveTupleStoreInstance
     , deriveGenericInstance
     , deriveManyStorePrimVector
+    , deriveManyStoreUnboxVector
     , deriveStore
     -- * Misc utilties used in Store test
     , getAllInstanceTypes1
@@ -21,8 +23,9 @@ module Data.Store.TH.Internal
 
 import           Control.Applicative
 import           Data.Complex ()
-import           Data.Generics.Schemes (listify)
-import           Data.List (find)
+import           Data.Generics.Aliases (extT)
+import           Data.Generics.Schemes (listify, everywhere)
+import           Data.List (find, nub)
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
 import           Data.Primitive.ByteArray
@@ -43,7 +46,7 @@ import           Prelude
 import           Safe (headMay)
 import           TH.Derive (Deriver(..))
 import           TH.ReifyDataType
-import           TH.Utilities (freeVarsT, expectTyCon1)
+import           TH.Utilities (freeVarsT, expectTyCon1, dequalify)
 
 instance Deriver (Store a) where
     runDeriver _ preds ty = do
@@ -322,61 +325,48 @@ deriveManyStorePrimVector = do
 primSizeOfExpr :: Type -> ExpQ
 primSizeOfExpr ty = [| $(varE 'sizeOf#) (error "sizeOf# evaluated its argument" :: $(return ty)) |]
 
-{-
 deriveManyStoreUnboxVector :: Q [Dec]
 deriveManyStoreUnboxVector = do
     unboxes <- getUnboxInfo
     stores <- postprocess . instancesMap <$> getInstances ''Store
-    let unboxInsts = M.elems $
-            M.toList (map (\(ty, con, args) -> (AppT ''UV.Vector ty, (ty, con, args))) unboxes)
+    let unboxInsts =
+            M.fromList (map (\(preds, ty, cons) -> ([AppT (ConT ''UV.Vector) ty], (preds, cons))) unboxes)
             `M.difference`
             stores
-    results <- forM unboxInsts $ \(ty, con, args) -> do
-        sizeExpr <- [|
-            VarSize $ \x ->
-                 I# (sizeOf# (undefined :: Int)) +
-                 -- TODO: consider going as far as using
-                 -- 'sizeofByteArray' instead.
-                 I# (sizeOf# (undefined :: $(return ty))) * UV.length x
-            |]
-        pokeExpr <- [e| let !($(conP con )) =  in
-            |]
-        return (makeStoreInstance [] )
--}
-
-    -- return $ M.elems $ flip M.mapMaybe () $
-    --     \(TypeclassInstance cs ty _) ->
-    --         let argTy = head (tail (unAppsT ty)) in
-    --         Just $ makeStoreInstance cs argTy
-    --             (AppE (VarE 'pokeUnboxedVector) (proxyEx)
+    -- TODO: ideally this would use a variant of 'deriveStore' which
+    -- assumes VarSize.
+    forM (M.toList unboxInsts) $ \case
+        ([ty], (preds, cons)) -> do
+            {-
+            -- While this approach is reasonable-ish, it ends up
+            -- requiring UndecidableInstances.
+            let extraPreds =
+                    map (AppT (ConT ''Store)) $
+                    filter (not . isMonoType) $
+                    concatMap (map snd . dcFields) cons
+            -}
+            let extraPreds =
+                    map (AppT (ConT ''Store) . AppT (ConT ''UV.Vector)) $ listify isVarT ty
+            deriveStore (nub (preds ++ extraPreds)) ty cons
+        _ -> fail "impossible case in deriveManyStoreUnboxVector"
 
 -- TODO: Add something for this purpose to TH.ReifyDataType
 
-getUnboxInfo :: Q [(Type, Name, [Type])]
+getUnboxInfo :: Q [(Cxt, Type, [DataCon])]
 getUnboxInfo = do
     FamilyI _ insts <- reify ''UV.Vector
-    return (map go insts)
+    return (map (everywhere (id `extT` dequalVarT) . go) insts)
   where
-    go (NewtypeInstD _ _ [ty] con _) =
-        (ty, conName con, conFields con)
-    go (DataInstD _ _ [ty] [con] _) =
-        (ty, conName con, conFields con)
+    go (NewtypeInstD preds _ [ty] con _) =
+        (preds, ty, conToDataCons con)
+    go (DataInstD preds _ [ty] cons _) =
+        (preds, ty, concatMap conToDataCons cons)
     go x = error ("Unexpected result from reifying Unboxed Vector instances: " ++ pprint x)
+    dequalVarT (VarT n) = VarT (dequalify n)
+    dequalVarT ty = ty
 
 ------------------------------------------------------------------------
 -- Utilities
-
-conName :: Con -> Name
-conName (NormalC name _) = name
-conName (RecC name _) = name
-conName (InfixC _ name _) = name
-conName (ForallC _ _ con) = conName con
-
-conFields :: Con -> [Type]
-conFields (NormalC _ tys) = map snd tys
-conFields (RecC _ tys) = map (\(_,_,ty) -> ty) tys
-conFields (InfixC l _ r) = [snd l, snd r]
-conFields (ForallC _ _ con) = conFields con
 
 -- Filters out overlapping instances and instances with more than one
 -- type arg (should be impossible).
@@ -386,17 +376,6 @@ postprocess =
         case (tys, xs) of
             ([_ty], [x]) -> Just x
             _ -> Nothing
-
-{-
-pokeUnboxedVector = do
-    let !(UV.V_Word (PV.Vector offset len (ByteArray array))) = x
-    sz = sizeOf (undefined :: Word)
-    poke len
-    pokeByteArray array (offset * sz) (len * sz)
-
-proxyExpr :: Type -> Exp
-proxyExpr ty = SigE 'Proxy (AppT ''Proxy ty)
--}
 
 makeStoreInstance :: Cxt -> Type -> Exp -> Exp -> Exp -> Dec
 makeStoreInstance cs ty sizeExpr peekExpr pokeExpr =
@@ -426,9 +405,10 @@ getAllInstanceTypes1 n =
 
 isMonoType :: Type -> Bool
 isMonoType = null . listify isVarT
-  where
-    isVarT VarT{} = True
-    isVarT _ = False
+
+isVarT :: Type -> Bool
+isVarT VarT{} = True
+isVarT _ = False
 
 -- TOOD: move these to th-reify-many
 
