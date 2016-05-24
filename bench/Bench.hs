@@ -62,14 +62,14 @@ main = do
                       2 -> SS3 (fromIntegral i)
                       3 -> SS4 (fromIntegral i)
                       _ -> error "This does not compute."
-              ) <$> V.enumFromTo 1 100
+              ) <$> V.enumFromTo 1 (100 :: Int)
         ssms = (\i -> case i `mod` 4 of
                        0 -> SSM1 (fromIntegral i)
                        1 -> SSM2 (fromIntegral i)
                        2 -> SSM3 (fromIntegral i)
                        3 -> SSM4 (fromIntegral i)
                        _ -> error "This does not compute."
-               ) <$> V.enumFromTo 1 100
+               ) <$> V.enumFromTo 1 (100 :: Int)
         nestedTuples = (\i -> ((i,i+1),(i+2,i+3))) <$> V.enumFromTo (1::Int) 100
 #endif
     defaultMain

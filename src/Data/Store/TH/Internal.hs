@@ -89,7 +89,7 @@ deriveStore preds headTy cons0 =
     valName = mkName "val"
     sizeExpr =
         caseE (tupE (concatMap (map sizeAtType . snd) cons))
-              [matchConstSize, matchVarSize]
+              (if null sizeNames then [matchConstSize] else [matchConstSize, matchVarSize])
       where
         sizeAtType :: (Name, Type) -> ExpQ
         sizeAtType (_, ty) = [| size :: Size $(return ty) |]
@@ -105,7 +105,7 @@ deriveStore preds headTy cons0 =
                     (_ : tailSizeNames) ->
                         foldl (\l r -> [| $(l) && $(r) |]) [| True |] $
                         map (\szn -> [| $(return sz0) == $(varE szn) |]) tailSizeNames
-                    _ -> [| True |]
+                    [] -> [| True |]
             result <- [| ConstSize (tagSize + $(return sz0)) |]
             match (tupP (map (\(n, _) -> conP 'ConstSize [varP n])
                              (concatMap snd cons)))
