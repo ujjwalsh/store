@@ -3,6 +3,8 @@ packages:
 - .
 - location: deps/smallcheck
   extra-dep: true
+- location: deps/weigh
+  extra-dep: true
 extra-deps:
 - fail-4.9.0.0
 - th-lift-instances-0.1.6
@@ -11,3 +13,4 @@ extra-deps:
 - th-orphans-0.13.1
 - base-orphans-0.5.4
 - cereal-vector-0.2.0.1
+- ghc-heap-view-0.5.4
