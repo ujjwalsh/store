@@ -1,4 +1,4 @@
-# store [![Build Status](https://travis-ci.org/fpco/store.png)](https://travis-ci.org/fpco/store)
+# store
 
 The 'store' package provides binary serialization of Haskell datatypes. It fills
 quite a different niche from packages like 'binary' or 'cereal'. In particular:
