@@ -6,8 +6,6 @@
 * Storable instance in Base for Ratio throws errors when denominator is 0.
   Fixed via custom instance, but a patch to base should maybe be made.
 
-* Add remaining unboxed vector instances (via TH)
-
 * Benchmark Word vs Int for tags
 
 * Based on speed of test, UTCTime seems to be slow
