@@ -8,7 +8,6 @@ module Main where
 
 import           Control.DeepSeq
 import           Data.List
-import           Data.List.Split
 import qualified Data.Serialize as Cereal
 import qualified Data.Store as Store
 import qualified Data.Vector as Boxed
@@ -43,7 +42,3 @@ encoding =
           mapM_ func
                 (map (\x -> (x,commas x))
                      [1000000,2000000,10000000])
-
--- | Formatting an integral number to 1,000,000, etc.
-commas :: (Num a,Integral a,Show a) => a -> String
-commas = reverse . intercalate "," . chunksOf 3 . reverse . show
