@@ -10,4 +10,3 @@ extra-deps:
 - th-utilities-0.1.1.0
 - th-reify-many-0.1.6
 - th-orphans-0.13.1
-- ghc-heap-view-0.5.4
