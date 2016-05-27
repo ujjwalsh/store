@@ -29,7 +29,7 @@ import           Data.Vector.Serialize ()
 #endif
 
 data SomeData = SomeData !Int64 !Word8 !Double
-    deriving (Eq, Show, Generic)
+    deriving (Eq, Show, Generic, Typeable)
 instance NFData SomeData where
     rnf x = x `seq` ()
 instance Store SomeData
