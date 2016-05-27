@@ -39,7 +39,7 @@ dependencies:
 # config. Many of these bounds can be much lower, most aren't even necessary.
 # Added to appease at least the lower part of the PvP
   - array >=0.5.0.0
-  - base-orphans >=0.5.4
+  - base-orphans >=0.4.5
   - bytestring >=0.10.4.0
   - conduit >=1.2.3.1
   - containers >=0.5.5.1
