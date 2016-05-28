@@ -1,5 +1,5 @@
 resolver: lts-3.13
-packages :
+packages:
   - .
   - location: deps/smallcheck
     extra-dep: true
@@ -8,4 +8,7 @@ packages :
 extra-deps:
   - fail-4.9.0.0
   - th-lift-instances-0.1.7
-  - th-utilities-0.1.0.1
+  - th-utilities-0.1.1.0
+  - th-reify-many-0.1.6
+  - base-orphans-0.5.4
+  - th-orphans-0.13.1
