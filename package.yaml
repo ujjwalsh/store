@@ -82,6 +82,17 @@ tests:
     ghc-options: -threaded -rtsopts -with-rtsopts=-N
     dependencies:
       - store
+  store-weigh:
+    source-dirs: test
+    main: Allocations.hs
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N -with-rtsopts=-T -O2
+    dependencies:
+      - store
+      - weigh
+      - criterion
+      - cereal
+      - cereal-vector
+      - vector-binary-instances
 
 benchmarks:
   store-bench:
