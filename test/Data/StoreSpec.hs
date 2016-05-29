@@ -8,6 +8,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 module Data.StoreSpec where
 
 import           Control.Applicative
@@ -65,7 +66,7 @@ import           Test.SmallCheck.Series
 -- TODO: should be possible to do something clever where it only defines
 -- instances that don't already exist.  For now, just doing it manually.
 
-addMinAndMaxBounds :: forall a. (Bounded a, Eq a, Num a) => [a] -> [a]
+addMinAndMaxBounds :: forall a. (Bounded a, Eq a) => [a] -> [a]
 addMinAndMaxBounds xs =
     (if (minBound :: a) `notElem` xs then [minBound] else []) ++
     (if (maxBound :: a) `notElem` xs && (maxBound :: a) /= minBound then maxBound : xs else xs)
@@ -191,8 +192,10 @@ instance (Monad m, Serial m a) => Serial m (Tagged a)
 instance Monad m => Serial m Void where
     series = generate (\_ -> [])
 
+#if !MIN_VERSION_template_haskell(2,11,0)
 deriving instance Show NameFlavour
 deriving instance Show NameSpace
+#endif
 
 ------------------------------------------------------------------------
 -- Test datatypes for generics support
