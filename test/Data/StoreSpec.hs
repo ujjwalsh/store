@@ -12,6 +12,7 @@
 module Data.StoreSpec where
 
 import           Control.Applicative
+import           Control.Exception (evaluate)
 import           Control.Monad (unless)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -215,6 +216,20 @@ data X = X
 instance Monad m => Serial m X
 instance Store X
 
+
+-- Datatypes with faulty instances
+newtype BadIdea = BadIdea Int64
+instance Store BadIdea where
+    poke (BadIdea x) = poke x
+    peek = BadIdea <$> peek
+    size = ConstSize 1 -- too small
+
+newtype BadIdea2 = BadIdea2 Int64
+instance Store BadIdea2 where
+    poke (BadIdea2 x) = poke x
+    peek = BadIdea2 <$> peek
+    size = ConstSize 12 -- too large
+
 spec :: Spec
 spec = do
     describe "Store on all monomorphic instances"
@@ -305,3 +320,9 @@ spec = do
         mapM_ putStrLn
               $(do insts <- getAllInstanceTypes1 ''Store
                    lift $ map pprint $ filter (not . isMonoType) insts)
+    it "Faulty implementations of size lead to PokeExceptions" $ do
+        evaluate (encode (BadIdea 0)) `shouldThrow` isPokeException
+        evaluate (encode (BadIdea2 0)) `shouldThrow` isPokeException
+
+isPokeException :: Test.Hspec.Selector PokeException
+isPokeException = const True
