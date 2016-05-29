@@ -14,6 +14,7 @@ module Data.StoreSpec where
 import           Control.Applicative
 import           Control.Exception (evaluate)
 import           Control.Monad (unless)
+import qualified Data.Array.Unboxed as A
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short as SBS
@@ -176,6 +177,16 @@ instance (Monad m, Serial m k, Serial m a, Hashable k, Eq k) => Serial m (HashMa
 instance (Monad m, Serial m a, Hashable a, Eq a) => Serial m (HashSet a) where
     series = fmap setFromList series
 
+instance (Monad m, A.Ix i, Serial m i, Serial m e) => Serial m (A.Array i e) where
+    series = seriesArray
+
+instance (Monad m, A.IArray A.UArray e, A.Ix i, Serial m i, Serial m e) => Serial m (A.UArray i e) where
+    series = seriesArray
+
+seriesArray :: (Monad m, A.Ix i, A.IArray a e, Serial m i, Serial m e) => Series m (a i e)
+seriesArray = cons2 $ \bounds (NonEmpty xs) ->
+    A.listArray bounds (take (A.rangeSize bounds) (cycle xs))
+
 instance Monad m => Serial m Time.Day where
     series = Time.ModifiedJulianDay <$> series
 
@@ -297,6 +308,8 @@ spec = do
             , [t| NE.NonEmpty Int8 |]
             , [t| NE.NonEmpty Int64 |]
             , [t| Tagged Int32 |]
+            , [t| A.Array (Int, Integer) Integer |]
+            , [t| A.UArray Char Bool |]
             ])
     it "Slices roundtrip" $ do
         assertRoundtrip False $ T.drop 3 $ T.take 3 "Hello world!"

@@ -46,6 +46,8 @@ module Data.Store.Internal
     , sizeSet, pokeSet, peekSet
     -- ** Store instances in terms of IsMap
     , sizeMap, pokeMap, peekMap
+    -- ** Store instances in terms of IArray
+    , sizeArray, pokeArray, peekArray
     -- ** Peek utilities
     , skip, isolate
     -- ** Static Size type
@@ -61,6 +63,7 @@ import           Control.DeepSeq (NFData)
 import           Control.Exception (throwIO)
 import           Control.Monad (when)
 import           Control.Monad.IO.Class (liftIO)
+import qualified Data.Array.Unboxed as A
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -68,7 +71,7 @@ import qualified Data.ByteString.Short.Internal as SBS
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
 import           Data.Data (Data)
 import           Data.Fixed (Fixed (..), Pico)
-import           Data.Foldable (forM_)
+import           Data.Foldable (forM_, foldl')
 import           Data.HashMap.Strict (HashMap)
 import           Data.HashSet (HashSet)
 import           Data.Hashable (Hashable)
@@ -373,17 +376,6 @@ instance Store T.Text where
     {-# INLINE peek #-}
     {-# INLINE poke #-}
 
-{-
--- Gets a little tricky to compute size due to size of storing indices.
-
-instance (Store i, Store e) => Store (Array i e) where
-    size = combineSize' () () () $
-        VarSize $ \t ->
-        case size :: Size e of
-            ConstSize n ->  n * length x
-            VarSize f -> foldl' (\acc x -> acc + f x) 0
--}
-
 ------------------------------------------------------------------------
 -- Known size instances
 
@@ -500,11 +492,46 @@ instance (Eq a, Hashable a, Store a) => Store (HashSet a) where
     {-# INLINE peek #-}
     {-# INLINE poke #-}
 
--- FIXME: implement
---
--- instance (Ix i, Bounded i, Store a) => Store (Array ix a) where
---
--- instance (Ix i, Bounded i, Store a) => Store (UA.UArray ix a) where
+instance (A.Ix i, Store i, Store e) => Store (A.Array i e) where
+    -- TODO: Speed up poke and peek
+    size = sizeArray
+    poke = pokeArray
+    peek = peekArray
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
+
+instance (A.Ix i, A.IArray A.UArray e, Store i, Store e) => Store (A.UArray i e) where
+    -- TODO: Speed up poke and peek
+    size = sizeArray
+    poke = pokeArray
+    peek = peekArray
+    {-# INLINE size #-}
+    {-# INLINE peek #-}
+    {-# INLINE poke #-}
+
+sizeArray :: (A.Ix i, A.IArray a e, Store i, Store e) => Size (a i e)
+sizeArray = VarSize $ \arr ->
+    let bounds = A.bounds arr
+    in  getSize bounds +
+        case size of
+            ConstSize n ->  n * A.rangeSize bounds
+            VarSize f -> foldl' (\acc x -> acc + f x) 0 (A.elems arr)
+{-# INLINE sizeArray #-}
+
+pokeArray :: (A.Ix i, A.IArray a e, Store i, Store e) => a i e -> Poke ()
+pokeArray arr = do
+    poke (A.bounds arr)
+    forM_ (A.elems arr) poke
+{-# INLINE pokeArray #-}
+
+peekArray :: (A.Ix i, A.IArray a e, Store i, Store e) => Peek (a i e)
+peekArray = do
+    bounds <- peek
+    let len = A.rangeSize bounds
+    elems <- replicateM len peek
+    return (A.listArray bounds elems)
+{-# INLINE peekArray #-}
 
 instance Store Integer where
 #if MIN_VERSION_integer_gmp(1,0,0)
