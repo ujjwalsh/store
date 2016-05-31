@@ -1,24 +1,49 @@
 # store
 
-The 'store' package provides binary serialization of Haskell datatypes. It fills
-quite a different niche from packages like 'binary' or 'cereal'. In particular:
+The 'store' package provides efficient binary serialization. There are a couple
+features that particularly distinguish it from most prior Haskell serialization
+libraries:
 
-* Its primary goal is speed. Whenever possible, direct machine representations
-  are used. For numeric types (`Int`, `Double`, `Word32`, etc) and types that
-  use buffers (`Text`, `ByteString`, `Vector`, etc).  This means that much of
-  serialization uses the equivalent of `memcpy`.
+* Its primary goal is speed. By default, direct machine representations are used
+  for things like numeric values (`Int`, `Double`, `Word32`, etc) and buffers
+  (`Text`, `ByteString`, `Vector`, etc). This means that much of serialization
+  uses the equivalent of `memcpy`.
 
-* By using machine representations, we lose serialization compatibility between
-  different architectures. Store could in theory be used to describe
-  machine-independent serialization formats. However, this is not the usecase
-  it's currently designed for (though utilities might be added for this in the
-  future!)
+  We have plans for supporting architecture independent serialization - see
+  [#36](https://github.com/fpco/store/issues/36) and
+  [#31](https://github.com/fpco/store/issues/31). This plan makes little endian
+  the default, so that the most common endianness has no overhead.
 
-* `Store` will not work at all on architectures which lack unaligned memory
-  access (for example, older ARM processors).  This is not a fundamental
-  limitation, but we do not currently require ARM support.
+* Instead of implementing lazy serialization / deserialization involving
+  multiple input / output buffers, `peek` an `poke` always work with a single
+  buffer. This buffer is allocated by asking the value for its size before
+  encoding. This simplifies the encoding logic, and allows for highly optimized
+  tight loops.
 
-See
-[this blog post](https://www.fpcomplete.com/blog/2016/03/efficient-binary-serialization)
-which describes the initial motivations and benchmarks that led to the existence
-of this package.
+* `store` can optimize size computations by knowing when some types always
+  use the same number of bytes.  This allows us to compute the byte size of a
+  `Vector Int32` by just doing `length v * 4`.
+
+It also features:
+
+* Optimized serialization instances for many types from base, vector,
+  bytestring, text, containers, time, template-haskell, and more.
+
+* TH and GHC Generics based generation of Store instances for datatypes
+
+* TH generation of testcases.
+
+## Architecture limitations
+
+`Store` does not currently work at all on architectures which lack efficient
+unaligned memory access (for example, older ARM processors). This is not a
+fundamental limitation, but we do not currently require ARM or PowerPC support.
+See [#37](https://github.com/fpco/store/issues/37) and
+[#47](https://github.com/fpco/store/issues/47).
+
+## Blog posts
+
+* [Initial release announcement](https://www.fpcomplete.com/blog/2016/05/store-package)
+* [Benchmarks of the prototype](https://www.fpcomplete.com/blog/2016/03/efficient-binary-serialization)
+* [New 'weigh' allocation benchmark package](https://www.fpcomplete.com/blog/2016/05/weigh-package),
+  created particularly to aid optimizing `store`.
