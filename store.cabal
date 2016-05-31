@@ -50,8 +50,9 @@ library
     , th-utilities >=0.1.1.0
     , primitive >=0.6
     , th-reify-many >=0.1.6
+    , th-orphans >= 0.13.1
     , array >=0.5.0.0
-    , base-orphans >=0.4.5
+    , base-orphans >=0.4.3
     , bytestring >=0.10.4.0
     , conduit >=1.2.3.1
     , containers >=0.5.5.1
@@ -75,7 +76,6 @@ library
     , text >=1.2.0.4
     , th-lift >=0.7.1
     , th-lift-instances >=0.1.4
-    , th-orphans >=0.13.1
     , time >=1.4.2
     , transformers >=0.3.0.0
     , unordered-containers >=0.2.5.1
@@ -97,8 +97,9 @@ test-suite store-test
     , th-utilities >=0.1.1.0
     , primitive >=0.6
     , th-reify-many >=0.1.6
+    , th-orphans >= 0.13.1
     , array >=0.5.0.0
-    , base-orphans >=0.4.5
+    , base-orphans >=0.4.3
     , bytestring >=0.10.4.0
     , conduit >=1.2.3.1
     , containers >=0.5.5.1
@@ -122,7 +123,6 @@ test-suite store-test
     , text >=1.2.0.4
     , th-lift >=0.7.1
     , th-lift-instances >=0.1.4
-    , th-orphans >=0.13.1
     , time >=1.4.2
     , transformers >=0.3.0.0
     , unordered-containers >=0.2.5.1
@@ -148,8 +148,9 @@ test-suite store-weigh
     , th-utilities >=0.1.1.0
     , primitive >=0.6
     , th-reify-many >=0.1.6
+    , th-orphans >= 0.13.1
     , array >=0.5.0.0
-    , base-orphans >=0.4.5
+    , base-orphans >=0.4.3
     , bytestring >=0.10.4.0
     , conduit >=1.2.3.1
     , containers >=0.5.5.1
@@ -173,7 +174,6 @@ test-suite store-weigh
     , text >=1.2.0.4
     , th-lift >=0.7.1
     , th-lift-instances >=0.1.4
-    , th-orphans >=0.13.1
     , time >=1.4.2
     , transformers >=0.3.0.0
     , unordered-containers >=0.2.5.1
@@ -204,8 +204,9 @@ benchmark store-bench
     , th-utilities >=0.1.1.0
     , primitive >=0.6
     , th-reify-many >=0.1.6
+    , th-orphans >= 0.13.1
     , array >=0.5.0.0
-    , base-orphans >=0.4.5
+    , base-orphans >=0.4.3
     , bytestring >=0.10.4.0
     , conduit >=1.2.3.1
     , containers >=0.5.5.1
@@ -229,7 +230,6 @@ benchmark store-bench
     , text >=1.2.0.4
     , th-lift >=0.7.1
     , th-lift-instances >=0.1.4
-    , th-orphans >=0.13.1
     , time >=1.4.2
     , transformers >=0.3.0.0
     , unordered-containers >=0.2.5.1

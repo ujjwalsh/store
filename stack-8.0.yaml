@@ -6,10 +6,7 @@ packages:
 - location: deps/weigh
   extra-dep: true
 extra-deps:
-- th-lift-instances-0.1.7
 - th-utilities-0.1.1.0
-- th-reify-many-0.1.6
-- th-orphans-0.13.1
 - hspec-smallcheck-0.4.1
 - mono-traversable-0.10.2
 - dlist-instances-0.1
