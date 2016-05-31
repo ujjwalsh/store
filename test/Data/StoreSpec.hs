@@ -30,6 +30,7 @@ import qualified Data.List.NonEmpty as NE
 import           Data.Map (Map)
 import           Data.Monoid
 import           Data.Primitive.Types (Addr)
+import           Data.Proxy (Proxy(..))
 import           Data.Sequence (Seq)
 import           Data.Sequences (fromList)
 import           Data.Set (Set)
@@ -42,6 +43,7 @@ import           Data.StoreSpec.TH
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Time as Time
+import           Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import qualified Data.Vector.Primitive as PV
 import qualified Data.Vector.Storable as SV
@@ -257,6 +259,20 @@ spec = do
                  ]
              let f ty = isMonoType ty && ty `notElem` omitTys
              smallcheckManyStore verbose 2 . map return . filter f $ insts)
+    describe "Store on non-numeric Float/Double values" $ do
+        let testNonNumeric :: forall a m. (RealFloat a, Eq a, Show a, Typeable a, Store a, Monad m) => Proxy a -> m ()
+            testNonNumeric _proxy = do
+                assertRoundtrip verbose ((1/0) :: a)
+                assertRoundtrip verbose ((-1/0) :: a)
+                assertRoundtrip verbose ((-0) :: a)
+                -- 0/0 /= 0/0
+                case decode (encode ((0/0) :: a)) of
+                    Right (x :: a) -> unless (isNaN x) (fail "Could not roundtrip NaN")
+                    _ -> fail "Could not roundtrip NaN"
+        testNonNumeric (Proxy :: Proxy Double)
+        testNonNumeric (Proxy :: Proxy Float)
+        testNonNumeric (Proxy :: Proxy CDouble)
+        testNonNumeric (Proxy :: Proxy CFloat)
     describe "Store on all custom generic instances"
         $(smallcheckManyStore verbose 2
             [ [t| Test |]
