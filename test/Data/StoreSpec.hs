@@ -259,13 +259,17 @@ spec = do
                  ]
              let f ty = isMonoType ty && ty `notElem` omitTys
              smallcheckManyStore verbose 2 . map return . filter f $ insts)
-    describe "Store on non-numeric Float/Double values" $ do
+    it "Store on non-numeric Float/Double values" $ do
         let testNonNumeric :: forall a m. (RealFloat a, Eq a, Show a, Typeable a, Store a, Monad m) => Proxy a -> m ()
             testNonNumeric _proxy = do
                 assertRoundtrip verbose ((1/0) :: a)
                 assertRoundtrip verbose ((-1/0) :: a)
+                -- -0 == 0, so we check if the infinity sign is the same
+                case decode (encode ((-0) :: a)) of
+                    Right (x :: a) -> unless (-1/0 == 1/x) (fail "Could not roundtrip negative 0")
+                    _ -> fail "Could not roundtrip negative 0"
                 assertRoundtrip verbose ((-0) :: a)
-                -- 0/0 /= 0/0
+                -- 0/0 /= 0/0, so we check for NaN explicitly
                 case decode (encode ((0/0) :: a)) of
                     Right (x :: a) -> unless (isNaN x) (fail "Could not roundtrip NaN")
                     _ -> fail "Could not roundtrip NaN"
@@ -273,6 +277,7 @@ spec = do
         testNonNumeric (Proxy :: Proxy Float)
         testNonNumeric (Proxy :: Proxy CDouble)
         testNonNumeric (Proxy :: Proxy CFloat)
+        (return () :: IO ())
     describe "Store on all custom generic instances"
         $(smallcheckManyStore verbose 2
             [ [t| Test |]
