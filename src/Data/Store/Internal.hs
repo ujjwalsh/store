@@ -48,6 +48,8 @@ module Data.Store.Internal
     , sizeMap, pokeMap, peekMap
     -- ** Store instances in terms of IArray
     , sizeArray, pokeArray, peekArray
+    -- ** Store instances in terms of Generic
+    , genericSize, genericPoke, genericPeek
     -- ** Peek utilities
     , skip, isolate
     -- ** Static Size type
