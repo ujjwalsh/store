@@ -29,7 +29,7 @@ module Data.Store.Streaming
        , conduitDecode
        ) where
 
-import           Control.Exception (assert, throwIO)
+import           Control.Exception (assert)
 import           Control.Monad (liftM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource (MonadResource)
@@ -38,7 +38,7 @@ import qualified Data.ByteString.Internal as BS
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as C
 import           Data.Store
-import           Data.Store.Impl (Peek (..), Poke (..), tooManyBytes, getSize)
+import           Data.Store.Impl (Poke (..), tooManyBytes, getSize, decodeIOWithFromPtr)
 import           Data.Word
 import           Foreign.Ptr
 import qualified Foreign.Storable as Storable
@@ -144,14 +144,7 @@ decodeSized bb getBs n =
 -- | Decode a value, given a 'Ptr' and the number of bytes that make
 -- up the encoded message.
 decodeFromPtr :: (MonadIO m, Store a) => Ptr Word8 -> Int -> m a
-decodeFromPtr ptr n = liftIO $ do
-    (ptr2, x) <- runPeek peek end ptr
-    case ptr2 `compare` end
-      of EQ -> return x
-         GT -> throwIO $ PeekException (ptr2 `minusPtr` end) "Consumed more input than anticipated."
-         LT -> throwIO $ PeekException (end `minusPtr` ptr2) "Consumed less input than anticipated."
-  where
-    end = ptr `plusPtr` n
+decodeFromPtr ptr n = liftIO $ decodeIOWithFromPtr peek ptr n
 {-# INLINE decodeFromPtr #-}
 
 -- | Conduit for encoding 'Message's to 'ByteString's.
