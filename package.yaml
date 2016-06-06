@@ -82,8 +82,12 @@ library:
 
 tests:
   store-test:
-    source-dirs: test
+    source-dirs:
+      - test
+      - src
     main: Spec.hs
+    other-modules:
+      - Data.Store.Impl
     ghc-options: -threaded -rtsopts -with-rtsopts=-N
     dependencies:
       - store
