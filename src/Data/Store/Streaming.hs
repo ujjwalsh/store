@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-|
 Module: Data.Store.Streaming
 Description: A thin streaming layer that uses 'Store' for serialisation.
@@ -28,7 +29,7 @@ module Data.Store.Streaming
        , conduitDecode
        ) where
 
-import           Control.Exception (assert)
+import           Control.Exception (assert, throwIO)
 import           Control.Monad (liftM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource (MonadResource)
@@ -143,8 +144,14 @@ decodeSized bb getBs n =
 -- | Decode a value, given a 'Ptr' and the number of bytes that make
 -- up the encoded message.
 decodeFromPtr :: (MonadIO m, Store a) => Ptr Word8 -> Int -> m a
-decodeFromPtr ptr n =
-    liftIO (liftM snd $ runPeek peek (ptr `plusPtr` n) ptr)
+decodeFromPtr ptr n = liftIO $ do
+    (ptr2, x) <- runPeek peek end ptr
+    case ptr2 `compare` end
+      of EQ -> return x
+         GT -> throwIO $ PeekException (ptr2 `minusPtr` end) "Consumed more input than anticipated."
+         LT -> throwIO $ PeekException (end `minusPtr` ptr2) "Consumed less input than anticipated."
+  where
+    end = ptr `plusPtr` n
 {-# INLINE decodeFromPtr #-}
 
 -- | Conduit for encoding 'Message's to 'ByteString's.
