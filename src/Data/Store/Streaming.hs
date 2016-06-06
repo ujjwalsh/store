@@ -13,6 +13,9 @@ also contains the length of the serialisation.  This way, instead of
 consuming input incrementally, more input can be demanded before
 serialisation is attempted in the first place.
 
+Each message starts with a fixed magic number, in order to detect
+(randomly) invalid data.
+
 -}
 module Data.Store.Streaming
        ( -- * 'Message's to stream data using 'Store' for serialisation.
@@ -28,7 +31,7 @@ module Data.Store.Streaming
        , conduitDecode
        ) where
 
-import           Control.Exception (assert)
+import           Control.Exception (assert, throwIO)
 import           Control.Monad (liftM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource (MonadResource)
@@ -38,6 +41,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.List as C
 import           Data.Store
 import           Data.Store.Impl (Peek (..), Poke (..), tooManyBytes, getSize)
+import qualified Data.Text as T
 import           Data.Word
 import           Foreign.Ptr
 import qualified Foreign.Storable as Storable
@@ -52,18 +56,30 @@ newtype Message a = Message { fromMessage :: a } deriving (Eq, Show)
 -- | Type used to store the length of a 'Message'.
 type SizeTag = Int
 
-tagLength :: Int
-tagLength = Storable.sizeOf (undefined :: SizeTag)
-{-# INLINE tagLength #-}
+-- | Some fixed arbitrary magic number that precedes every 'Message'.
+messageMagic :: Word64
+messageMagic = 18205256374652458875
+
+magicLength :: Int
+magicLength = Storable.sizeOf messageMagic
+
+sizeTagLength :: Int
+sizeTagLength = Storable.sizeOf (undefined :: SizeTag)
+
+headerLength :: Int
+headerLength = magicLength + sizeTagLength
 
 -- | Encode a 'Message' to a 'ByteString'.
 encodeMessage :: Store a => Message a -> ByteString
 encodeMessage (Message x) =
     let l = getSize x
-        totalLength = tagLength + l
+        totalLength = headerLength + l
     in BS.unsafeCreate
        totalLength
-       (\p -> do (offset, ()) <- runPoke (poke l >> poke x) p 0
+       (\p -> do (offset, ()) <- runPoke (do poke messageMagic
+                                             poke l
+                                             poke x
+                                         ) p 0
                  assert (offset == totalLength) (return ()))
 {-# INLINE encodeMessage #-}
 
@@ -81,16 +97,24 @@ peekSized bb n =
                                                   >> peekSized bb n)
 {-# INLINE peekSized #-}
 
--- | Decode a 'SizeTag' from a 'ByteBuffer'.
-peekSizeTag :: MonadIO m => ByteBuffer -> m (PeekMessage m SizeTag)
-peekSizeTag bb = peekSized bb tagLength
-{-# INLINE peekSizeTag #-}
+-- | Decode a header (magic number and 'SizeTag') from a 'ByteBuffer'.
+peekMessageHeader :: MonadIO m => ByteBuffer -> m (PeekMessage m SizeTag)
+peekMessageHeader bb = do
+    available <- BB.availableBytes bb
+    if available < headerLength
+        then return $ NeedMoreInput (\bs -> BB.copyByteString bb bs
+                                            >> peekMessageHeader bb)
+        else peekSized bb magicLength >>= \case
+          Done (Message x) | x == messageMagic -> peekSized bb sizeTagLength
+          Done (Message x) -> liftIO . throwIO $ PeekException 0 . T.pack $ "Wrong message magic, " ++ show x
+          NeedMoreInput _ -> fail "Internal error in peekMessageHeader."
+{-# INLINE peekMessageHeader #-}
 
 -- | Decode some 'Message' from a 'ByteBuffer', by first reading its
--- size, and then the actual 'Message'.
+-- header, and then the actual 'Message'.
 peekMessage :: (MonadIO m, Store a) => ByteBuffer -> m (PeekMessage m a)
 peekMessage bb =
-   peekSizeTag bb >>= \case
+   peekMessageHeader bb >>= \case
         (Done (Message n)) -> peekSized bb n
         NeedMoreInput _ ->
             return $ NeedMoreInput (\ bs -> BB.copyByteString bb bs
@@ -107,24 +131,24 @@ peekMessage bb =
 decodeMessage :: (MonadIO m, Store a)
             => ByteBuffer -> m (Maybe ByteString) -> m (Maybe (Message a))
 decodeMessage bb getBs =
-    decodeSizeTag bb getBs >>= \case
+    decodeHeader bb getBs >>= \case
         Nothing -> return Nothing
         Just n -> decodeSized bb getBs n
 {-# INLINE decodeMessage #-}
 
-decodeSizeTag :: MonadIO m
+decodeHeader :: MonadIO m
               => ByteBuffer
               -> m (Maybe ByteString)
               -> m (Maybe SizeTag)
-decodeSizeTag bb getBs =
-    peekSizeTag bb >>= \case
+decodeHeader bb getBs =
+    peekMessageHeader bb >>= \case
         (Done (Message n)) -> return (Just n)
         (NeedMoreInput _) -> getBs >>= \case
-            Just bs -> BB.copyByteString bb bs >> decodeSizeTag bb getBs
+            Just bs -> BB.copyByteString bb bs >> decodeHeader bb getBs
             Nothing -> BB.availableBytes bb >>= \case
                 0 -> return Nothing
-                n -> liftIO $ tooManyBytes tagLength n "Data.Store.Message.SizeTag"
-{-# INLINE decodeSizeTag #-}
+                n -> liftIO $ tooManyBytes headerLength n "Data.Store.Message.SizeTag"
+{-# INLINE decodeHeader #-}
 
 decodeSized :: (MonadIO m, Store a)
             => ByteBuffer

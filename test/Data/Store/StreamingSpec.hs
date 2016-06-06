@@ -24,8 +24,9 @@ spec = do
     it "Throws an Exception on incomplete messages." conduitIncomplete
     it "Throws an Exception on excess input." $ property conduitExcess
   describe "peekMessage" $ do
-    it "demands more input when needed." $ property (askMore 8)
-    it "demands more input on incomplete SizeTag." $ property (askMore 1)
+    it "demands more input when needed." $ property (askMore 17)
+    it "demands more input on incomplete message magic." $ property (askMore 1)
+    it "demands more input on incomplete SizeTag." $ property (askMore 9)
     it "successfully decodes valid input." $ property peek
   describe "decodeMessage" $
     it "Throws an Exception on incomplete messages." decodeIncomplete
