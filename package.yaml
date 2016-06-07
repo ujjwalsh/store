@@ -34,7 +34,6 @@ dependencies:
 
   # Due to behavior change for reification errors
   - th-reify-many >=0.1.6
-  - th-orphans >= 0.13.1
 
 # "Just cuz" constraints. These are the package versions we use in the 7.8
 # config. Many of these bounds can be much lower, most aren't even necessary.
@@ -64,6 +63,7 @@ dependencies:
   - text >=1.2.0.4
   - th-lift >=0.7.1
   - th-lift-instances >=0.1.4
+  - th-orphans >= 0.12.2
   - time >=1.4.2
   - transformers >=0.3.0.0
   - unordered-containers >=0.2.5.1
