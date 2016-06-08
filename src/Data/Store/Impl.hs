@@ -183,9 +183,8 @@ decodeIOPortionWith mypeek (BS.PS x s len) =
 decodeIOWithFromPtr :: Peek a -> Ptr Word8 -> Int -> IO a
 decodeIOWithFromPtr mypeek ptr len = do
     (offset, x) <- decodeIOPortionWithFromPtr mypeek ptr len
-    let remaining = len - offset
-    if remaining > 0
-       then throwIO $ PeekException remaining "Didn't consume all input."
+    if len /= offset
+       then throwIO $ PeekException (len - offset) "Didn't consume all input."
        else return x
 {-# INLINE decodeIOWithFromPtr #-}
 
