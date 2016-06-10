@@ -2,14 +2,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Data.Store.StreamingSpec where
 
+import Control.Monad (void)
+import           Control.Exception (try)
 import           Control.Monad.Trans.Resource
-import Control.Exception (try)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Internal as BS
 import           Data.Conduit ((=$=), ($$))
 import qualified Data.Conduit.List as C
+import           Data.Int
 import           Data.List (unfoldr)
 import           Data.Monoid
-import           Data.Store (PeekException (..))
+import           Data.Store.Impl (Poke (..))
+import           Data.Store.Internal -- (PeekException (..))
 import           Data.Store.Streaming
 import qualified System.IO.ByteBuffer as BB
 import           Test.Hspec
@@ -26,9 +30,11 @@ spec = do
   describe "peekMessage" $ do
     it "demands more input when needed." $ property (askMore 8)
     it "demands more input on incomplete SizeTag." $ property (askMore 1)
-    it "successfully decodes valid input." $ property peek
-  describe "decodeMessage" $
+    it "successfully decodes valid input." $ property canPeek
+  describe "decodeMessage" $ do
     it "Throws an Exception on incomplete messages." decodeIncomplete
+    it "Throws an Exception on messages that are shorter than indicated." decodeTooShort
+    it "Throws an Exception on messages that are longer than indicated." decodeTooLong
 
 roundtrip :: [Int] -> Property IO
 roundtrip xs = monadic $ do
@@ -65,7 +71,7 @@ conduitIncomplete =
     (runResourceT (C.sourceList [incompleteInput]
                   =$= conduitDecode (Just 10)
                   $$ C.consume)
-    :: IO [Message Integer]) `shouldThrow` peekException
+    :: IO [Message Integer]) `shouldThrow` (== PeekException 8 "Attempted to read too many bytes for Data.Store.Message.Message. Needed 9, but only 8 remain.")
 
 conduitExcess :: [Int] -> Property IO
 conduitExcess xs = monadic $ do
@@ -97,8 +103,8 @@ askMore n x = monadic $ BB.with (Just 10) $ \ bb -> do
         _ -> return False
     _ -> return False
 
-peek :: Integer -> Property IO
-peek x = monadic $ BB.with (Just 10) $ \ bb -> do
+canPeek :: Integer -> Property IO
+canPeek x = monadic $ BB.with (Just 10) $ \ bb -> do
   let bs = encodeMessage (Message x)
   BB.copyByteString bb bs
   peekResult <- peekMessage bb :: IO (PeekMessage IO Integer)
@@ -110,12 +116,37 @@ decodeIncomplete :: IO ()
 decodeIncomplete = BB.with (Just 0) $ \ bb -> do
   BB.copyByteString bb (BS.take 1 incompleteInput)
   (decodeMessage bb (return Nothing) :: IO (Maybe (Message Integer)))
-    `shouldThrow` peekException
+    `shouldThrow` (== PeekException 1 "Attempted to read too many bytes for Data.Store.Message.SizeTag. Needed 8, but only 1 remain.")
 
 incompleteInput :: BS.ByteString
 incompleteInput =
   let bs = encodeMessage (Message (42 :: Integer))
   in BS.take (BS.length bs - 1) bs
 
-peekException :: Selector PeekException
-peekException = const True
+decodeTooLong :: IO ()
+decodeTooLong = BB.with Nothing $ \bb -> do
+    BB.copyByteString bb (encodeMessageTooLong . Message $ (1 :: Int))
+    (decodeMessage bb (return Nothing) :: IO (Maybe (Message Int)))
+        `shouldThrow` (== PeekException 8 "Didn't consume all input.")
+
+decodeTooShort :: IO ()
+decodeTooShort = BB.with Nothing $ \bb -> do
+    BB.copyByteString bb (encodeMessageTooShort . Message $ (1 :: Int))
+    (decodeMessage bb (return Nothing) :: IO (Maybe (Message Int)))
+        `shouldThrow` (== PeekException 0 "Attempted to read too many bytes for Foreign.Storable.Storable GHC.Types.Int. Needed 8, but only 0 remain.")
+
+encodeMessageTooLong :: Store a => Message a -> BS.ByteString
+encodeMessageTooLong (Message x) =
+    let l = 8 + getSize x
+        totalLength = 8 + l
+    in BS.unsafeCreate
+       totalLength
+       (\p -> void $ runPoke (poke l >> poke x >> poke (0::Int64)) p 0)
+
+encodeMessageTooShort :: Store a => Message a -> BS.ByteString
+encodeMessageTooShort (Message x) =
+    let l = 0
+        totalLength = 8 + l
+    in BS.unsafeCreate
+       totalLength
+       (\p -> void $ runPoke (poke l >> poke x) p 0)

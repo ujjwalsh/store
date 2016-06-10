@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-|
 Module: Data.Store.Streaming
 Description: A thin streaming layer that uses 'Store' for serialisation.
@@ -37,7 +38,7 @@ import qualified Data.ByteString.Internal as BS
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as C
 import           Data.Store
-import           Data.Store.Impl (Peek (..), Poke (..), tooManyBytes, getSize)
+import           Data.Store.Impl (Poke (..), tooManyBytes, getSize, decodeIOWithFromPtr)
 import           Data.Word
 import           Foreign.Ptr
 import qualified Foreign.Storable as Storable
@@ -143,8 +144,7 @@ decodeSized bb getBs n =
 -- | Decode a value, given a 'Ptr' and the number of bytes that make
 -- up the encoded message.
 decodeFromPtr :: (MonadIO m, Store a) => Ptr Word8 -> Int -> m a
-decodeFromPtr ptr n =
-    liftIO (liftM snd $ runPeek peek (ptr `plusPtr` n) ptr)
+decodeFromPtr ptr n = liftIO $ decodeIOWithFromPtr peek ptr n
 {-# INLINE decodeFromPtr #-}
 
 -- | Conduit for encoding 'Message's to 'ByteString's.

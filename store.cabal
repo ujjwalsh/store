@@ -91,6 +91,7 @@ test-suite store-test
   main-is: Spec.hs
   hs-source-dirs:
       test
+    , src
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
@@ -130,11 +131,7 @@ test-suite store-test
     , void >=0.5.11
     , store
   other-modules:
-      Allocations
-      Data.Store.StreamingSpec
-      Data.StoreSpec
-      Data.StoreSpec.TH
-      System.IO.ByteBufferSpec
+      Data.Store.Impl
   default-language: Haskell2010
 
 test-suite store-weigh

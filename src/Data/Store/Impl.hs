@@ -165,12 +165,10 @@ decodeIO = decodeIOWith peek
 -- exceptions, and taking a 'Peek' to run. It is an exception to not
 -- consume all input.
 decodeIOWith :: Peek a -> BS.ByteString -> IO a
-decodeIOWith mypeek bs = do
-    (offset, x) <- decodeIOPortionWith mypeek bs
-    let remaining = BS.length bs - offset
-    if remaining > 0
-        then throwIO $ PeekException remaining "Didn't consume all input."
-        else return x
+decodeIOWith mypeek (BS.PS x s len) =
+    withForeignPtr x $ \ptr0 ->
+        let ptr = ptr0 `plusPtr` s
+        in decodeIOWithFromPtr mypeek ptr len
 {-# INLINE decodeIOWith #-}
 
 -- | Similar to 'decodeExPortionWith', but runs in the 'IO' monad.
@@ -178,13 +176,29 @@ decodeIOPortionWith :: Peek a -> BS.ByteString -> IO (Offset, a)
 decodeIOPortionWith mypeek (BS.PS x s len) =
     withForeignPtr x $ \ptr0 ->
         let ptr = ptr0 `plusPtr` s
-            end = ptr `plusPtr` len
-         in do
-             (ptr2, x') <- runPeek mypeek end ptr
-             if ptr2 > end
-                 then throwIO $ PeekException (end `minusPtr` ptr2) "Overshot end of buffer"
-                 else return (ptr2 `minusPtr` ptr, x')
+        in decodeIOPortionWithFromPtr mypeek ptr len
 {-# INLINE decodeIOPortionWith #-}
+
+-- | Like 'decodeIOWith', but using 'Ptr' and length instead of a 'ByteString'.
+decodeIOWithFromPtr :: Peek a -> Ptr Word8 -> Int -> IO a
+decodeIOWithFromPtr mypeek ptr len = do
+    (offset, x) <- decodeIOPortionWithFromPtr mypeek ptr len
+    if len /= offset
+       then throwIO $ PeekException (len - offset) "Didn't consume all input."
+       else return x
+{-# INLINE decodeIOWithFromPtr #-}
+
+-- | Like 'decodeIOPortionWith', but using 'Ptr' and length instead of a 'ByteString'.
+decodeIOPortionWithFromPtr :: Peek a -> Ptr Word8 -> Int -> IO (Offset, a)
+decodeIOPortionWithFromPtr mypeek ptr len =
+    let end = ptr `plusPtr` len
+    in do
+        (ptr2, x') <- runPeek mypeek end ptr
+        if ptr2 > end
+            then throwIO $ PeekException (end `minusPtr` ptr2) "Overshot end of buffer"
+            else return (ptr2 `minusPtr` ptr, x')
+{-# INLINE decodeIOPortionWithFromPtr #-}
+
 
 ------------------------------------------------------------------------
 -- Generics
