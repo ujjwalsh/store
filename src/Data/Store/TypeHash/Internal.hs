@@ -25,7 +25,6 @@ import           Data.Store
 import           Data.Store.Internal
 import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
-import           Instances.TH.Lift ()
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany (reifyMany)
 import           Language.Haskell.TH.Syntax (Lift(lift))
@@ -58,7 +57,7 @@ deriving instance Data TypeHash
 instance NFData TypeHash
 
 instance Lift TypeHash where
-    lift = liftStaticSize [t| BS.ByteString |] . unTypeHash
+    lift = staticByteStringExp . unStaticSize . unTypeHash
 
 -- TODO: move into th-reify-many
 reifyManyTyDecls :: ((Name, Info) -> Q (Bool, [Name]))
@@ -83,7 +82,7 @@ reifyManyTyDecls f = reifyMany go
 typeHashForNames :: [Name] -> Q Exp
 typeHashForNames ns = do
     infos <- getTypeInfosRecursively ns
-    [| TypeHash (BS.pack $(lift (BS.unpack (SHA1.hash (encode infos))))) |]
+    [| TypeHash $(staticByteStringExp (SHA1.hash (encode infos))) |]
 
 -- | At compiletime, this yields a cryptographic hash of the specified 'Type',
 -- including the definition of things it references (transitively).

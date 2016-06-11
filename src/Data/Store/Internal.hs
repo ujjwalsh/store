@@ -57,7 +57,7 @@ module Data.Store.Internal
     -- This portion of the library is still work-in-progress.
     -- 'IsStaticSize' is only supported for strict ByteStrings, in order
     -- to support the use case of 'Tagged'.
-    , IsStaticSize(..), StaticSize(..), toStaticSizeEx, liftStaticSize
+    , IsStaticSize(..), StaticSize(..), toStaticSizeEx, liftStaticSize, staticByteStringExp
     ) where
 
 import           Control.Applicative
@@ -70,6 +70,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short.Internal as SBS
+import           Data.ByteString.Unsafe (unsafePackAddressLen)
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
 import           Data.Data (Data)
 import           Data.Fixed (Fixed (..), Pico)
@@ -115,6 +116,7 @@ import           Language.Haskell.TH.Instances ()
 import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
 import           Prelude
+import           System.IO.Unsafe (unsafePerformIO)
 import           TH.Derive
 
 -- Conditional import to avoid warning
@@ -411,7 +413,7 @@ instance KnownNat n => Store (StaticSize n BS.ByteString) where
         pokeFromForeignPtr sourceFp sourceOffset sourceLength
     peek = do
         let len = fromInteger (natVal (Proxy :: Proxy n))
-        fp <- peekToPlainForeignPtr ("StaticSize " ++ show len ++ " Data.ByteString") len
+        fp <- peekToPlainForeignPtr ("StaticSize " ++ show len ++ " Data.ByteString.ByteString") len
         return (StaticSize (BS.PS fp 0 len))
     {-# INLINE size #-}
     {-# INLINE peek #-}
@@ -424,6 +426,14 @@ liftStaticSize :: forall n a. (KnownNat n, Lift a) => TypeQ -> StaticSize n a ->
 liftStaticSize tyq (StaticSize x) = do
     let numTy = litT $ numTyLit $ natVal (Proxy :: Proxy n)
     [| StaticSize $(lift x) :: StaticSize $(numTy) $(tyq) |]
+
+staticByteStringExp :: BS.ByteString -> ExpQ
+staticByteStringExp bs =
+    [| StaticSize (unsafePerformIO (unsafePackAddressLen len $(litE (stringPrimL (BS.unpack bs)))))
+    :: StaticSize $(litT (numTyLit (fromIntegral len))) BS.ByteString
+    |]
+  where
+    len = BS.length bs
 
 ------------------------------------------------------------------------
 -- containers instances
