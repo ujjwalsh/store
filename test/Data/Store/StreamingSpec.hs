@@ -72,7 +72,7 @@ conduitIncomplete =
     (runResourceT (C.sourceList [incompleteInput]
                   =$= conduitDecode (Just 10)
                   $$ C.consume)
-    :: IO [Message Integer]) `shouldThrow` (== PeekException 8 "Attempted to read too many bytes for Data.Store.Message.Message. Needed 9, but only 8 remain.")
+    :: IO [Message Integer]) `shouldThrow` \PeekException{} -> True
 
 conduitExcess :: [Int] -> Property IO
 conduitExcess xs = monadic $ do
@@ -117,7 +117,7 @@ decodeIncomplete :: IO ()
 decodeIncomplete = BB.with (Just 0) $ \ bb -> do
   BB.copyByteString bb (BS.take 1 incompleteInput)
   (decodeMessage bb (return Nothing) :: IO (Maybe (Message Integer)))
-    `shouldThrow` (== PeekException 1 "Attempted to read too many bytes for Data.Store.Message.SizeTag. Needed 8, but only 1 remain.")
+    `shouldThrow` \PeekException{} -> True
 
 incompleteInput :: BS.ByteString
 incompleteInput =
@@ -128,13 +128,13 @@ decodeTooLong :: IO ()
 decodeTooLong = BB.with Nothing $ \bb -> do
     BB.copyByteString bb (encodeMessageTooLong . Message $ (1 :: Int))
     (decodeMessage bb (return Nothing) :: IO (Maybe (Message Int)))
-        `shouldThrow` (== PeekException 8 "Didn't consume all input.")
+        `shouldThrow` \PeekException{} -> True
 
 decodeTooShort :: IO ()
 decodeTooShort = BB.with Nothing $ \bb -> do
     BB.copyByteString bb (encodeMessageTooShort . Message $ (1 :: Int))
     (decodeMessage bb (return Nothing) :: IO (Maybe (Message Int)))
-        `shouldThrow` (== PeekException 0 "Attempted to read too many bytes for Foreign.Storable.Storable GHC.Types.Int. Needed 8, but only 0 remain.")
+        `shouldThrow` (== PeekException 8 "Attempted to read too many bytes for Data.Store.Message.SizeTag. Needed 16, but only 8 remain.")
 
 encodeMessageTooLong :: Store a => Message a -> BS.ByteString
 encodeMessageTooLong (Message x) =
