@@ -78,7 +78,7 @@ reifyManyTyDecls f = reifyMany go
 -- Not only does this cover the datatypes themselves, but also all
 -- transitive dependencies.
 --
--- The resulting expression is a literal of type 'Int'.
+-- The resulting expression is a literal of type 'TypeHash'.
 typeHashForNames :: [Name] -> Q Exp
 typeHashForNames ns = do
     infos <- getTypeInfosRecursively ns
@@ -87,12 +87,12 @@ typeHashForNames ns = do
 -- | At compiletime, this yields a cryptographic hash of the specified 'Type',
 -- including the definition of things it references (transitively).
 --
--- The resulting expression is a literal of type 'Int'.
+-- The resulting expression is a literal of type 'TypeHash'.
 hashOfType :: Type -> Q Exp
 hashOfType ty = do
     unless (null (getVarNames ty)) $ fail $ "hashOfType cannot handle polymorphic type " <> pprint ty
     infos <- getTypeInfosRecursively (getConNames ty)
-    lift $ TypeHash $ toStaticSizeEx $ SHA1.hash $ encode (ty, infos)
+    [| TypeHash $(staticByteStringExp (SHA1.hash (encode infos))) |]
 
 getTypeInfosRecursively :: [Name] -> Q [(Name, Info)]
 getTypeInfosRecursively names = do
@@ -116,7 +116,7 @@ class HasTypeHash a where
 mkHasTypeHash :: Type -> Q [Dec]
 mkHasTypeHash ty =
     [d| instance HasTypeHash $(return ty) where
-            typeHash _ = TypeHash $(hashOfType ty)
+            typeHash _ = $(hashOfType ty)
       |]
 
 mkManyHasTypeHash :: [Q Type] -> Q [Dec]
