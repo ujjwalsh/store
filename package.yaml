@@ -88,6 +88,10 @@ tests:
     main: Spec.hs
     other-modules:
       - Data.Store.Impl
+      - Data.Store.StreamingSpec
+      - Data.StoreSpec
+      - Data.StoreSpec.TH
+      - System.IO.ByteBufferSpec
     ghc-options: -threaded -rtsopts -with-rtsopts=-N
     dependencies:
       - store

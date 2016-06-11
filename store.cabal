@@ -132,6 +132,10 @@ test-suite store-test
     , store
   other-modules:
       Data.Store.Impl
+      Data.Store.StreamingSpec
+      Data.StoreSpec
+      Data.StoreSpec.TH
+      System.IO.ByteBufferSpec
   default-language: Haskell2010
 
 test-suite store-weigh
