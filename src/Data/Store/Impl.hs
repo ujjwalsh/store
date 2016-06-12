@@ -44,8 +44,7 @@ import           Foreign.Ptr (Ptr, plusPtr, minusPtr, castPtr)
 import           Foreign.Storable (pokeByteOff, Storable, sizeOf)
 import qualified Foreign.Storable as Storable
 import           GHC.Generics
-import           GHC.Prim ( unsafeCoerce#, RealWorld )
-import           GHC.Prim (copyByteArrayToAddr#, copyAddrToByteArray#)
+import           GHC.Prim (unsafeCoerce#, RealWorld, copyByteArrayToAddr#, copyAddrToByteArray#)
 import           GHC.Ptr (Ptr(..))
 import           GHC.TypeLits
 import           GHC.Types (IO(..), Int(..))

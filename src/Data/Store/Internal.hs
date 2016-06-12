@@ -70,7 +70,6 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short.Internal as SBS
-import           Data.ByteString.Unsafe (unsafePackAddressLen)
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
 import           Data.Data (Data)
 import           Data.Fixed (Fixed (..), Pico)
@@ -111,6 +110,7 @@ import qualified GHC.Integer.GMP.Internals as I
 import           GHC.Real (Ratio(..))
 import           GHC.TypeLits
 import           GHC.Types (Int (I#))
+import           Instances.TH.Lift ()
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Instances ()
 import           Language.Haskell.TH.ReifyMany
@@ -429,9 +429,7 @@ liftStaticSize tyq (StaticSize x) = do
 
 staticByteStringExp :: BS.ByteString -> ExpQ
 staticByteStringExp bs =
-    [| StaticSize (unsafePerformIO (unsafePackAddressLen len $(litE (stringPrimL (BS.unpack bs)))))
-    :: StaticSize $(litT (numTyLit (fromIntegral len))) BS.ByteString
-    |]
+    [| StaticSize bs :: StaticSize $(litT (numTyLit (fromIntegral len))) BS.ByteString |]
   where
     len = BS.length bs
 
