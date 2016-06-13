@@ -42,8 +42,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.List as C
 import           Data.Store
 import           Data.Store.Impl (getSize)
-import           Data.Store.Core (decodeIOWithFromPtr)
-import           Data.Store.Core.Internal (Poke(..), tooManyBytes)
+import           Data.Store.Core (Poke(..), tooManyBytes, decodeIOWithFromPtr)
 import qualified Data.Text as T
 import           Data.Word
 import           Foreign.Ptr

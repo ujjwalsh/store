@@ -91,7 +91,6 @@ import           Data.Sequences (IsSequence, Index, replicateM)
 import           Data.Set (Set)
 import           Data.Store.Impl
 import           Data.Store.Core
-import           Data.Store.Core.Internal
 import           Data.Store.TH.Internal
 import qualified Data.Text as T
 import qualified Data.Text.Array as TA

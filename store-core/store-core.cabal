@@ -38,5 +38,4 @@ library
     buildable: False
   exposed-modules:
       Data.Store.Core
-      Data.Store.Core.Internal
   default-language: Haskell2010

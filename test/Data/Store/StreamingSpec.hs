@@ -12,7 +12,7 @@ import qualified Data.Conduit.List as C
 import           Data.Int
 import           Data.List (unfoldr)
 import           Data.Monoid
-import           Data.Store.Core.Internal (Poke(..))
+import           Data.Store.Core (Poke(..))
 import           Data.Store.Internal
 import           Data.Store.Streaming
 import qualified System.IO.ByteBuffer as BB
