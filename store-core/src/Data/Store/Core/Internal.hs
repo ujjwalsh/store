@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -11,6 +12,7 @@
 
 module Data.Store.Core.Internal where
 
+import           Control.Applicative
 import           Control.Exception (Exception(..), throwIO)
 import qualified Control.Monad.Fail as Fail
 import           Control.Monad.IO.Class (MonadIO(..))
@@ -23,6 +25,7 @@ import           Foreign.Ptr (minusPtr)
 import           GHC.Prim (unsafeCoerce#, RealWorld, copyByteArrayToAddr#, copyAddrToByteArray#)
 import           GHC.Ptr (Ptr(..))
 import           GHC.Types (IO(..), Int(..))
+import           Prelude
 
 ------------------------------------------------------------------------
 -- Utilities un-exported by Data.Store.Core
