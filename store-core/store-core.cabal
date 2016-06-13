@@ -4,7 +4,7 @@
 
 name:           store-core
 version:        0.2.0.0
-synopsis:       Core of store library + memory manipulation utilities
+synopsis:       Fast and lightweight binary serialization
 category:       Serialization, Data
 homepage:       https://github.com/fpco/store#readme
 bug-reports:    https://github.com/fpco/store/issues
