@@ -4,7 +4,7 @@ synopsis: Core of store library + memory manipulation utilities
 maintainer: Michael Sloan <sloan@fpcomplete.com>
 license: MIT
 copyright: 2016 FP Complete
-github: fpco/store-core
+github: fpco/store
 category: Serialization, Data
 extra-source-files:
   - ChangeLog.md
