@@ -3,7 +3,7 @@
 -- see: https://github.com/sol/hpack
 
 name:                store
-version:             0.1.0.1
+version:             0.2.0.0
 synopsis:            Fast binary serialization
 homepage:            https://github.com/fpco/store#readme
 bug-reports:         https://github.com/fpco/store/issues
@@ -47,6 +47,7 @@ library
       Data.Store.Impl
   build-depends:
       base >=4.7 && <5
+    , store-core >=0.2 && <0.3
     , th-utilities >=0.1.1.0
     , primitive >=0.6
     , th-reify-many >=0.1.6
@@ -91,10 +92,10 @@ test-suite store-test
   main-is: Spec.hs
   hs-source-dirs:
       test
-    , src
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , store-core >=0.2 && <0.3
     , th-utilities >=0.1.1.0
     , primitive >=0.6
     , th-reify-many >=0.1.6
@@ -131,7 +132,6 @@ test-suite store-test
     , void >=0.5.11
     , store
   other-modules:
-      Data.Store.Impl
       Data.Store.StreamingSpec
       Data.StoreSpec
       Data.StoreSpec.TH
@@ -146,6 +146,7 @@ test-suite store-weigh
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N -with-rtsopts=-T -O2
   build-depends:
       base >=4.7 && <5
+    , store-core >=0.2 && <0.3
     , th-utilities >=0.1.1.0
     , primitive >=0.6
     , th-reify-many >=0.1.6
@@ -202,6 +203,7 @@ benchmark store-bench
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N1 -with-rtsopts=-s -with-rtsopts=-qg
   build-depends:
       base >=4.7 && <5
+    , store-core >=0.2 && <0.3
     , th-utilities >=0.1.1.0
     , primitive >=0.6
     , th-reify-many >=0.1.6

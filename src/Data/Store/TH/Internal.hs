@@ -30,6 +30,7 @@ import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
 import           Data.Primitive.ByteArray
 import           Data.Primitive.Types
+import           Data.Store.Core
 import           Data.Store.Impl
 import qualified Data.Text as T
 import           Data.Traversable (forM)

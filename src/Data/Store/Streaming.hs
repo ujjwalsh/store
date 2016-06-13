@@ -41,7 +41,9 @@ import qualified Data.ByteString.Internal as BS
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as C
 import           Data.Store
-import           Data.Store.Impl (Poke (..), tooManyBytes, getSize, decodeIOWithFromPtr)
+import           Data.Store.Impl (getSize)
+import           Data.Store.Core (decodeIOWithFromPtr)
+import           Data.Store.Core.Internal (Poke(..), tooManyBytes)
 import qualified Data.Text as T
 import           Data.Word
 import           Foreign.Ptr

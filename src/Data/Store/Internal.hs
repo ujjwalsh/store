@@ -39,7 +39,7 @@ module Data.Store.Internal
     -- ** Size type
     , Size(..)
     , getSize, getSizeWith
-    , contramapSize, combineSize, combineSize', scaleSize, addSize
+    , contramapSize, combineSize, combineSizeWith, addSize
     -- ** Store instances in terms of IsSequence
     , sizeSequence, pokeSequence, peekSequence
     -- ** Store instances in terms of IsSet
@@ -90,6 +90,8 @@ import           Data.Sequence (Seq)
 import           Data.Sequences (IsSequence, Index, replicateM)
 import           Data.Set (Set)
 import           Data.Store.Impl
+import           Data.Store.Core
+import           Data.Store.Core.Internal
 import           Data.Store.TH.Internal
 import qualified Data.Text as T
 import qualified Data.Text.Array as TA
@@ -116,7 +118,6 @@ import           Language.Haskell.TH.Instances ()
 import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
 import           Prelude
-import           System.IO.Unsafe (unsafePerformIO)
 import           TH.Derive
 
 -- Conditional import to avoid warning

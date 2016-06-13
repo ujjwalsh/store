@@ -1,0 +1,29 @@
+name: store-core
+version: 0.2.0.0
+synopsis: Core of store library + memory manipulation utilities
+maintainer: Michael Sloan <sloan@fpcomplete.com>
+license: MIT
+copyright: 2016 FP Complete
+github: fpco/store-core
+category: Serialization, Data
+extra-source-files:
+  - ChangeLog.md
+
+ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2
+
+dependencies:
+  - base >=4.7 && <5
+  - primitive >=0.6 && < 1.0 # Due to removal of 'internal' from MonadPrim in 0.6
+  - bytestring >=0.10.4.0 && < 1.0 # soft
+  - fail # shim for Control.Monad.Fail on older bases
+  - transformers >=0.3.0.0 && < 1.0 # soft
+  - ghc-prim >=0.3.1.0 && < 1.0 # soft
+  - text >=1.2.0.4 && < 2.0 #soft
+
+library:
+  source-dirs: src
+  when:
+    # Theoretically, these are the architectures which support reasonably
+    # efficient unaligned access.
+    - condition: (!arch(I386) && !arch(X86_64) && !arch(IA64) && !impl(ghcjs))
+      buildable: false

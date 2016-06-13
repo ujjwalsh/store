@@ -1,5 +1,5 @@
 name: store
-version: 0.1.0.1
+version: 0.2.0.0
 synopsis: Fast binary serialization
 maintainer: Michael Sloan <sloan@fpcomplete.com>
 license: MIT
@@ -15,7 +15,6 @@ flags:
     default: false
     manual: true
 
-
   small-bench:
     default: false
     manual: true
@@ -25,6 +24,9 @@ ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-
 dependencies:
 # Meaningful constraints.
   - base >=4.7 && <5
+
+  # Core package tightly packaged to this package
+  - store-core >=0.2 && <0.3
 
   # Utilities package tightly coupled to the TH code
   - th-utilities >=0.1.1.0
@@ -82,12 +84,9 @@ library:
 
 tests:
   store-test:
-    source-dirs:
-      - test
-      - src
+    source-dirs: test
     main: Spec.hs
     other-modules:
-      - Data.Store.Impl
       - Data.Store.StreamingSpec
       - Data.StoreSpec
       - Data.StoreSpec.TH
