@@ -1,6 +1,7 @@
 resolver: lts-2.22
 packages:
 - .
+- store-core
 - location: deps/smallcheck
   extra-dep: true
 - location: deps/weigh
