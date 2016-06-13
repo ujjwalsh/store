@@ -10,10 +10,24 @@
 {-# LANGUAGE UnboxedTuples #-}
 
 module Data.Store.Core
-    ( Peek, PeekException, peekException
-    , Poke, PokeException, pokeException
+    ( -- * Core Types
+      Poke, PokeException, pokeException
+    , Peek, PeekException, peekException
     , Offset
-    , module Data.Store.Core
+      -- * Encode ByteString
+    , unsafeEncodeWith
+      -- * Decode ByteString
+    , decodeWith, decodeExWith
+    , decodeIOWith, decodeIOPortionWith
+    , decodeIOWithFromPtr, decodeIOPortionWithFromPtr
+      -- * Storable
+    , sizeStorable, pokeStorable, peekStorable
+      -- * Size
+    , Size(..), getSizeWith, contramapSize, combineSizeWith, addSize
+      -- * ForeignPtr
+    , pokeFromForeignPtr, peekToPlainForeignPtr, pokeFromPtr
+      -- * ByteArray
+    , pokeFromByteArray, peekToByteArray
     ) where
 
 import           Control.Exception (throwIO, try)
@@ -82,7 +96,8 @@ decodeIOPortionWith mypeek (BS.PS x s len) =
         in decodeIOPortionWithFromPtr mypeek ptr len
 {-# INLINE decodeIOPortionWith #-}
 
--- | Like 'decodeIOWith', but using 'Ptr' and length instead of a 'ByteString'.
+-- | Like 'decodeIOWith', but using 'Ptr' and length instead of a
+-- 'ByteString'.
 decodeIOWithFromPtr :: Peek a -> Ptr Word8 -> Int -> IO a
 decodeIOWithFromPtr mypeek ptr len = do
     (offset, x) <- decodeIOPortionWithFromPtr mypeek ptr len
@@ -159,19 +174,26 @@ data Size a
     | ConstSize !Int
     deriving Typeable
 
+-- | Given a 'Size' value and a value of the type @a@, returns its 'Int'
+-- size.
 getSizeWith :: Size a -> a -> Int
 getSizeWith (VarSize f) x = f x
 getSizeWith (ConstSize n) _ = n
 {-# INLINE getSizeWith #-}
 
--- TODO: depend on contravariant package? The ConstSize case is a little
--- wonky due to type conversion
-
+-- | This allows for changing the type used as an input when the 'Size'
+-- is 'VarSize'.
 contramapSize :: (a -> b) -> Size b -> Size a
 contramapSize f (VarSize g) = VarSize (g . f)
 contramapSize _ (ConstSize n) = ConstSize n
 {-# INLINE contramapSize #-}
 
+-- | Create an aggregate 'Size' by providing functions to split the
+-- input into two pieces, as well as 'Size' values to use to measure the
+-- results.
+--
+-- If both of the input 'Size' values are 'ConstSize', the result is
+-- 'ConstSize' and the functions will not be used.
 combineSizeWith :: forall a b c. (c -> a) -> (c -> b) -> Size a -> Size b -> Size c
 combineSizeWith toA toB sizeA sizeB =
     case (sizeA, sizeB) of
@@ -181,6 +203,7 @@ combineSizeWith toA toB sizeA sizeB =
         (ConstSize n, ConstSize m) -> ConstSize (n + m)
 {-# INLINE combineSizeWith #-}
 
+-- | Adds a constant amount to a 'Size' value.
 addSize :: Int -> Size a -> Size a
 addSize x (ConstSize n) = ConstSize (x + n)
 addSize x (VarSize f) = VarSize ((x +) . f)
@@ -189,6 +212,9 @@ addSize x (VarSize f) = VarSize ((x +) . f)
 ------------------------------------------------------------------------
 -- Utilities for implementing 'Store' instances via memcpy
 
+-- | Copy a section of memory, based on a 'ForeignPtr', to the output.
+-- Note that this operation is unsafe, the offset and length parameters
+-- are not checked.
 pokeFromForeignPtr :: ForeignPtr a -> Int -> Int -> Poke ()
 pokeFromForeignPtr sourceFp sourceOffset len =
     Poke $ \targetPtr targetOffset -> do
@@ -199,6 +225,8 @@ pokeFromForeignPtr sourceFp sourceOffset len =
         let !newOffset = targetOffset + len
         return (newOffset, ())
 
+-- | Allocate a plain ForeignPtr (no finalizers), of the specified
+-- length and fill it with bytes from the input.
 peekToPlainForeignPtr :: String -> Int -> Peek (ForeignPtr a)
 peekToPlainForeignPtr ty len =
     Peek $ \end sourcePtr -> do
@@ -210,6 +238,9 @@ peekToPlainForeignPtr ty len =
             BS.memcpy targetPtr (castPtr sourcePtr) len
         return (ptr2, castForeignPtr fp)
 
+-- | Copy a section of memory, based on a 'Ptr', to the output. Note
+-- that this operation is unsafe, because the offset and length
+-- parameters are not checked.
 pokeFromPtr :: Ptr a -> Int -> Int -> Poke ()
 pokeFromPtr sourcePtr sourceOffset len =
     Poke $ \targetPtr targetOffset -> do
@@ -219,6 +250,11 @@ pokeFromPtr sourcePtr sourceOffset len =
         let !newOffset = targetOffset + len
         return (newOffset, ())
 
+-- TODO: have a safer variant with the check?
+
+-- | Copy a section of memory, based on a 'ByteArray#', to the output.
+-- Note that this operation is unsafe, because the offset and length
+-- parameters are not checked.
 pokeFromByteArray :: ByteArray# -> Int -> Int -> Poke ()
 pokeFromByteArray sourceArr sourceOffset len =
     Poke $ \targetPtr targetOffset -> do
@@ -227,6 +263,8 @@ pokeFromByteArray sourceArr sourceOffset len =
         let !newOffset = targetOffset + len
         return (newOffset, ())
 
+-- | Allocate a ByteArray of the specified length and fill it with bytes
+-- from the input.
 peekToByteArray :: String -> Int -> Peek ByteArray
 peekToByteArray ty len =
     Peek $ \end sourcePtr -> do
