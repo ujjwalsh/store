@@ -6,8 +6,8 @@ name:           store-core
 version:        0.2.0.0
 synopsis:       Core of store library + memory manipulation utilities
 category:       Serialization, Data
-homepage:       https://github.com/fpco/store-core#readme
-bug-reports:    https://github.com/fpco/store-core/issues
+homepage:       https://github.com/fpco/store#readme
+bug-reports:    https://github.com/fpco/store/issues
 maintainer:     Michael Sloan <sloan@fpcomplete.com>
 copyright:      2016 FP Complete
 license:        MIT
@@ -20,7 +20,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/fpco/store-core
+  location: https://github.com/fpco/store
 
 library
   hs-source-dirs:
