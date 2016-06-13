@@ -23,8 +23,9 @@ import           Control.Monad
 import qualified Data.ByteString as BS
 import           Data.Proxy
 import           Data.Store.Core
+import           Data.Typeable (Typeable, typeRep)
 import           Data.Word
-import           Foreign.Storable (sizeOf)
+import           Foreign.Storable (Storable, sizeOf)
 import           GHC.Generics
 import           GHC.TypeLits
 import           Prelude
@@ -107,15 +108,78 @@ decodeIO = decodeIOWith peek
 {-# INLINE decodeIO #-}
 
 ------------------------------------------------------------------------
--- Misc Utilities
+-- Size
 
+-- | Info about a type's serialized length. Either the length is known
+-- independently of the value, or the length depends on the value.
+data Size a
+    = VarSize (a -> Int)
+    | ConstSize !Int
+    deriving Typeable
+
+-- | Get the number of bytes needed to store the given value. See
+-- 'size'.
 getSize :: Store a => a -> Int
 getSize = getSizeWith size
 {-# INLINE getSize #-}
 
+-- | Given a 'Size' value and a value of the type @a@, returns its 'Int'
+-- size.
+getSizeWith :: Size a -> a -> Int
+getSizeWith (VarSize f) x = f x
+getSizeWith (ConstSize n) _ = n
+{-# INLINE getSizeWith #-}
+
+-- | This allows for changing the type used as an input when the 'Size'
+-- is 'VarSize'.
+contramapSize :: (a -> b) -> Size b -> Size a
+contramapSize f (VarSize g) = VarSize (g . f)
+contramapSize _ (ConstSize n) = ConstSize n
+{-# INLINE contramapSize #-}
+
+-- | Create an aggregate 'Size' by providing functions to split the
+-- input into two pieces.
+--
+-- If both of the types are 'ConstSize', the result is 'ConstSize' and
+-- the functions will not be used.
 combineSize :: forall a b c. (Store a, Store b) => (c -> a) -> (c -> b) -> Size c
 combineSize toA toB = combineSizeWith toA toB size size
 {-# INLINE combineSize #-}
+
+-- | Create an aggregate 'Size' by providing functions to split the
+-- input into two pieces, as well as 'Size' values to use to measure the
+-- results.
+--
+-- If both of the input 'Size' values are 'ConstSize', the result is
+-- 'ConstSize' and the functions will not be used.
+combineSizeWith :: forall a b c. (c -> a) -> (c -> b) -> Size a -> Size b -> Size c
+combineSizeWith toA toB sizeA sizeB =
+    case (sizeA, sizeB) of
+        (VarSize f, VarSize g) -> VarSize (\x -> f (toA x) + g (toB x))
+        (VarSize f, ConstSize m) -> VarSize (\x -> f (toA x) + m)
+        (ConstSize n, VarSize g) -> VarSize (\x -> n + g (toB x))
+        (ConstSize n, ConstSize m) -> ConstSize (n + m)
+{-# INLINE combineSizeWith #-}
+
+-- | Adds a constant amount to a 'Size' value.
+addSize :: Int -> Size a -> Size a
+addSize x (ConstSize n) = ConstSize (x + n)
+addSize x (VarSize f) = VarSize ((x +) . f)
+{-# INLINE addSize #-}
+
+-- | A 'size' implementation based on an instance of 'Storable' and
+-- 'Typeable'.
+sizeStorable :: forall a. (Storable a, Typeable a) => Size a
+sizeStorable = sizeStorableTy (show (typeRep (Proxy :: Proxy a)))
+{-# INLINE sizeStorable #-}
+
+-- | A 'size' implementation based on an instance of 'Storable'. Use this
+-- if the type is not 'Typeable'.
+sizeStorableTy :: forall a. Storable a => String -> Size a
+sizeStorableTy ty = ConstSize (sizeOf (error msg :: a))
+  where
+    msg = "In Data.Store.storableSize: " ++ ty ++ "'s sizeOf evaluated its argument."
+{-# INLINE sizeStorableTy #-}
 
 ------------------------------------------------------------------------
 -- Generics

@@ -17,13 +17,12 @@ module Data.Store.Core
       -- * Encode ByteString
     , unsafeEncodeWith
       -- * Decode ByteString
-    , decodeWith, decodeExWith
+    , decodeWith
+    , decodeExWith, decodeExPortionWith
     , decodeIOWith, decodeIOPortionWith
     , decodeIOWithFromPtr, decodeIOPortionWithFromPtr
       -- * Storable
-    , sizeStorable, pokeStorable, peekStorable
-      -- * Size
-    , Size(..), getSizeWith, contramapSize, combineSizeWith, addSize
+    , pokeStorable, peekStorable, peekStorableTy
       -- * ForeignPtr
     , pokeFromForeignPtr, peekToPlainForeignPtr, pokeFromPtr
       -- * ByteArray
@@ -120,20 +119,6 @@ decodeIOPortionWithFromPtr mypeek ptr len =
 ------------------------------------------------------------------------
 -- Utilities for defining 'Store' instances based on 'Storable'
 
--- | A 'size' implementation based on an instance of 'Storable' and
--- 'Typeable'.
-sizeStorable :: forall a. (Storable a, Typeable a) => Size a
-sizeStorable = sizeStorableTy (show (typeRep (Proxy :: Proxy a)))
-{-# INLINE sizeStorable #-}
-
--- | A 'size' implementation based on an instance of 'Storable'. Use this
--- if the type is not 'Typeable'.
-sizeStorableTy :: forall a. Storable a => String -> Size a
-sizeStorableTy ty = ConstSize (sizeOf (error msg :: a))
-  where
-    msg = "In Data.Store.storableSize: " ++ ty ++ "'s sizeOf evaluated its argument."
-{-# INLINE sizeStorableTy #-}
-
 -- | A 'poke' implementation based on an instance of 'Storable'.
 pokeStorable :: Storable a => a -> Poke ()
 pokeStorable x = Poke $ \ptr offset -> do
@@ -163,51 +148,6 @@ peekStorableTy ty = Peek $ \end ptr ->
         x <- Storable.peek (castPtr ptr)
         return (ptr', x)
 {-# INLINE peekStorableTy #-}
-
-------------------------------------------------------------------------
--- Size type
-
--- | Info about a type's serialized length. Either the length is known
--- independently of the value, or the length depends on the value.
-data Size a
-    = VarSize (a -> Int)
-    | ConstSize !Int
-    deriving Typeable
-
--- | Given a 'Size' value and a value of the type @a@, returns its 'Int'
--- size.
-getSizeWith :: Size a -> a -> Int
-getSizeWith (VarSize f) x = f x
-getSizeWith (ConstSize n) _ = n
-{-# INLINE getSizeWith #-}
-
--- | This allows for changing the type used as an input when the 'Size'
--- is 'VarSize'.
-contramapSize :: (a -> b) -> Size b -> Size a
-contramapSize f (VarSize g) = VarSize (g . f)
-contramapSize _ (ConstSize n) = ConstSize n
-{-# INLINE contramapSize #-}
-
--- | Create an aggregate 'Size' by providing functions to split the
--- input into two pieces, as well as 'Size' values to use to measure the
--- results.
---
--- If both of the input 'Size' values are 'ConstSize', the result is
--- 'ConstSize' and the functions will not be used.
-combineSizeWith :: forall a b c. (c -> a) -> (c -> b) -> Size a -> Size b -> Size c
-combineSizeWith toA toB sizeA sizeB =
-    case (sizeA, sizeB) of
-        (VarSize f, VarSize g) -> VarSize (\x -> f (toA x) + g (toB x))
-        (VarSize f, ConstSize m) -> VarSize (\x -> f (toA x) + m)
-        (ConstSize n, VarSize g) -> VarSize (\x -> n + g (toB x))
-        (ConstSize n, ConstSize m) -> ConstSize (n + m)
-{-# INLINE combineSizeWith #-}
-
--- | Adds a constant amount to a 'Size' value.
-addSize :: Int -> Size a -> Size a
-addSize x (ConstSize n) = ConstSize (x + n)
-addSize x (VarSize f) = VarSize ((x +) . f)
-{-# INLINE addSize #-}
 
 ------------------------------------------------------------------------
 -- Utilities for implementing 'Store' instances via memcpy
