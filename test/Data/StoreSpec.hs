@@ -9,6 +9,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.StoreSpec where
 
 import           Control.Applicative
@@ -31,6 +32,7 @@ import           Data.Map (Map)
 import           Data.Monoid
 import           Data.Primitive.Types (Addr)
 import           Data.Proxy (Proxy(..))
+import           Data.Ratio (numerator, denominator)
 import           Data.Sequence (Seq)
 import           Data.Sequences (fromList)
 import           Data.Set (Set)
@@ -211,6 +213,21 @@ deriving instance Show NameFlavour
 deriving instance Show NameSpace
 #endif
 
+-- We define our own Serial instance for 'Ratio' because of <https://github.com/feuerbach/smallcheck/pull/34>
+
+newtype SerialRatio a = SerialRatio (Ratio a)
+  deriving (Store, Eq, Show)
+
+instance (Integral i, Serial m i) => Serial m (SerialRatio i) where
+   series = pairToRatio <$> series
+     where
+      pairToRatio (n, Positive d) = SerialRatio (n :% d)
+instance (Integral i, CoSerial m i) => CoSerial m (SerialRatio i) where
+  coseriesP rs = (. ratioToPair) <$> alts1 rs
+    where
+     ratioToPair (SerialRatio r) = (numerator r, denominator r)
+
+
 ------------------------------------------------------------------------
 -- Test datatypes for generics support
 
@@ -287,7 +304,7 @@ spec = do
         $(smallcheckManyStore verbose 2
             [ [t| SV.Vector Int8 |]
             , [t| V.Vector  Int8 |]
-            , [t| Ratio     Int8 |]
+            , [t| SerialRatio     Int8 |]
             , [t| Complex   Int8 |]
             , [t| Dual      Int8 |]
             , [t| Sum       Int8 |]
@@ -298,7 +315,7 @@ spec = do
             , [t| Either    Int8 Int8 |]
             , [t| SV.Vector Int64 |]
             , [t| V.Vector  Int64 |]
-            , [t| Ratio     Int64 |]
+            , [t| SerialRatio     Int64 |]
             , [t| Complex   Int64 |]
             , [t| Dual      Int64 |]
             , [t| Sum       Int64 |]
