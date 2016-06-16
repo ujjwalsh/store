@@ -50,7 +50,8 @@ library
     , store-core >=0.2 && <0.3
     , th-utilities >=0.1.1.0
     , primitive >=0.6
-    , th-reify-many -- This branch is used to build the docker image, where we have an older but patched version
+    -- This branch is used to build the docker image, where we have an older but patched version
+    , th-reify-many
     , array >=0.5.0.0
     , base-orphans >=0.4.3
     , bytestring >=0.10.4.0
