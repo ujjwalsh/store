@@ -222,11 +222,6 @@ instance (Integral i, Serial m i) => Serial m (SerialRatio i) where
    series = pairToRatio <$> series
      where
       pairToRatio (n, Positive d) = SerialRatio (n :% d)
-instance (Integral i, CoSerial m i) => CoSerial m (SerialRatio i) where
-  coseriesP rs = (. ratioToPair) <$> alts1 rs
-    where
-     ratioToPair (SerialRatio r) = (numerator r, denominator r)
-
 
 ------------------------------------------------------------------------
 -- Test datatypes for generics support
