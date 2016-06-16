@@ -1,6 +1,3 @@
-[submodule "deps/smallcheck"]
-	path = deps/smallcheck
-	url = git://github.com/mgsloan/smallcheck.git
 [submodule "deps/weigh"]
 	path = deps/weigh
 	url = https://github.com/fpco/weigh.git
