@@ -370,6 +370,7 @@ pokeFromForeignPtr sourceFp sourceOffset len =
                       len
         let !newOffset = targetOffset + len
         return (newOffset, ())
+{-# INLINE pokeFromForeignPtr #-}
 
 -- | Allocate a plain ForeignPtr (no finalizers), of the specified
 -- length and fill it with bytes from the input.
@@ -383,6 +384,7 @@ peekToPlainForeignPtr ty len =
         withForeignPtr fp $ \targetPtr ->
             BS.memcpy targetPtr (castPtr sourcePtr) len
         return (ptr2, castForeignPtr fp)
+{-# INLINE peekToPlainForeignPtr #-}
 
 -- | Copy a section of memory, based on a 'Ptr', to the output. Note
 -- that this operation is unsafe, because the offset and length
@@ -395,6 +397,7 @@ pokeFromPtr sourcePtr sourceOffset len =
                   len
         let !newOffset = targetOffset + len
         return (newOffset, ())
+{-# INLINE pokeFromPtr #-}
 
 -- TODO: have a safer variant with the check?
 
@@ -408,6 +411,7 @@ pokeFromByteArray sourceArr sourceOffset len =
         copyByteArrayToAddr sourceArr sourceOffset target len
         let !newOffset = targetOffset + len
         return (newOffset, ())
+{-# INLINE pokeFromByteArray #-}
 
 -- | Allocate a ByteArray of the specified length and fill it with bytes
 -- from the input.
@@ -421,13 +425,16 @@ peekToByteArray ty len =
         copyAddrToByteArray sourcePtr marr 0 len
         x <- unsafeFreezeByteArray marr
         return (ptr2, x)
+{-# INLINE peekToByteArray #-}
 
 -- | Wrapper around @copyByteArrayToAddr#@ primop.
 copyByteArrayToAddr :: ByteArray# -> Int -> Ptr a -> Int -> IO ()
 copyByteArrayToAddr arr (I# offset) (Ptr addr) (I# len) =
     IO (\s -> (# copyByteArrayToAddr# arr offset addr len s, () #))
+{-# INLINE copyByteArrayToAddr  #-}
 
 -- | Wrapper around @copyAddrToByteArray#@ primop.
 copyAddrToByteArray :: Ptr a -> MutableByteArray (PrimState IO) -> Int -> Int -> IO ()
 copyAddrToByteArray (Ptr addr) (MutableByteArray arr) (I# offset) (I# len) =
     IO (\s -> (# copyAddrToByteArray# addr arr offset len s, () #))
+{-# INLINE copyAddrToByteArray  #-}
