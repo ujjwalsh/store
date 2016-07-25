@@ -49,7 +49,9 @@ module Data.Store.Internal
     -- ** Store instances in terms of IArray
     , sizeArray, pokeArray, peekArray
     -- ** Store instances in terms of Generic
-    , genericSize, genericPoke, genericPeek
+    , GStoreSize, genericSize
+    , GStorePoke, genericPoke
+    , GStorePeek, genericPeek
     -- ** Peek utilities
     , skip, isolate
     -- ** Static Size type
