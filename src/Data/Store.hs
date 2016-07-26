@@ -16,6 +16,7 @@ module Data.Store
       decodeIO, decodeIOWith, decodeIOPortionWith
     -- * Store class and related types.
     , Store(..), Size(..), Poke, Peek
+    , GStoreSize, GStorePoke, GStorePeek
     -- ** Exceptions thrown by Peek
     , PeekException(..), peekException
     ) where
