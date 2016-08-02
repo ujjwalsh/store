@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -116,8 +117,9 @@ impl wf vc = do
                         else return (", use something like the following to compare with the old structural info:\n\n" ++
                                      "diff -u " ++ show path ++ " " ++ show newPath)
                     error $
-                        "\nData.Store.Version computed hash " ++ show hashb64 ++
-                        ", but expected hash " ++ show expectedHash ++ " is specified.\n" ++
+                        "For " ++ shownType ++ ",\n" ++
+                        "Data.Store.Version expected hash " ++ show hashb64 ++
+                        ", but " ++ show expectedHash ++ " is specified.\n" ++
                         "The data used to construct the hash has been written to " ++ show newPath ++
                         extraMsg ++ "\n"
     case wf of
@@ -225,7 +227,11 @@ getStructureInfo' ignore _ = do
                 return (error "unexpected evaluation")
 
 showsQualTypeRep :: Int -> TypeRep -> ShowS
-showsQualTypeRep p (TypeRep _ tycon kinds tys) =
+#if MIN_VERSION_base(4,8,0)
+showsQualTypeRep p (TypeRep _ tycon _ tys) =
+#else
+showsQualTypeRep p (TypeRep _ tycon tys) =
+#endif
     case tys of
         [] -> showsQualTyCon tycon
         [x] | tycon == tcList -> showChar '[' . showsQualTypeRep 0 x . showChar ']'
@@ -239,7 +245,7 @@ showsQualTypeRep p (TypeRep _ tycon kinds tys) =
                 showParen (p > 9) $
                 showsQualTyCon tycon .
                 showChar ' '      .
-                showArgs (showChar ' ') (kinds ++ tys)
+                showArgs (showChar ' ') tys
 
 showsQualTyCon :: TyCon -> ShowS
 showsQualTyCon tc = showString (tyConModule tc ++ "." ++ tyConName tc)
@@ -271,10 +277,23 @@ tyConOf = typeRepTyCon . typeRep
 data VersionCheckException = VersionCheckException
     { expectedVersion :: StoreVersion
     , receivedVersion :: StoreVersion
-    } deriving (Typeable, Show)
+    } deriving
+#if MIN_VERSION_base(4,8,0)
+        (Typeable, Show)
 
 instance Exception VersionCheckException where
-    displayException VersionCheckException{..} =
-        "Mismatch detected by Data.Store.Version - expected " ++
-        T.unpack (decodeUtf8With lenientDecode (unStoreVersion expectedVersion)) ++ " but got " ++
-        T.unpack (decodeUtf8With lenientDecode (unStoreVersion receivedVersion))
+    displayException = displayVCE
+#else
+        (Typeable)
+
+instance Show VersionCheckException where
+    show = displayVCE
+
+instance Exception VersionCheckException
+#endif
+
+displayVCE :: VersionCheckException -> String
+displayVCE VersionCheckException{..} =
+    "Mismatch detected by Data.Store.Version - expected " ++
+    T.unpack (decodeUtf8With lenientDecode (unStoreVersion expectedVersion)) ++ " but got " ++
+    T.unpack (decodeUtf8With lenientDecode (unStoreVersion receivedVersion))
