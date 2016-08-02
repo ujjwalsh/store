@@ -6,5 +6,5 @@ packages:
   extra-dep: true
 extra-deps:
 - th-lift-instances-0.1.7
-- th-utilities-0.1.1.0
+- th-utilities-0.2.0.0
 - th-reify-many-0.1.6

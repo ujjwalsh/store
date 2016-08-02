@@ -1,5 +1,17 @@
 # ChangeLog
 
+## 0.2.1.0
+
+Release notes:
+
+* Adds `Data.Store.Version` and deprecates `Data.Store.TypeHash`.
+  The new functionality is similar to TypeHash, but there are much fewer false
+  positives of hashes changing.
+
+Other enhancements:
+
+* Now exports types related to generics
+
 ## 0.2.0.0
 
 Release notes:

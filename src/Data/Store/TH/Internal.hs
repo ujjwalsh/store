@@ -45,7 +45,7 @@ import           Language.Haskell.TH.Syntax (lift)
 import           Prelude
 import           Safe (headMay)
 import           TH.Derive (Deriver(..))
-import           TH.ReifyDataType
+import           TH.ReifySimple
 import           TH.Utilities (expectTyCon1, dequalify, plainInstanceD)
 
 instance Deriver (Store a) where
