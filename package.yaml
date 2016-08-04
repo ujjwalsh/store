@@ -29,7 +29,7 @@ dependencies:
   - store-core >=0.2 && <0.3
 
   # Utilities package tightly coupled to the TH code
-  - th-utilities >=0.1.1.0
+  - th-utilities >=0.1.1.0 && <0.2.0.0
 
   # Due to removal of 'internal' from MonadPrim in 0.6
   - primitive >=0.6
