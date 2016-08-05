@@ -67,6 +67,8 @@ data VersionConfig a = VersionConfig
       -- ^ When set, specifies the name to instead use to tag the data.
     , vcIgnore :: S.Set String
       -- ^ DataTypes to ignore.
+    , vcRenames :: M.Map String String
+      -- ^ Allowed renamings of datatypes, useful when they move.
     } deriving (Eq, Show, Data, Typeable, Generic)
 
 hashedVersionConfig :: String -> VersionConfig a
@@ -74,6 +76,7 @@ hashedVersionConfig hash = VersionConfig
     { vcExpectedHash = Just hash
     , vcManualName = Nothing
     , vcIgnore = S.empty
+    , vcRenames = M.empty
     }
 
 namedVersionConfig :: String -> String -> VersionConfig a
@@ -81,6 +84,7 @@ namedVersionConfig name hash = VersionConfig
     { vcExpectedHash = Just hash
     , vcManualName = Just name
     , vcIgnore = S.empty
+    , vcRenames = M.empty
     }
 
 wrapVersion :: Data a => VersionConfig a -> Q Exp
@@ -94,7 +98,7 @@ data WhichFunc = Wrap | Check
 impl :: forall a. Data a => WhichFunc -> VersionConfig a -> Q Exp
 impl wf vc = do
     let proxy = Proxy :: Proxy a
-        info = encodeUtf8 (T.pack (getStructureInfo (vcIgnore vc) proxy))
+        info = encodeUtf8 (T.pack (getStructureInfo (vcIgnore vc) (vcRenames vc) proxy))
         hash = SHA1.hash info
         hashb64 = BS8.unpack (B64Url.encode hash)
         version = case vcManualName vc of
@@ -103,7 +107,7 @@ impl wf vc = do
     case vcExpectedHash vc of
         Nothing -> return ()
         Just expectedHash -> do
-            let shownType = showsQualTypeRep 0 (typeRep proxy) ""
+            let shownType = showsQualTypeRep (vcRenames vc) 0 (typeRep proxy) ""
             -- FIXME: sanitize expected and handle null
             path <- storeVersionedPath expectedHash
             if hashb64 == expectedHash
@@ -165,13 +169,13 @@ data S = S
     , sFieldNames :: [String]
     }
 
-getStructureInfo :: forall a. Data a => S.Set String -> Proxy a -> String
-getStructureInfo ignore = renderResults . sResults . flip execState (S M.empty "" []) . getStructureInfo' ignore
+getStructureInfo :: forall a. Data a => S.Set String -> M.Map String String -> Proxy a -> String
+getStructureInfo ignore renames = renderResults . sResults . flip execState (S M.empty "" []) . getStructureInfo' ignore renames
   where
     renderResults = unlines . map (\(k, v) -> k ++ v) . M.toAscList
 
-getStructureInfo' :: forall a. Data a => S.Set String -> Proxy a -> State S ()
-getStructureInfo' ignore _ = do
+getStructureInfo' :: forall a. Data a => S.Set String -> M.Map String String -> Proxy a -> State S ()
+getStructureInfo' ignore renames _ = do
     s0 <- get
     when (M.notMember label (sResults s0)) $
         if S.member shownType ignore
@@ -202,7 +206,7 @@ getStructureInfo' ignore _ = do
              , sFieldNames = []
              })
     label = "data-type " ++ shownType
-    shownType = showsQualTypeRep 0 (typeRep (Proxy :: Proxy a)) ""
+    shownType = showsQualTypeRep renames 0 (typeRep (Proxy :: Proxy a)) ""
     goConstr :: (Bool, Constr) -> State S ()
     goConstr (isFirst, c) = do
         modify (\s -> s
@@ -217,53 +221,56 @@ getStructureInfo' ignore _ = do
         case sFieldNames s of
             [] -> fail "impossible case in getStructureInfo'"
             (name:names) -> do
-                getStructureInfo' ignore (Proxy :: Proxy b)
+                getStructureInfo' ignore renames (Proxy :: Proxy b)
                 s' <- get
                 put s
                     { sResults = sResults s'
-                    , sCurResult = sCurResult s ++ "    " ++ name ++ " :: " ++ showsQualTypeRep 0 (typeRep (Proxy :: Proxy b)) "\n"
+                    , sCurResult = sCurResult s ++ "    " ++ name ++ " :: " ++ showsQualTypeRep renames 0 (typeRep (Proxy :: Proxy b)) "\n"
                     , sFieldNames = names
                     }
                 return (error "unexpected evaluation")
 
-showsQualTypeRep :: Int -> TypeRep -> ShowS
+showsQualTypeRep :: M.Map String String -> Int -> TypeRep -> ShowS
 #if MIN_VERSION_base(4,8,0)
-showsQualTypeRep p (TypeRep _ tycon _ tys) =
+showsQualTypeRep renames p (TypeRep _ tycon _ tys) =
 #else
-showsQualTypeRep p (TypeRep _ tycon tys) =
+showsQualTypeRep renames p (TypeRep _ tycon tys) =
 #endif
     case tys of
-        [] -> showsQualTyCon tycon
-        [x] | tycon == tcList -> showChar '[' . showsQualTypeRep 0 x . showChar ']'
+        [] -> showsQualTyCon renames tycon
+        [x] | tycon == tcList -> showChar '[' . showsQualTypeRep renames 0 x . showChar ']'
           where
         [a,r] | tycon == tcFun  -> showParen (p > 8) $
-                                     showsQualTypeRep 9 a .
+                                     showsQualTypeRep renames 9 a .
                                      showString " -> " .
-                                     showsQualTypeRep 8 r
-        xs | isTupleTyCon tycon -> showTuple xs
+                                     showsQualTypeRep renames 8 r
+        xs | isTupleTyCon tycon -> showTuple renames xs
            | otherwise         ->
                 showParen (p > 9) $
-                showsQualTyCon tycon .
+                showsQualTyCon renames tycon .
                 showChar ' '      .
-                showArgs (showChar ' ') tys
+                showArgs renames (showChar ' ') tys
 
-showsQualTyCon :: TyCon -> ShowS
-showsQualTyCon tc = showString (tyConModule tc ++ "." ++ tyConName tc)
+showsQualTyCon :: M.Map String String -> TyCon -> ShowS
+showsQualTyCon renames tc = showString (M.findWithDefault name name renames)
+  where
+    name = tyConModule tc ++ "." ++ tyConName tc
 
 isTupleTyCon :: TyCon -> Bool
 isTupleTyCon tc
   | ('(':',':_) <- tyConName tc = True
   | otherwise                   = False
 
-showArgs :: ShowS -> [TypeRep] -> ShowS
-showArgs _   []     = id
-showArgs _   [a]    = showsQualTypeRep 10 a
-showArgs sep (a:as) = showsQualTypeRep 10 a . sep . showArgs sep as
+showArgs :: M.Map String String -> ShowS -> [TypeRep] -> ShowS
+showArgs _       _   []     = id
+showArgs renames _   [a]    = showsQualTypeRep renames 10 a
+showArgs renames sep (a:as) = showsQualTypeRep renames 10 a . sep . showArgs renames sep as
 
-showTuple :: [TypeRep] -> ShowS
-showTuple args = showChar '('
-               . showArgs (showChar ',') args
-               . showChar ')'
+showTuple :: M.Map String String -> [TypeRep] -> ShowS
+showTuple renames args
+    = showChar '('
+    . showArgs renames (showChar ',') args
+    . showChar ')'
 
 tcList :: TyCon
 tcList = tyConOf (Proxy :: Proxy [()])
