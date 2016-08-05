@@ -16,6 +16,11 @@
 -- The magic here is using an SYB traversal ('Data') to get the
 -- structure of all the data-types involved. This info is rendered to
 -- text and hashed to yield a hash which describes it.
+--
+-- NOTE that this API is still quite new and so is likely to break
+-- compatibility in the future. It should also be expected that the
+-- computed hashes may change between major version bumps, though this
+-- will be minimized when directly feasible.
 module Data.Store.Version
     ( StoreVersion(..)
     , WithVersion(..)

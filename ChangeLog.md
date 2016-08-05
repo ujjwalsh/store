@@ -4,7 +4,7 @@
 
 Release notes:
 
-* Adds `Data.Store.Version` and deprecates `Data.Store.TypeHash`.
+* Adds experimental `Data.Store.Version` and deprecates `Data.Store.TypeHash`.
   The new functionality is similar to TypeHash, but there are much fewer false
   positives of hashes changing.
 
