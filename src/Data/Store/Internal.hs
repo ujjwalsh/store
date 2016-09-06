@@ -273,8 +273,9 @@ peekMutableSequence new write = do
 skip :: Int -> Peek ()
 skip len = Peek $ \end ptr -> do
     let ptr2 = ptr `plusPtr` len
-    when (ptr2 > end) $
-        tooManyBytes len (end `minusPtr` ptr) "skip"
+        remaining = end `minusPtr` ptr
+    when (len > remaining) $
+        tooManyBytes len remaining "skip"
     return (ptr2, ())
 
 -- | Isolate the input to n bytes, skipping n bytes forward. Fails if @m@
@@ -283,8 +284,9 @@ skip len = Peek $ \end ptr -> do
 isolate :: Int -> Peek a -> Peek a
 isolate len m = Peek $ \end ptr -> do
     let ptr2 = ptr `plusPtr` len
-    when (ptr2 > end) $
-        tooManyBytes len (end `minusPtr` ptr) "isolate"
+        remaining = end `minusPtr` ptr
+    when (len > remaining) $
+        tooManyBytes len remaining "isolate"
     (ptr', x) <- runPeek m end ptr
     when (ptr' > end) $
         throwIO $ PeekException (ptr' `minusPtr` end) "Overshot end of isolated bytes"
