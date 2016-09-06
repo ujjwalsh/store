@@ -315,9 +315,10 @@ decodeIOWithFromPtr mypeek ptr len = do
 decodeIOPortionWithFromPtr :: Peek a -> Ptr Word8 -> Int -> IO (Offset, a)
 decodeIOPortionWithFromPtr mypeek ptr len =
     let end = ptr `plusPtr` len
+        remaining = end `minusPtr` ptr
     in do
         (ptr2, x') <- runPeek mypeek end ptr
-        if ptr2 > end
+        if len > remaining
             then throwIO $ PeekException (end `minusPtr` ptr2) "Overshot end of buffer"
             else return (ptr2 `minusPtr` ptr, x')
 {-# INLINE decodeIOPortionWithFromPtr #-}
@@ -349,7 +350,7 @@ peekStorableTy ty = Peek $ \end ptr ->
         needed = sizeOf (undefined :: a)
         remaining = end `minusPtr` ptr
      in do
-        when (ptr' > end) $
+        when (needed > remaining) $
             tooManyBytes needed remaining ty
         x <- Storable.peek (castPtr ptr)
         return (ptr', x)
@@ -378,8 +379,9 @@ peekToPlainForeignPtr :: String -> Int -> Peek (ForeignPtr a)
 peekToPlainForeignPtr ty len =
     Peek $ \end sourcePtr -> do
         let ptr2 = sourcePtr `plusPtr` len
-        when (ptr2 > end) $
-            tooManyBytes len (end `minusPtr` sourcePtr) ty
+            remaining = end `minusPtr` sourcePtr
+        when (len > remaining) $
+            tooManyBytes len remaining ty
         fp <- BS.mallocByteString len
         withForeignPtr fp $ \targetPtr ->
             BS.memcpy targetPtr (castPtr sourcePtr) len
@@ -419,8 +421,9 @@ peekToByteArray :: String -> Int -> Peek ByteArray
 peekToByteArray ty len =
     Peek $ \end sourcePtr -> do
         let ptr2 = sourcePtr `plusPtr` len
-        when (ptr2 > end) $
-            tooManyBytes len (end `minusPtr` sourcePtr) ty
+            remaining = end `minusPtr` sourcePtr
+        when (len > remaining) $
+            tooManyBytes len remaining ty
         marr <- newByteArray len
         copyAddrToByteArray sourcePtr marr 0 len
         x <- unsafeFreezeByteArray marr
