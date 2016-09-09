@@ -276,7 +276,7 @@ skip :: Int -> Peek ()
 skip len = Peek $ \end ptr -> do
     let ptr2 = ptr `plusPtr` len
         remaining = end `minusPtr` ptr
-    when (len > remaining) $
+    when (len > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
         tooManyBytes len remaining "skip"
     return (ptr2, ())
 
@@ -287,7 +287,7 @@ isolate :: Int -> Peek a -> Peek a
 isolate len m = Peek $ \end ptr -> do
     let ptr2 = ptr `plusPtr` len
         remaining = end `minusPtr` ptr
-    when (len > remaining) $
+    when (len > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
         tooManyBytes len remaining "isolate"
     (ptr', x) <- runPeek m end ptr
     when (ptr' > end) $

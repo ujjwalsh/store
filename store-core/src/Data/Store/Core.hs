@@ -318,7 +318,7 @@ decodeIOPortionWithFromPtr mypeek ptr len =
         remaining = end `minusPtr` ptr
     in do
         (ptr2, x') <- runPeek mypeek end ptr
-        if len > remaining
+        if len > remaining -- Do not perform the check on the new pointer, since it could have overflowed
             then throwIO $ PeekException (end `minusPtr` ptr2) "Overshot end of buffer"
             else return (ptr2 `minusPtr` ptr, x')
 {-# INLINE decodeIOPortionWithFromPtr #-}
@@ -350,7 +350,7 @@ peekStorableTy ty = Peek $ \end ptr ->
         needed = sizeOf (undefined :: a)
         remaining = end `minusPtr` ptr
      in do
-        when (needed > remaining) $
+        when (needed > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
             tooManyBytes needed remaining ty
         x <- Storable.peek (castPtr ptr)
         return (ptr', x)
@@ -380,7 +380,7 @@ peekToPlainForeignPtr ty len =
     Peek $ \end sourcePtr -> do
         let ptr2 = sourcePtr `plusPtr` len
             remaining = end `minusPtr` sourcePtr
-        when (len > remaining) $
+        when (len > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
             tooManyBytes len remaining ty
         fp <- BS.mallocByteString len
         withForeignPtr fp $ \targetPtr ->
@@ -422,7 +422,7 @@ peekToByteArray ty len =
     Peek $ \end sourcePtr -> do
         let ptr2 = sourcePtr `plusPtr` len
             remaining = end `minusPtr` sourcePtr
-        when (len > remaining) $
+        when (len > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
             tooManyBytes len remaining ty
         marr <- newByteArray len
         copyAddrToByteArray sourcePtr marr 0 len
