@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 0.2.1.1
+
+* Fixes a bug that could result in segfaults when reading corrupted data.
+
 ## 0.2.1.0
 
 Release notes:
