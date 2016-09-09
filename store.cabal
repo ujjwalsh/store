@@ -1,4 +1,4 @@
--- This file has been generated from package.yaml by hpack version 0.14.0.
+-- This file has been generated from package.yaml by hpack version 0.14.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -48,7 +48,7 @@ library
       Data.Store.Impl
   build-depends:
       base >=4.7 && <5
-    , store-core >=0.2 && <0.3
+    , store-core >=0.2.0.1 && <0.3
     , th-utilities >=0.2
     , primitive >=0.6
     , th-reify-many >=0.1.6
@@ -99,7 +99,7 @@ test-suite store-test
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , store-core >=0.2 && <0.3
+    , store-core >=0.2.0.1 && <0.3
     , th-utilities >=0.2
     , primitive >=0.6
     , th-reify-many >=0.1.6
@@ -153,7 +153,7 @@ test-suite store-weigh
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N -with-rtsopts=-T -O2
   build-depends:
       base >=4.7 && <5
-    , store-core >=0.2 && <0.3
+    , store-core >=0.2.0.1 && <0.3
     , th-utilities >=0.2
     , primitive >=0.6
     , th-reify-many >=0.1.6
@@ -213,7 +213,7 @@ benchmark store-bench
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N1 -with-rtsopts=-s -with-rtsopts=-qg
   build-depends:
       base >=4.7 && <5
-    , store-core >=0.2 && <0.3
+    , store-core >=0.2.0.1 && <0.3
     , th-utilities >=0.2
     , primitive >=0.6
     , th-reify-many >=0.1.6
