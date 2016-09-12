@@ -375,9 +375,18 @@ spec = do
                             , BS.drop (sizeOf (10 :: Int)) bs
                             ]
         evaluate (decodeEx bs' :: SV.Vector Int) `shouldThrow` isNegativeBytesException
+    it "Avoids overflow in bounds checks" $ do
+        let bs = encode ("some random bytestring" :: BS.ByteString)
+            bs' = BS.concat [encode (maxBound :: Int)
+                            , BS.drop (sizeOf (10 :: Int)) bs
+                            ]
+        evaluate (decodeEx bs' :: BS.ByteString) `shouldThrow` isTooManyBytesException
 
 isPokeException :: Test.Hspec.Selector PokeException
 isPokeException = const True
 
 isNegativeBytesException :: Test.Hspec.Selector PeekException
 isNegativeBytesException (PeekException _ t) = "Attempted to read negative number of bytes" `T.isPrefixOf` t
+
+isTooManyBytesException :: Test.Hspec.Selector PeekException
+isTooManyBytesException (PeekException _ t) = "Attempted to read too many bytes" `T.isPrefixOf` t
