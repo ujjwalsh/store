@@ -1,5 +1,10 @@
 # ChangeLog
 
+## 0.2.1.2
+
+* Fixes a bug that could could result in attempting to malloc a negative
+  number of bytes when reading corrupted data.
+
 ## 0.2.1.1
 
 * Fixes a bug that could result in segfaults when reading corrupted data.
