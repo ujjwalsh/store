@@ -231,6 +231,18 @@ tooManyBytes needed remaining ty =
         show needed ++ ", but only " ++
         show remaining ++ " remain."
 
+-- | Throws a 'PeekException' about an attempt to read a negative number of bytes.
+--
+-- This can happen when we read invalid data -- the length tag is
+-- basically random in this case.
+negativeBytes :: Int -> Int -> String -> IO void
+negativeBytes needed remaining ty =
+    throwIO $ PeekException remaining $ T.pack $
+        "Attempted to read negative number of bytes for " ++
+        ty ++
+        ". Tried to read " ++
+        show needed ++ ".  This probably means that we're trying to read invalid data."
+
 ------------------------------------------------------------------------
 -- Decoding and encoding ByteStrings
 
@@ -382,6 +394,8 @@ peekToPlainForeignPtr ty len =
             remaining = end `minusPtr` sourcePtr
         when (len > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
             tooManyBytes len remaining ty
+        when (len < 0) $
+            negativeBytes len remaining ty
         fp <- BS.mallocByteString len
         withForeignPtr fp $ \targetPtr ->
             BS.memcpy targetPtr (castPtr sourcePtr) len
@@ -424,6 +438,8 @@ peekToByteArray ty len =
             remaining = end `minusPtr` sourcePtr
         when (len > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
             tooManyBytes len remaining ty
+        when (len < 0) $
+            negativeBytes len remaining ty
         marr <- newByteArray len
         copyAddrToByteArray sourcePtr marr 0 len
         x <- unsafeFreezeByteArray marr
