@@ -54,7 +54,7 @@ import           Data.Void (Void)
 import           Data.Word
 import           Foreign.C.Types
 import           Foreign.Ptr
-import           Foreign.Storable (Storable)
+import           Foreign.Storable (Storable, sizeOf)
 import           GHC.Fingerprint.Type (Fingerprint(..))
 import           GHC.Generics
 import           GHC.Real (Ratio(..))
@@ -369,6 +369,15 @@ spec = do
     it "Faulty implementations of size lead to PokeExceptions" $ do
         evaluate (encode (BadIdea 0)) `shouldThrow` isPokeException
         evaluate (encode (BadIdea2 0)) `shouldThrow` isPokeException
+    it "Avoids reading data with a negative size" $ do
+        let bs = encode (SV.fromList [1..10::Int])
+            bs' = BS.concat [encode (-1 :: Int)
+                            , BS.drop (sizeOf (10 :: Int)) bs
+                            ]
+        evaluate (decodeEx bs' :: SV.Vector Int) `shouldThrow` isNegativeBytesException
 
 isPokeException :: Test.Hspec.Selector PokeException
 isPokeException = const True
+
+isNegativeBytesException :: Test.Hspec.Selector PeekException
+isNegativeBytesException (PeekException _ t) = "Attempted to read negative number of bytes" `T.isPrefixOf` t
