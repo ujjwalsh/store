@@ -15,6 +15,7 @@ import           Data.Monoid
 import           Data.Store.Core (Poke(..))
 import           Data.Store.Internal
 import           Data.Store.Streaming
+import qualified Data.Text as T
 import qualified System.IO.ByteBuffer as BB
 import           Test.Hspec
 import           Test.Hspec.SmallCheck
@@ -28,9 +29,9 @@ spec = do
     it "Throws an Exception on incomplete messages." conduitIncomplete
     it "Throws an Exception on excess input." $ property conduitExcess
   describe "peekMessage" $ do
-    it "demands more input when needed." $ property (askMore 17)
+    it "demands more input when needed." $ property (askMore (headerLength + 1))
     it "demands more input on incomplete message magic." $ property (askMore 1)
-    it "demands more input on incomplete SizeTag." $ property (askMore 9)
+    it "demands more input on incomplete SizeTag." $ property (askMore (headerLength - 1))
     it "successfully decodes valid input." $ property canPeek
   describe "decodeMessage" $ do
     it "Throws an Exception on incomplete messages." decodeIncomplete
@@ -134,7 +135,10 @@ decodeTooShort :: IO ()
 decodeTooShort = BB.with Nothing $ \bb -> do
     BB.copyByteString bb (encodeMessageTooShort . Message $ (1 :: Int))
     (decodeMessage bb (return Nothing) :: IO (Maybe (Message Int)))
-        `shouldThrow` (== PeekException 8 "Attempted to read too many bytes for Data.Store.Message.SizeTag. Needed 16, but only 8 remain.")
+        `shouldThrow` (== PeekException 8 (T.concat
+                                          ["Attempted to read too many bytes for Data.Store.Message.SizeTag. Needed "
+                                           , T.pack . show $ headerLength
+                                           , ", but only 8 remain."]))
 
 encodeMessageTooLong :: Store a => Message a -> BS.ByteString
 encodeMessageTooLong (Message x) =

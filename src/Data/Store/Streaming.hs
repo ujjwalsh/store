@@ -21,6 +21,7 @@ Each message starts with a fixed magic number, in order to detect
 module Data.Store.Streaming
        ( -- * 'Message's to stream data using 'Store' for serialisation.
          Message (..)
+       , headerLength
          -- * Encoding 'Message's
        , encodeMessage
          -- * Decoding 'Message's
@@ -68,6 +69,7 @@ magicLength = Storable.sizeOf messageMagic
 sizeTagLength :: Int
 sizeTagLength = Storable.sizeOf (undefined :: SizeTag)
 
+-- | Number of bytes needed for the magic number and size tag.
 headerLength :: Int
 headerLength = magicLength + sizeTagLength
 
