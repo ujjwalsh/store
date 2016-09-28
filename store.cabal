@@ -86,8 +86,6 @@ library
     , unordered-containers >=0.2.5.1
     , vector >=0.10.12.3
     , void >=0.5.11
-  if (!arch(I386) && !arch(X86_64) && !arch(IA64) && !impl(ghcjs) && !(impl(AArch64)))
-    buildable: False
   default-language: Haskell2010
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2
 

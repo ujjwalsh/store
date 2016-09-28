@@ -79,11 +79,6 @@ library:
   source-dirs: src
   other-modules:
     - Data.Store.Impl
-  when:
-    # Theoretically, these are the architectures which support reasonably
-    # efficient unaligned access.
-    - condition: (!arch(I386) && !arch(X86_64) && !arch(IA64) && !impl(ghcjs))
-      buildable: false
 
 tests:
   store-test:
