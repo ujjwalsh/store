@@ -12,7 +12,7 @@ import qualified Data.Conduit.List as C
 import           Data.Int
 import           Data.List (unfoldr)
 import           Data.Monoid
-import           Data.Store.Core (Poke(..))
+import           Data.Store.Core (unsafeEncodeWith)
 import           Data.Store.Internal
 import           Data.Store.Streaming
 import qualified Data.Text as T
@@ -135,23 +135,16 @@ decodeTooShort :: IO ()
 decodeTooShort = BB.with Nothing $ \bb -> do
     BB.copyByteString bb (encodeMessageTooShort . Message $ (1 :: Int))
     (decodeMessage bb (return Nothing) :: IO (Maybe (Message Int)))
-        `shouldThrow` (== PeekException 8 (T.concat
-                                          ["Attempted to read too many bytes for Data.Store.Message.SizeTag. Needed "
-                                           , T.pack . show $ headerLength
-                                           , ", but only 8 remain."]))
+        `shouldThrow` \PeekException{} -> True
 
 encodeMessageTooLong :: Store a => Message a -> BS.ByteString
 encodeMessageTooLong (Message x) =
     let l = 8 + getSize x
         totalLength = 8 + l
-    in BS.unsafeCreate
-       totalLength
-       (\p -> void $ runPoke (poke l >> poke x >> poke (0::Int64)) p 0)
+    in unsafeEncodeWith (poke l >> poke x >> poke (0::Int64)) totalLength
 
 encodeMessageTooShort :: Store a => Message a -> BS.ByteString
 encodeMessageTooShort (Message x) =
     let l = 0
         totalLength = 8 + l
-    in BS.unsafeCreate
-       totalLength
-       (\p -> void $ runPoke (poke l >> poke x) p 0)
+    in unsafeEncodeWith (poke l) totalLength

@@ -25,5 +25,5 @@ library:
   when:
     # Theoretically, these are the architectures which support reasonably
     # efficient unaligned access.
-    - condition: (!arch(I386) && !arch(X86_64) && !arch(IA64) && !impl(ghcjs) && !impl(AArch64))
+    - condition: "!(arch(I386) || arch(X86_64) || arch(IA64) || impl(ghcjs) || impl(AArch64))"
       buildable: false

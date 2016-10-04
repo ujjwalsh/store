@@ -33,17 +33,16 @@ module Data.Store.Streaming
        , conduitDecode
        ) where
 
-import           Control.Exception (assert, throwIO)
+import           Control.Exception (throwIO)
 import           Control.Monad (liftM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource (MonadResource)
 import           Data.ByteString (ByteString)
-import qualified Data.ByteString.Internal as BS
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as C
 import           Data.Store
 import           Data.Store.Impl (getSize)
-import           Data.Store.Core (Poke(..), tooManyBytes, decodeIOWithFromPtr)
+import           Data.Store.Core (tooManyBytes, decodeIOWithFromPtr, unsafeEncodeWith)
 import qualified Data.Text as T
 import           Data.Word
 import           Foreign.Ptr
@@ -76,15 +75,14 @@ headerLength = magicLength + sizeTagLength
 -- | Encode a 'Message' to a 'ByteString'.
 encodeMessage :: Store a => Message a -> ByteString
 encodeMessage (Message x) =
-    let l = getSize x
-        totalLength = headerLength + l
-    in BS.unsafeCreate
-       totalLength
-       (\p -> do (offset, ()) <- runPoke (do poke messageMagic
-                                             poke l
-                                             poke x
-                                         ) p 0
-                 assert (offset == totalLength) (return ()))
+    unsafeEncodeWith pokeFunc totalLength
+  where
+    bodyLength = getSize x
+    totalLength = headerLength + bodyLength
+    pokeFunc = do
+        poke messageMagic
+        poke bodyLength
+        poke x
 {-# INLINE encodeMessage #-}
 
 -- | The result of peeking at the next message can either be a
