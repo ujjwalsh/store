@@ -9,6 +9,11 @@ category: Serialization, Data
 extra-source-files:
   - ChangeLog.md
 
+flags:
+  force-alignment:
+    default: false
+    manual: true
+
 ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2
 
 dependencies:
@@ -23,7 +28,9 @@ dependencies:
 library:
   source-dirs: src
   when:
-    # Theoretically, these are the architectures which support reasonably
-    # efficient unaligned access.
-    - condition: (!arch(I386) && !arch(X86_64) && !arch(IA64) && !impl(ghcjs) && !impl(AArch64))
+    - condition: (!arch(I386) && !arch(X86_64) && !arch(IA64) && !impl(ghcjs) && !arch(AArch64) && !arch(PPC) && !arch(PPC64) && !arch(Mips) && !arch(Sparc))
       buildable: false
+
+when:
+  - condition: flag(force-alignment) || arch(PPC) || arch(PPC64) || arch(Mips) || arch(Sparc)
+    cpp-options: -DALIGNED_MEMORY

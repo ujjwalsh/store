@@ -14,6 +14,8 @@ module Data.Store.Core
     ( -- * Core Types
       Poke(..), PokeException(..), pokeException
     , Peek(..), PeekException(..), peekException, tooManyBytes
+    , PokeState, pokeStatePtr
+    , PeekState, peekStateEndPtr
     , Offset
       -- * Encode ByteString
     , unsafeEncodeWith
@@ -44,13 +46,17 @@ import qualified Data.Text as T
 import           Data.Typeable
 import           Data.Word
 import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr, castForeignPtr)
-import           Foreign.Ptr (plusPtr, minusPtr, castPtr)
+import           Foreign.Ptr
 import           Foreign.Storable as Storable
 import           GHC.Prim (unsafeCoerce#, RealWorld, copyByteArrayToAddr#, copyAddrToByteArray#)
 import           GHC.Ptr (Ptr(..))
 import           GHC.Types (IO(..), Int(..))
 import           Prelude
 import           System.IO.Unsafe (unsafePerformIO)
+
+#if ALIGNED_MEMORY
+import           Foreign.Marshal.Alloc (allocaBytesAligned)
+#endif
 
 ------------------------------------------------------------------------
 -- Helpful Type Synonyms
@@ -69,7 +75,7 @@ type Offset = Int
 -- byte. They allow you to chain 'Poke' action such that subsequent
 -- 'Poke's write into subsequent portions of the output.
 newtype Poke a = Poke
-    { runPoke :: forall byte. Ptr byte -> Offset -> IO (Offset, a)
+    { runPoke :: PokeState -> Offset -> IO (Offset, a)
       -- ^ Run the 'Poke' action, with the 'Ptr' to the buffer where
       -- data is poked, and the current 'Offset'. The result is the new
       -- offset, along with a return value.
@@ -112,6 +118,21 @@ instance MonadIO Poke where
     liftIO f = Poke $ \_ offset -> (offset, ) <$> f
     {-# INLINE liftIO #-}
 
+-- | Holds a 'pokeStatePtr', which is passed in to each 'Poke' action.
+-- If the package is built with the 'force-alignment' flag, this also
+-- has a hidden 'Ptr' field, which is used as scratch space during
+-- unaligned writes.
+#if ALIGNED_MEMORY
+data PokeState = PokeState
+    { pokeStatePtr :: {-# UNPACK #-} !(Ptr Word8)
+    , pokeStateAlignPtr :: {-# UNPACK #-} !(Ptr Word8)
+    }
+#else
+newtype PokeState = PokeState
+    { pokeStatePtr :: Ptr Word8
+    }
+#endif
+
 -- | Exception thrown while running 'poke'. Note that other types of
 -- exceptions could also be thrown. Invocations of 'fail' in the 'Poke'
 -- monad causes this exception to be thrown.
@@ -148,7 +169,7 @@ pokeException msg = Poke $ \_ off -> throwIO (PokeException off msg)
 -- together to get more complicated deserializers. This machinery keeps
 -- track of the current 'Ptr' and end-of-buffer 'Ptr'.
 newtype Peek a = Peek
-    { runPeek :: forall byte. Ptr byte -> Ptr byte -> IO (Ptr byte, a)
+    { runPeek :: PeekState -> Ptr Word8 -> IO (Ptr Word8, a)
       -- ^ Run the 'Peek' action, with a 'Ptr' to the end of the buffer
       -- where data is poked, and a 'Ptr' to the current position. The
       -- result is the 'Ptr', along with a return value.
@@ -198,6 +219,20 @@ instance MonadIO Peek where
     liftIO f = Peek $ \_ ptr -> (ptr, ) <$> f
     {-# INLINE liftIO #-}
 
+-- | Holds a 'peekStatePtr', which is passed in to each 'Peek' action.
+-- If the package is built with the 'force-alignment' flag, this also
+-- has a hidden 'Ptr' field, which is used as scratch space during
+-- unaligned reads.
+#if ALIGNED_MEMORY
+data PeekState = PeekState
+    { peekStateEndPtr :: {-# UNPACK #-} !(Ptr Word8)
+    , peekStateAlignPtr :: {-# UNPACK #-} !(Ptr Word8)
+    }
+#else
+newtype PeekState = PeekState
+    { peekStateEndPtr :: Ptr Word8 }
+#endif
+
 -- | Exception thrown while running 'peek'. Note that other types of
 -- exceptions can also be thrown. Invocations of 'fail' in the 'Poke'
 -- monad causes this exception to be thrown.
@@ -219,7 +254,7 @@ instance Exception PeekException where
 
 -- | Throws a 'PeekException'.
 peekException :: T.Text -> Peek a
-peekException msg = Peek $ \end ptr -> throwIO (PeekException (end `minusPtr` ptr) msg)
+peekException msg = Peek $ \ps ptr -> throwIO (PeekException (peekStateEndPtr ps `minusPtr` ptr) msg)
 
 -- | Throws a 'PeekException' about an attempt to read too many bytes.
 tooManyBytes :: Int -> Int -> String -> IO void
@@ -255,10 +290,25 @@ negativeBytes needed remaining ty =
 -- in the case of overshooting the buffer, memory corruption and
 -- segfaults may occur.
 unsafeEncodeWith :: Poke () -> Int -> ByteString
-unsafeEncodeWith f l = BS.unsafeCreate l $ \p -> do
-    (o, ()) <- runPoke f p 0
-    checkOffset o l
+unsafeEncodeWith f l =
+    BS.unsafeCreate l $ \ptr -> do
+#if ALIGNED_MEMORY
+    allocaBytesAligned alignBufferSize 8 $ \aptr -> do
+#endif
+        let ps = PokeState
+                { pokeStatePtr = ptr
+#if ALIGNED_MEMORY
+                , pokeStateAlignPtr = aptr
+#endif
+                }
+        (o, ()) <- runPoke f ps 0
+        checkOffset o l
 {-# INLINE unsafeEncodeWith #-}
+
+#if ALIGNED_MEMORY
+alignBufferSize :: Int
+alignBufferSize = 32
+#endif
 
 -- | Checks if the offset matches the expected length, and throw a
 -- 'PokeException' otherwise.
@@ -328,11 +378,17 @@ decodeIOPortionWithFromPtr :: Peek a -> Ptr Word8 -> Int -> IO (Offset, a)
 decodeIOPortionWithFromPtr mypeek ptr len =
     let end = ptr `plusPtr` len
         remaining = end `minusPtr` ptr
-    in do
-        (ptr2, x') <- runPeek mypeek end ptr
-        if len > remaining -- Do not perform the check on the new pointer, since it could have overflowed
-            then throwIO $ PeekException (end `minusPtr` ptr2) "Overshot end of buffer"
-            else return (ptr2 `minusPtr` ptr, x')
+    in do (ptr2, x') <-
+#if ALIGNED_MEMORY
+              allocaBytesAligned alignBufferSize 8 $ \aptr -> do
+                  runPeek mypeek (PeekState end aptr) ptr
+#else
+              runPeek mypeek (PeekState end) ptr
+#endif
+        -- TODO: consider moving this condition to before running the peek?
+          if len > remaining -- Do not perform the check on the new pointer, since it could have overflowed
+              then throwIO $ PeekException (end `minusPtr` ptr2) "Overshot end of buffer"
+              else return (ptr2 `minusPtr` ptr, x')
 {-# INLINE decodeIOPortionWithFromPtr #-}
 
 ------------------------------------------------------------------------
@@ -340,10 +396,31 @@ decodeIOPortionWithFromPtr mypeek ptr len =
 
 -- | A 'poke' implementation based on an instance of 'Storable'.
 pokeStorable :: Storable a => a -> Poke ()
-pokeStorable x = Poke $ \ptr offset -> do
-    y <- pokeByteOff ptr offset x
+pokeStorable x = Poke $ \ps offset -> do
+    let targetPtr = pokeStatePtr ps `plusPtr` offset
+#if ALIGNED_MEMORY
+    -- If necessary, poke into the scratch buffer, and copy the results
+    -- to the output buffer.
+    let bufStart = pokeStateAlignPtr ps
+        alignStart = alignPtr (pokeStateAlignPtr ps) (alignment x)
+        sz = sizeOf x
+    if targetPtr == alignPtr targetPtr (alignment x)
+        -- If we luck out and the output is already aligned, just poke it
+        -- directly.
+        then poke targetPtr x
+        else (if (alignStart `plusPtr` sz) < (bufStart `plusPtr` alignBufferSize)
+            then do
+                poke (castPtr alignStart) x
+                BS.memcpy (castPtr targetPtr) alignStart sz
+            else do
+                allocaBytesAligned sz (alignment x) $ \tempPtr -> do
+                    poke tempPtr x
+                    BS.memcpy (castPtr targetPtr) (castPtr tempPtr) sz)
+#else
+    poke targetPtr x
+#endif
     let !newOffset = offset + sizeOf x
-    return (newOffset, y)
+    return (newOffset, ())
 {-# INLINE pokeStorable #-}
 
 -- FIXME: make it the responsibility of the caller to check this.
@@ -357,15 +434,30 @@ peekStorable = peekStorableTy (show (typeRep (Proxy :: Proxy a)))
 -- | A 'peek' implementation based on an instance of 'Storable'. Use
 -- this if the type is not 'Typeable'.
 peekStorableTy :: forall a. Storable a => String -> Peek a
-peekStorableTy ty = Peek $ \end ptr ->
-    let ptr' = ptr `plusPtr` needed
-        needed = sizeOf (undefined :: a)
-        remaining = end `minusPtr` ptr
-     in do
-        when (needed > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
-            tooManyBytes needed remaining ty
-        x <- Storable.peek (castPtr ptr)
-        return (ptr', x)
+peekStorableTy ty = Peek $ \ps ptr -> do
+    let ptr' = ptr `plusPtr` sz
+        sz = sizeOf (undefined :: a)
+        remaining = peekStateEndPtr ps `minusPtr` ptr
+    when (sz > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
+        tooManyBytes sz remaining ty
+#if ALIGNED_MEMORY
+    let bufStart = peekStateAlignPtr ps
+        alignStart = alignPtr (peekStateAlignPtr ps) alignAmount
+        alignAmount = alignment (undefined :: a)
+    x <- if ptr == alignPtr ptr alignAmount
+        then Storable.peek (castPtr ptr)
+        else (if (alignStart `plusPtr` sz) < (bufStart `plusPtr` alignBufferSize)
+            then do
+                BS.memcpy (castPtr alignStart) ptr sz
+                Storable.peek (castPtr alignStart)
+            else do
+                allocaBytesAligned sz alignAmount $ \tempPtr -> do
+                    BS.memcpy tempPtr (castPtr ptr) sz
+                    Storable.peek (castPtr tempPtr))
+#else
+    x <- Storable.peek (castPtr ptr)
+#endif
+    return (ptr', x)
 {-# INLINE peekStorableTy #-}
 
 ------------------------------------------------------------------------
@@ -376,7 +468,8 @@ peekStorableTy ty = Peek $ \end ptr ->
 -- are not checked.
 pokeFromForeignPtr :: ForeignPtr a -> Int -> Int -> Poke ()
 pokeFromForeignPtr sourceFp sourceOffset len =
-    Poke $ \targetPtr targetOffset -> do
+    Poke $ \targetState targetOffset -> do
+        let targetPtr = pokeStatePtr targetState
         withForeignPtr sourceFp $ \sourcePtr ->
             BS.memcpy (targetPtr `plusPtr` targetOffset)
                       (sourcePtr `plusPtr` sourceOffset)
@@ -389,9 +482,9 @@ pokeFromForeignPtr sourceFp sourceOffset len =
 -- length and fill it with bytes from the input.
 peekToPlainForeignPtr :: String -> Int -> Peek (ForeignPtr a)
 peekToPlainForeignPtr ty len =
-    Peek $ \end sourcePtr -> do
+    Peek $ \ps sourcePtr -> do
         let ptr2 = sourcePtr `plusPtr` len
-            remaining = end `minusPtr` sourcePtr
+            remaining = peekStateEndPtr ps `minusPtr` sourcePtr
         when (len > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
             tooManyBytes len remaining ty
         when (len < 0) $
@@ -407,7 +500,8 @@ peekToPlainForeignPtr ty len =
 -- parameters are not checked.
 pokeFromPtr :: Ptr a -> Int -> Int -> Poke ()
 pokeFromPtr sourcePtr sourceOffset len =
-    Poke $ \targetPtr targetOffset -> do
+    Poke $ \targetState targetOffset -> do
+        let targetPtr = pokeStatePtr targetState
         BS.memcpy (targetPtr `plusPtr` targetOffset)
                   (sourcePtr `plusPtr` sourceOffset)
                   len
@@ -422,8 +516,8 @@ pokeFromPtr sourcePtr sourceOffset len =
 -- parameters are not checked.
 pokeFromByteArray :: ByteArray# -> Int -> Int -> Poke ()
 pokeFromByteArray sourceArr sourceOffset len =
-    Poke $ \targetPtr targetOffset -> do
-        let target = targetPtr `plusPtr` targetOffset
+    Poke $ \targetState targetOffset -> do
+        let target = (pokeStatePtr targetState) `plusPtr` targetOffset
         copyByteArrayToAddr sourceArr sourceOffset target len
         let !newOffset = targetOffset + len
         return (newOffset, ())
@@ -433,9 +527,9 @@ pokeFromByteArray sourceArr sourceOffset len =
 -- from the input.
 peekToByteArray :: String -> Int -> Peek ByteArray
 peekToByteArray ty len =
-    Peek $ \end sourcePtr -> do
+    Peek $ \ps sourcePtr -> do
         let ptr2 = sourcePtr `plusPtr` len
-            remaining = end `minusPtr` sourcePtr
+            remaining = peekStateEndPtr ps `minusPtr` sourcePtr
         when (len > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
             tooManyBytes len remaining ty
         when (len < 0) $

@@ -22,6 +22,10 @@ source-repository head
   type: git
   location: https://github.com/fpco/store
 
+flag force-alignment
+  manual: True
+  default: False
+
 library
   hs-source-dirs:
       src
@@ -34,7 +38,9 @@ library
     , transformers >=0.3.0.0 && < 1.0
     , ghc-prim >=0.3.1.0 && < 1.0
     , text >=1.2.0.4 && < 2.0
-  if (!arch(I386) && !arch(X86_64) && !arch(IA64) && !impl(ghcjs) && !impl(AArch64))
+  if flag(force-alignment) || arch(PPC) || arch(PPC64) || arch(Mips) || arch(Sparc)
+    cpp-options: -DALIGNED_MEMORY
+  if (!arch(I386) && !arch(X86_64) && !arch(IA64) && !impl(ghcjs) && !arch(AArch64) && !arch(PPC) && !arch(PPC64) && !arch(Mips) && !arch(Sparc))
     buildable: False
   exposed-modules:
       Data.Store.Core
