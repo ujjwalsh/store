@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-|
 Module: System.IO.ByteBuffer
 Description: Provides an efficient buffering abstraction.
@@ -26,12 +27,13 @@ module System.IO.ByteBuffer
        , totalSize, isEmpty, availableBytes
          -- * Feeding new input
        , copyByteString
+       , fillFromFd
          -- * Consuming bytes from the buffer
        , consume, unsafeConsume
        ) where
 
 import           Control.Applicative
-import           Control.Exception.Lifted (bracket)
+import           Control.Exception.Lifted (bracket, throwIO)
 import           Control.Monad (when)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Control (MonadBaseControl)
@@ -40,11 +42,14 @@ import qualified Data.ByteString.Internal as BS
 import           Data.IORef
 import           Data.Maybe (fromMaybe)
 import           Data.Word
+import qualified Foreign.C.Error as CE
 import           Foreign.ForeignPtr
 import qualified Foreign.Marshal.Alloc as Alloc
 import           Foreign.Marshal.Utils hiding (new, with)
 import           GHC.Ptr
 import           Prelude
+import Foreign.C.Types
+import           System.Posix.Types (Fd (..))
 
 -- | A buffer into which bytes can be written.
 --
@@ -145,14 +150,17 @@ with l action =
 -- | Reset a 'ByteBuffer', i.e. copy all the bytes that have not yet
 -- been consumed to the front of the buffer.
 reset :: ByteBuffer -> IO ()
-reset bb = do
-    bbref@BBRef{..} <- readIORef bb
+reset bb = readIORef bb >>= resetBBRef >>= writeIORef bb
+{-# INLINE reset #-}
+
+resetBBRef :: BBRef -> IO BBRef
+resetBBRef bbref@BBRef{..} = do
     let available = contained - consumed
     moveBytes ptr (ptr `plusPtr` consumed) available
-    writeIORef bb bbref { contained = available
-                        , consumed = 0
-                        }
-{-# INLINE reset #-}
+    return bbref { contained = available
+                 , consumed = 0
+                 }
+{-# INLINE resetBBRef #-}
 
 -- | Make sure the buffer is at least @minSize@ bytes long.
 --
@@ -162,20 +170,25 @@ enlargeByteBuffer :: ByteBuffer
                  -> Int
                  -- ^ minSize
                  -> IO ()
-enlargeByteBuffer bb minSize = do
-    bbref@BBRef{..} <- readIORef bb
-    when (size < minSize) $ do
+enlargeByteBuffer bb minSize = readIORef bb >>= (`enlargeBBRef` minSize) >>= writeIORef bb
+{-# INLINE enlargeByteBuffer #-}
+
+enlargeBBRef :: BBRef -> Int -> IO BBRef
+enlargeBBRef bbref@BBRef{..} minSize =
+    if size < minSize
+    then do
         let newSize = head . dropWhile (<minSize) $
-                      iterate (ceiling . (*(1.5 :: Double)) . fromIntegral) (max 1 (size))
+                      iterate (ceiling . (*(1.5 :: Double)) . fromIntegral) (max 1 size)
         -- possible optimisation: since reallocation might copy the
         -- bytes anyway, we could discard the consumed bytes,
         -- basically 'reset'ting the buffer on the fly.
         -- ptr' <- Alloc.mallocBytes newSize
         ptr' <- Alloc.reallocBytes ptr newSize
-        writeIORef bb bbref { ptr = ptr'
-                            , size = newSize
-                            }
-{-# INLINE enlargeByteBuffer #-}
+        return bbref { ptr = ptr'
+                     , size = newSize
+                     }
+    else return bbref
+{-# INLINE enlargeBBRef #-}
 
 -- | Copy the contents of a 'ByteString' to a 'ByteBuffer'.
 --
@@ -247,3 +260,40 @@ consume bb n = do
             return (Right bs)
         Left missing -> return (Left missing)
 {-# INLINE consume #-}
+
+-- | Will read all available bytes from the given socket, enlarging the buffer if necessary.
+--
+-- Does nothing if the read would block.
+fillFromFd :: MonadIO m => ByteBuffer -> Fd -> m Bool
+fillFromFd bb sock = liftIO $ do
+    bbref <- readIORef bb
+    (bbref', bool) <- fillBBRefFromFd sock bbref
+    writeIORef bb bbref'
+    return bool
+{-# INLINE fillFromFd #-}
+
+fillBBRefFromFd :: Fd -> BBRef -> IO (BBRef, Bool)
+fillBBRefFromFd (Fd sock) bbref@BBRef{..} = do
+    let space = size - contained
+    if space == 0
+        then do
+        bbref' <- if consumed > 0
+                 then resetBBRef bbref
+                 else enlargeBBRef bbref (size + 1)
+        fillBBRefFromFd (Fd sock) bbref'
+        else do
+          bytes <- fromIntegral <$> c_recv sock (castPtr (ptr `plusPtr` contained)) (fromIntegral space) 0
+          if bytes == -1
+              then CE.getErrno >>= \case -- encountered an error
+                  err | err == CE.eAGAIN || err == CE.eWOULDBLOCK -> return (bbref, False)
+                  err -> throwIO $ CE.errnoToIOError "ByteBuffer.fillBBRefFromFd: " err Nothing Nothing
+              else let bbref' = bbref{ contained = contained + bytes }
+                   in if bytes == space
+                      then do
+                           (bbref'', _) <- fillBBRefFromFd (Fd sock) bbref'
+                           return (bbref'', True)
+                      else return (bbref', True)
+{-# INLINE fillBBRefFromFd #-}
+
+foreign import ccall unsafe "recv"
+    c_recv :: CInt -> Ptr CChar -> CSize -> CInt -> IO CInt

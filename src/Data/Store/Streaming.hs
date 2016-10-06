@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -25,15 +26,18 @@ module Data.Store.Streaming
        , encodeMessage
          -- * Decoding 'Message's
        , PeekMessage (..)
+       , PeekMessage'
        , peekMessage
        , decodeMessage
+       , peekMessage'
          -- * Conduits for encoding and decoding
        , conduitEncode
        , conduitDecode
        ) where
 
 import           Control.Exception (assert, throwIO)
-import           Control.Monad (liftM)
+import           Control.Monad (liftM, unless)
+import           Control.Monad.Free
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource (MonadResource)
 import           Data.ByteString (ByteString)
@@ -90,6 +94,11 @@ encodeMessage (Message x) =
 data PeekMessage m a = Done (Message a)
                      | NeedMoreInput (ByteString -> m (PeekMessage m a))
 
+-- | As `PeekMessage`, but with a continuation that has to be
+-- performed after the underlying `ByteBuffer` has been refilled
+-- manually.
+type PeekMessage' m a = Free m (Message a)
+
 -- | Decode a 'Message' of known size from a 'ByteBuffer'.
 peekSized :: (MonadIO m, Store a) => ByteBuffer -> Int -> m (PeekMessage m a)
 peekSized bb n =
@@ -108,9 +117,12 @@ peekMessageHeader bb = do
                                             >> peekMessageHeader bb)
         else peekSized bb magicLength >>= \case
           Done (Message x) | x == messageMagic -> peekSized bb sizeTagLength
-          Done (Message x) -> liftIO . throwIO $ PeekException 0 . T.pack $ "Wrong message magic, " ++ show x
+          Done (Message x) -> wrongMagic x
           NeedMoreInput _ -> fail "Internal error in peekMessageHeader."
 {-# INLINE peekMessageHeader #-}
+
+wrongMagic :: MonadIO m => Word64 -> m a
+wrongMagic x = liftIO . throwIO $ PeekException 0 . T.pack $ "Wrong message magic, " ++ show x
 
 -- | Decode some 'Message' from a 'ByteBuffer', by first reading its
 -- header, and then the actual 'Message'.
@@ -122,6 +134,31 @@ peekMessage bb =
             return $ NeedMoreInput (\ bs -> BB.copyByteString bb bs
                                             >> peekMessage bb)
 {-# INLINE peekMessage #-}
+
+-- | As `peekMessage`, but with a continuation that has to be
+-- performed after the underlying `ByteBuffer` has been refilled
+-- manually.
+peekMessage' :: forall m a. (MonadIO m, Store a) => ByteBuffer -> m (PeekMessage' m a)
+peekMessage' bb = do
+    available <- BB.availableBytes bb
+    if available < headerLength
+        then return . Free $ peekMessage' bb
+        else do
+            n <- BB.unsafeConsume bb headerLength >>= \case
+                Right ptr -> decodeFromPtr ptr magicLength >>= \case
+                    x | x == messageMagic -> decodeFromPtr (ptr `plusPtr` magicLength) sizeTagLength
+                    x -> wrongMagic x
+                Left _ -> fail "Internal error in System.IO.Streaming.peekMessage'."
+            doPeekBody n
+  where
+    doPeekBody n = do
+        available <- BB.availableBytes bb
+        if available < n
+            then return . Free $ doPeekBody n
+            else BB.unsafeConsume bb n >>= \case
+                Right ptr -> Pure . Message <$> decodeFromPtr ptr n
+                Left _ -> fail "Internal error in System.IO.Streaming.peekMessage'."
+{-# INLINE peekMessage' #-}
 
 -- | Decode a 'Message' from a 'ByteBuffer' and an action that can get
 -- additional 'ByteString's to refill the buffer when necessary.
