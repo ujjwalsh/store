@@ -33,7 +33,6 @@ module Data.Store.Core
 import           Control.Applicative
 import           Control.Exception (Exception(..), throwIO, try)
 import           Control.Monad (when)
-import qualified Control.Monad.Fail as Fail
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Primitive (PrimMonad (..))
 import           Data.ByteString (ByteString)
@@ -51,6 +50,10 @@ import           GHC.Ptr (Ptr(..))
 import           GHC.Types (IO(..), Int(..))
 import           Prelude
 import           System.IO.Unsafe (unsafePerformIO)
+
+#if MIN_VERSION_base(4,9,0)
+import qualified Control.Monad.Fail as Fail
+#endif
 
 ------------------------------------------------------------------------
 -- Helpful Type Synonyms
@@ -101,12 +104,14 @@ instance Monad Poke where
         (offset2, x') <- x ptr offset1
         runPoke (f x') ptr offset2
     {-# INLINE (>>=) #-}
-    fail = Fail.fail
+    fail = pokeException . T.pack
     {-# INLINE fail #-}
 
+#if MIN_VERSION_base(4,9,0)
 instance Fail.MonadFail Poke where
     fail = pokeException . T.pack
     {-# INLINE fail #-}
+#endif
 
 instance MonadIO Poke where
     liftIO f = Poke $ \_ offset -> (offset, ) <$> f
@@ -180,12 +185,14 @@ instance Monad Peek where
         (ptr2, x') <- x end ptr1
         runPeek (f x') end ptr2
     {-# INLINE (>>=) #-}
-    fail = Fail.fail
+    fail = peekException . T.pack
     {-# INLINE fail #-}
 
+#if MIN_VERSION_base(4,9,0)
 instance Fail.MonadFail Peek where
     fail = peekException . T.pack
     {-# INLINE fail #-}
+#endif
 
 instance PrimMonad Peek where
     type PrimState Peek = RealWorld
