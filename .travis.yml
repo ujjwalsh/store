@@ -60,10 +60,6 @@ matrix:
     addons: {apt: {packages: [ghc-8.0.1], sources: [hvr-ghc]}}
 
   # Build on OS X in addition to Linux
-  - env: BUILD=stack ARGS="--stack-yaml stack-7.8.yaml"
-    compiler: ": #stack 7.8.4 osx"
-    os: osx
-
   - env: BUILD=stack ARGS="--stack-yaml stack.yaml"
     compiler: ": #stack 7.10.3 osx"
     os: osx
@@ -73,7 +69,6 @@ matrix:
     os: osx
 
   allow_failures: []
-  # - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
 
 before_install:
 # Using compiler above sets CC to an invalid value, so unset it
