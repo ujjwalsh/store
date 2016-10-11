@@ -20,6 +20,7 @@ import qualified System.IO.ByteBuffer as BB
 import           Test.Hspec
 import           Test.Hspec.SmallCheck
 import           Test.SmallCheck
+import           Control.Monad.Trans.Free (runFreeT, FreeF(..))
 
 spec :: Spec
 spec = do
@@ -97,11 +98,11 @@ askMore n x = monadic $ BB.with (Just 10) $ \ bb -> do
   let bs = encodeMessage (Message x)
       (start, end) = BS.splitAt n $ bs
   BB.copyByteString bb start
-  peekResult <- peekMessage bb :: IO (PeekMessage IO Integer)
+  peekResult <- runFreeT (peekMessageBS bb)
   case peekResult of
-    NeedMoreInput cont ->
-      cont end >>= \case
-        Done (Message x') -> return $ x' == x
+    Free cont ->
+      runFreeT (cont end) >>= \case
+        Pure (Message x') -> return $ x' == x
         _ -> return False
     _ -> return False
 
@@ -109,15 +110,15 @@ canPeek :: Integer -> Property IO
 canPeek x = monadic $ BB.with (Just 10) $ \ bb -> do
   let bs = encodeMessage (Message x)
   BB.copyByteString bb bs
-  peekResult <- peekMessage bb :: IO (PeekMessage IO Integer)
+  peekResult <- runFreeT (peekMessageBS bb)
   case peekResult of
-    NeedMoreInput _ -> return False
-    Done (Message x') -> return $ x' == x
+    Free _ -> return False
+    Pure (Message x') -> return $ x' == x
 
 decodeIncomplete :: IO ()
 decodeIncomplete = BB.with (Just 0) $ \ bb -> do
   BB.copyByteString bb (BS.take 1 incompleteInput)
-  (decodeMessage bb (return Nothing) :: IO (Maybe (Message Integer)))
+  (decodeMessageBS bb (return Nothing) :: IO (Maybe (Message Integer)))
     `shouldThrow` \PeekException{} -> True
 
 incompleteInput :: BS.ByteString
@@ -128,13 +129,13 @@ incompleteInput =
 decodeTooLong :: IO ()
 decodeTooLong = BB.with Nothing $ \bb -> do
     BB.copyByteString bb (encodeMessageTooLong . Message $ (1 :: Int))
-    (decodeMessage bb (return Nothing) :: IO (Maybe (Message Int)))
+    (decodeMessageBS bb (return Nothing) :: IO (Maybe (Message Int)))
         `shouldThrow` \PeekException{} -> True
 
 decodeTooShort :: IO ()
 decodeTooShort = BB.with Nothing $ \bb -> do
     BB.copyByteString bb (encodeMessageTooShort . Message $ (1 :: Int))
-    (decodeMessage bb (return Nothing) :: IO (Maybe (Message Int)))
+    (decodeMessageBS bb (return Nothing) :: IO (Maybe (Message Int)))
         `shouldThrow` \PeekException{} -> True
 
 encodeMessageTooLong :: Store a => Message a -> BS.ByteString
