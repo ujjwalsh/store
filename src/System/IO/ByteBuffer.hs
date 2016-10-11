@@ -26,13 +26,13 @@ module System.IO.ByteBuffer
          -- * Query for number of available bytes
        , totalSize, isEmpty, availableBytes
          -- * Feeding new input
-       , copyByteString
+       , copyByteString, fillFromFd
          -- * Consuming bytes from the buffer
        , consume, unsafeConsume
        ) where
 
 import           Control.Applicative
-import           Control.Exception.Lifted (bracket)
+import           Control.Exception.Lifted (bracket, throwIO)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.ByteString (ByteString)
@@ -45,6 +45,9 @@ import qualified Foreign.Marshal.Alloc as Alloc
 import           Foreign.Marshal.Utils (copyBytes, moveBytes)
 import           GHC.Ptr
 import           Prelude
+import qualified Foreign.C.Error as CE
+import           Foreign.C.Types
+import           System.Posix.Types (Fd (..))
 
 -- | A buffer into which bytes can be written.
 --
@@ -211,6 +214,84 @@ copyByteString bb bs = liftIO $ do
         , ptr = ptr bbref''}
 {-# INLINE copyByteString #-}
 
+-- | Will read at most n bytes from the given 'Fd', in a non-blocking
+-- fashion. This function is intended to be used with non-blocking 'Socket's,
+-- such the ones created by the @network@ package.
+--
+-- Returns how many bytes could be read non-blockingly.
+fillFromFd :: MonadIO m => ByteBuffer -> Fd -> Int -> m Int
+fillFromFd bb sock maxBytes = if maxBytes < 0
+  then fail ("fillFromFd: negative argument (" ++ show maxBytes ++ ")")
+  else liftIO $ do
+    bbref <- readIORef bb
+    (bbref', readBytes) <- fillBBRefFromFd sock bbref maxBytes
+    writeIORef bb bbref'
+    return readBytes
+{-# INLINE fillFromFd #-}
+
+{-
+Note: I'd like to use these two definitions:
+
+{-@ measure _available @-}
+_available :: BBRef -> Int
+_available BBRef{..} = contained - consumed
+
+{-@ measure _free @-}
+_free :: BBRef -> Int
+_free BBRef{..} = size - contained
+
+but for some reason when I try to do so it does not work.
+-}
+
+{-@ fillBBRefFromFd ::
+       Fd -> b0: BBRef
+    -> maxBytes: Nat -> IO {v: (BBRef, Nat) | maxBytes >= snd v && contained (fst v) - consumed (fst v) == contained b0 - consumed b0 + snd v}
+  @-}
+fillBBRefFromFd :: Fd -> BBRef -> Int -> IO (BBRef, Int)
+fillBBRefFromFd (Fd sock) bbref0 maxBytes = do
+  bbref1 <- prepareSpace bbref0
+  go 0 bbref1
+  where
+    -- We enlarge the buffer directly to be able to contain the maximum number
+    -- of bytes since the common pattern for this function is to know how many
+    -- bytes we need to read -- so we'll eventually fill the enlarged buffer.
+    {-@ prepareSpace :: b: BBRef -> IO {v: BBRef | size v - contained v >= maxBytes && contained b - consumed b == contained v - consumed v} @-}
+    prepareSpace :: BBRef -> IO BBRef
+    prepareSpace bbref = do
+      let space = size bbref - contained bbref
+      if space < maxBytes
+        then if consumed bbref > 0
+          then do
+            prepareSpace =<< resetBBRef bbref
+          else enlargeBBRef bbref (contained bbref + maxBytes)
+        else return bbref
+
+    {-@ go ::
+           readBytes: {v: Nat | v <= maxBytes}
+        -> b: {b: BBRef | size b - contained b >= maxBytes - readBytes}
+        -> IO {v: (BBRef, Nat) | maxBytes >= snd v && snd v >= readBytes && size (fst v) - contained (fst v) >= maxBytes - snd v && contained (fst v) - consumed (fst v) == (contained b - consumed b) + (snd v - readBytes)}
+      @-}
+    go :: Int -> BBRef -> IO (BBRef, Int)
+    go readBytes bbref@BBRef{..} = if readBytes >= maxBytes
+      then return (bbref, readBytes)
+      else do
+        bytes <- fromIntegral <$> c_recv sock (castPtr (ptr `plusPtr` contained)) (fromIntegral (maxBytes - readBytes)) 0
+        if bytes == -1
+          then do
+            err <- CE.getErrno
+            if err == CE.eAGAIN || err == CE.eWOULDBLOCK
+              then return (bbref, readBytes)
+              else throwIO $ CE.errnoToIOError "ByteBuffer.fillBBRefFromFd: " err Nothing Nothing
+          else do
+            let bbref' = bbref{ contained = contained + bytes }
+            go (readBytes + bytes) bbref'
+{-# INLINE fillBBRefFromFd #-}
+
+foreign import ccall unsafe "recv"
+  -- c_recv returns -1 in the case of errors.
+  {-@ assume c_recv :: CInt -> Ptr CChar -> size: {v: CSize | v >= 0} -> flags: CInt -> IO {read: CInt | read >= -1 && size >= read} @-}
+  c_recv :: CInt -> Ptr CChar -> CSize -> CInt -> IO CInt
+
 -- | Try to get a pointer to @n@ bytes from the 'ByteBuffer'.
 --
 -- Note that the pointer should be used before any other actions are
@@ -288,19 +369,19 @@ createBS ptr n = do
 --
 -- This is a bit awkward, maybe there is an easier way.
 
-get1 :: (a,b,c) -> a
-get1 (x,_,_) = x
-{-@ measure get1 @-}
-get2 :: (a,b,c) -> b
-get2 (_,x,_) = x
-{-@ measure get2 @-}
-get3 :: (a,b,c) -> c
-get3 (_,_,x) = x
-{-@ measure get3 @-}
+_get1 :: (a,b,c) -> a
+_get1 (x,_,_) = x
+{-@ measure _get1 @-}
+_get2 :: (a,b,c) -> b
+_get2 (_,x,_) = x
+{-@ measure _get2 @-}
+_get3 :: (a,b,c) -> c
+_get3 (_,_,x) = x
+{-@ measure _get3 @-}
 
 {-@ Data.ByteString.Internal.toForeignPtr :: ByteString ->
-  {v:(ForeignPtr Word8, Int, Int) | get2 v >= 0
-                                 && get2 v <= (fplen (get1 v))
-                                 && get3 v >= 0
-                                 && ((get3 v) + (get2 v)) <= (fplen (get1 v))} @-}
+  {v:(ForeignPtr Word8, Int, Int) | _get2 v >= 0
+                                 && _get2 v <= (fplen (_get1 v))
+                                 && _get3 v >= 0
+                                 && ((_get3 v) + (_get2 v)) <= (fplen (_get1 v))} @-}
 
