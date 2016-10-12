@@ -261,8 +261,7 @@ fillBBRefFromFd (Fd sock) bbref0 maxBytes = do
       let space = size bbref - contained bbref
       if space < maxBytes
         then if consumed bbref > 0
-          then do
-            prepareSpace =<< resetBBRef bbref
+          then prepareSpace =<< resetBBRef bbref
           else enlargeBBRef bbref (contained bbref + maxBytes)
         else return bbref
 
@@ -313,8 +312,8 @@ unsafeConsume bb n = liftIO $ do
     if available < n
         then return $ Left (n - available)
         else do
-             writeIORef bb bbref { consumed = consumed bbref + n }
-             return $ Right (ptr bbref `plusPtr` consumed bbref)
+          writeIORef bb bbref { consumed = consumed bbref + n }
+          return $ Right (ptr bbref `plusPtr` consumed bbref)
 {-# INLINE unsafeConsume #-}
 
 -- | As `unsafeConsume`, but instead of returning a `Ptr` into the

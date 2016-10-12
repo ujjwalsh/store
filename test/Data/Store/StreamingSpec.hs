@@ -1,12 +1,12 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Data.Store.StreamingSpec where
 
 import           Control.Exception (try)
-import           Control.Monad (void)
+import           Control.Monad (void, (<=<), forM_, unless)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Internal as BS
 import           Data.Conduit ((=$=), ($$))
 import qualified Data.Conduit.List as C
 import           Data.Int
@@ -15,12 +15,21 @@ import           Data.Monoid
 import           Data.Store.Core (unsafeEncodeWith)
 import           Data.Store.Internal
 import           Data.Store.Streaming
-import qualified Data.Text as T
 import qualified System.IO.ByteBuffer as BB
 import           Test.Hspec
 import           Test.Hspec.SmallCheck
 import           Test.SmallCheck
+import           Network.Socket (Socket(..), socketPort)
+import           Network.Socket.ByteString (send)
+import           System.Posix.Types (Fd(..))
+import           Data.Streaming.Network (runTCPServer, runTCPClient, clientSettingsTCP, serverSettingsTCP, setAfterBind)
+import           Data.Streaming.Network.Internal (AppData(..))
+import           Control.Concurrent.MVar
+import           Control.Concurrent.Async (race, concurrently)
+import           Data.Void (absurd, Void)
+import           Control.Concurrent (threadDelay)
 import           Control.Monad.Trans.Free (runFreeT, FreeF(..))
+import           Control.Monad.Trans.Free.Church (fromFT)
 
 spec :: Spec
 spec = do
@@ -30,14 +39,18 @@ spec = do
     it "Throws an Exception on incomplete messages." conduitIncomplete
     it "Throws an Exception on excess input." $ property conduitExcess
   describe "peekMessage" $ do
-    it "demands more input when needed." $ property (askMore (headerLength + 1))
-    it "demands more input on incomplete message magic." $ property (askMore 1)
-    it "demands more input on incomplete SizeTag." $ property (askMore (headerLength - 1))
-    it "successfully decodes valid input." $ property canPeek
+    describe "ByteString" $ do
+      it "demands more input when needed." $ property (askMoreBS (headerLength + 1))
+      it "demands more input on incomplete message magic." $ property (askMoreBS 1)
+      it "demands more input on incomplete SizeTag." $ property (askMoreBS (headerLength - 1))
+      it "successfully decodes valid input." $ property canPeekBS
   describe "decodeMessage" $ do
-    it "Throws an Exception on incomplete messages." decodeIncomplete
-    it "Throws an Exception on messages that are shorter than indicated." decodeTooShort
-    it "Throws an Exception on messages that are longer than indicated." decodeTooLong
+    describe "ByteString" $ do
+      it "Throws an Exception on incomplete messages." decodeIncomplete
+      it "Throws an Exception on messages that are shorter than indicated." decodeTooShort
+      it "Throws an Exception on messages that are longer than indicated." decodeTooLong
+    describe "Socket" $ do
+      it "Decodes data trickling through a socket." $ property decodeTricklingMessageFd
 
 roundtrip :: [Int] -> Property IO
 roundtrip xs = monadic $ do
@@ -93,27 +106,76 @@ conduitExcess xs = monadic $ do
 -- peekResult, expecting it to require more input.  Then, feeds the
 -- second part and checks if the decoded result is the original
 -- message.
-askMore :: Int -> Integer -> Property IO
-askMore n x = monadic $ BB.with (Just 10) $ \ bb -> do
+askMoreBS :: Int -> Integer -> Property IO
+askMoreBS n x = monadic $ BB.with (Just 10) $ \ bb -> do
   let bs = encodeMessage (Message x)
       (start, end) = BS.splitAt n $ bs
   BB.copyByteString bb start
-  peekResult <- runFreeT (peekMessageBS bb)
+  peekResult <- runFreeT (fromFT (peekMessageBS bb))
   case peekResult of
     Free cont ->
       runFreeT (cont end) >>= \case
         Pure (Message x') -> return $ x' == x
-        _ -> return False
-    _ -> return False
+        Free _ -> return False
+    Pure _ -> return False
 
-canPeek :: Integer -> Property IO
-canPeek x = monadic $ BB.with (Just 10) $ \ bb -> do
+socketFd :: Socket -> Fd
+socketFd (MkSocket fd _ _ _ _) = Fd fd
+
+withServer :: (Socket -> Socket -> IO a) -> IO a
+withServer cont = do
+  sock1Var :: MVar Socket <- newEmptyMVar
+  sock2Var :: MVar Socket <- newEmptyMVar
+  portVar :: MVar Int <- newEmptyMVar
+  doneVar :: MVar Void <- newEmptyMVar
+  let adSocket ad = case appRawSocket' ad of
+        Nothing -> error "withServer.adSocket: no raw socket in AppData"
+        Just sock -> sock
+  let ss = setAfterBind
+        (putMVar portVar . fromIntegral <=< socketPort)
+        (serverSettingsTCP 0 "127.0.0.1")
+  x <- fmap (either (either absurd absurd) id) $ race
+    (race
+      (runTCPServer ss $ \ad -> do
+        putMVar sock1Var (adSocket ad)
+        void (readMVar doneVar))
+      (do port <- takeMVar portVar
+          runTCPClient (clientSettingsTCP port "127.0.0.1") $ \ad -> do
+            putMVar sock2Var (adSocket ad)
+            readMVar doneVar))
+    (do sock1 <- takeMVar sock1Var
+        sock2 <- takeMVar sock2Var
+        cont sock1 sock2)
+  putMVar doneVar (error "withServer: impossible: read from doneVar")
+  return x
+
+canPeekBS :: Integer -> Property IO
+canPeekBS x = monadic $ BB.with (Just 10) $ \ bb -> do
   let bs = encodeMessage (Message x)
   BB.copyByteString bb bs
-  peekResult <- runFreeT (peekMessageBS bb)
+  peekResult <- runFreeT (fromFT (peekMessageBS bb))
   case peekResult of
     Free _ -> return False
     Pure (Message x') -> return $ x' == x
+
+decodeTricklingMessageFd :: Integer -> Property IO
+decodeTricklingMessageFd x = monadic $ do
+  let bs = encodeMessage (Message x)
+  BB.with Nothing $ \bb ->
+    withServer $ \sock1 sock2 -> do
+      let generateChunks :: [Int] -> BS.ByteString -> [BS.ByteString]
+          generateChunks xs0 bs_ = case xs0 of
+            [] -> generateChunks [1,3,10] bs_
+            x : xs -> if BS.null bs_
+              then []
+              else BS.take x bs_ : generateChunks xs (BS.drop x bs_)
+      let chunks = generateChunks [] bs
+      ((), Message x') <- concurrently
+        (forM_ chunks $ \chunk -> do
+          void (send sock1 chunk)
+          threadDelay (10 * 1000))
+        (decodeMessageFd bb (socketFd sock2))
+      return (x == x')
 
 decodeIncomplete :: IO ()
 decodeIncomplete = BB.with (Just 0) $ \ bb -> do
@@ -145,7 +207,7 @@ encodeMessageTooLong (Message x) =
     in unsafeEncodeWith (poke l >> poke x >> poke (0::Int64)) totalLength
 
 encodeMessageTooShort :: Store a => Message a -> BS.ByteString
-encodeMessageTooShort (Message x) =
+encodeMessageTooShort (Message _x) =
     let l = 0
         totalLength = 8 + l
     in unsafeEncodeWith (poke l) totalLength

@@ -138,6 +138,9 @@ test-suite store-test
     , void >=0.5.11
     , store
     , free
+    , network
+    , streaming-commons
+    , async
   other-modules:
       Data.Store.StreamingSpec
       Data.StoreSpec

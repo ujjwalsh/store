@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
 {-|
 Module: Data.Store.Streaming
 Description: A thin streaming layer that uses 'Store' for serialisation.
@@ -55,7 +56,7 @@ import qualified Foreign.Storable as Storable
 import           Prelude
 import           System.IO.ByteBuffer (ByteBuffer)
 import qualified System.IO.ByteBuffer as BB
-import           Control.Monad.Trans.Free (FreeT, iterTM, wrap)
+import           Control.Monad.Trans.Free.Church (FT, iterTM, wrap)
 import           Control.Monad.Trans.Maybe (MaybeT(MaybeT), runMaybeT)
 import           Control.Applicative ((<|>), empty)
 import           Control.Monad.Trans.Class (lift)
@@ -98,7 +99,7 @@ encodeMessage (Message x) =
 
 -- | The result of peeking at the next message can either be a
 -- successfully deserialised object, or a request for more input.
-type PeekMessage i m a = FreeT ((->) i) m a
+type PeekMessage i m a = FT ((->) i) m a
 
 needMoreInput :: Monad m => PeekMessage i m i
 needMoreInput = wrap return
@@ -174,6 +175,7 @@ decodeMessageBS :: (MonadIO m, Store a)
 decodeMessageBS = decodeMessage (\bb _ bs -> BB.copyByteString bb bs)
 {-# INLINE decodeMessageBS #-}
 
+-- | Peeks a message from a _non blocking_ 'Fd'.
 peekMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> PeekMessage () m (Message a)
 peekMessageFd bb fd = peekMessage (\bb_ needed () -> void (BB.fillFromFd bb_ fd needed)) bb
 {-# INLINE peekMessageFd #-}
@@ -184,7 +186,7 @@ decodeMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> m (Message a)
 decodeMessageFd bb fd = do
   mbMsg <- decodeMessage
     (\bb_ needed () -> void (BB.fillFromFd bb_ fd needed)) bb
-    (liftIO (threadWaitRead fd) >> return (Just ()))
+    (Just () <$ liftIO (threadWaitRead fd))
   case mbMsg of
     Just msg -> return msg
     Nothing -> liftIO (fail "decodeMessageFd: impossible: got Nothing")
