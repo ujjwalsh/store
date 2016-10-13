@@ -82,23 +82,34 @@ $(mkManyHasTypeHash [ [t| Int32 |] ])
 -- Serial instances for (Num a, Bounded a) types. Only really
 -- appropriate for the use here.
 
-$(do let ns = [ ''CWchar, ''CUid, ''CUShort, ''CULong, ''CULLong, ''CIntMax
+$(do let ns = [ ''CWchar, ''CUShort, ''CULong, ''CULLong, ''CIntMax
               , ''CUIntMax, ''CPtrdiff, ''CSChar, ''CShort, ''CUInt, ''CLLong
-              , ''CLong, ''CInt, ''CChar, ''CTcflag, ''CSsize, ''CRLim, ''CPid
-              , ''COff, ''CNlink, ''CMode, ''CIno, ''CGid, ''CDev
+              , ''CLong, ''CInt, ''CChar, ''CSsize, ''CPid
+              , ''COff, ''CMode, ''CIno, ''CDev
               , ''Word8, ''Word16, ''Word32, ''Word64, ''Word
               , ''Int8, ''Int16, ''Int32, ''Int64
-              ]
+              ] ++
+#ifdef mingw32_HOST_OS
+              []
+#else
+              [ ''CUid, ''CTcflag, ''CRLim, ''CNlink, ''CGid ]
+#endif
          f n = [d| instance Monad m => Serial m $(conT n) where
                       series = generate (\_ -> addMinAndMaxBounds [0, 1]) |]
      concat <$> mapM f ns)
+
 
 -- Serial instances for (Num a) types. Only really appropriate for the
 -- use here.
 
 $(do let ns = [ ''CUSeconds, ''CClock, ''CTime, ''CUChar, ''CSize, ''CSigAtomic
-              ,  ''CSUSeconds, ''CFloat, ''CDouble, ''CSpeed, ''CCc
-              ]
+              ,  ''CSUSeconds, ''CFloat, ''CDouble
+              ] ++
+#ifdef mingw32_HOST_OS
+              []
+#else
+              [ ''CSpeed, ''CCc ]
+#endif
          f n = [d| instance Monad m => Serial m $(conT n) where
                       series = generate (\_ -> [0, 1]) |]
      concat <$> mapM f ns)
