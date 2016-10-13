@@ -2,6 +2,7 @@
 {-@ LIQUID "--short-names"    @-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
 {-|
 Module: System.IO.ByteBuffer
 Description: Provides an efficient buffering abstraction.
@@ -26,7 +27,10 @@ module System.IO.ByteBuffer
          -- * Query for number of available bytes
        , totalSize, isEmpty, availableBytes
          -- * Feeding new input
-       , copyByteString, fillFromFd
+       , copyByteString
+#ifndef mingw32_HOST_OS
+       , fillFromFd
+#endif
          -- * Consuming bytes from the buffer
        , consume, unsafeConsume
        ) where
@@ -214,6 +218,8 @@ copyByteString bb bs = liftIO $ do
         , ptr = ptr bbref''}
 {-# INLINE copyByteString #-}
 
+#ifndef mingw32_HOST_OS
+
 -- | Will read at most n bytes from the given 'Fd', in a non-blocking
 -- fashion. This function is intended to be used with non-blocking 'Socket's,
 -- such the ones created by the @network@ package.
@@ -290,6 +296,8 @@ foreign import ccall unsafe "recv"
   -- c_recv returns -1 in the case of errors.
   {-@ assume c_recv :: CInt -> Ptr CChar -> size: {v: CSize | v >= 0} -> flags: CInt -> IO {read: CInt | read >= -1 && size >= read} @-}
   c_recv :: CInt -> Ptr CChar -> CSize -> CInt -> IO CInt
+
+#endif
 
 -- | Try to get a pointer to @n@ bytes from the 'ByteBuffer'.
 --

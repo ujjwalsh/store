@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-|
 Module: Data.Store.Streaming
 Description: A thin streaming layer that uses 'Store' for serialisation.
@@ -32,8 +33,10 @@ module Data.Store.Streaming
        , decodeMessage
        , peekMessageBS
        , decodeMessageBS
+#ifndef mingw32_HOST_OS
        , peekMessageFd
        , decodeMessageFd
+#endif
          -- * Conduits for encoding and decoding
        , conduitEncode
        , conduitDecode
@@ -175,6 +178,8 @@ decodeMessageBS :: (MonadIO m, Store a)
 decodeMessageBS = decodeMessage (\bb _ bs -> BB.copyByteString bb bs)
 {-# INLINE decodeMessageBS #-}
 
+#ifndef mingw32_HOST_OS
+
 -- | Peeks a message from a _non blocking_ 'Fd'.
 peekMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> PeekMessage () m (Message a)
 peekMessageFd bb fd = peekMessage (\bb_ needed () -> void (BB.fillFromFd bb_ fd needed)) bb
@@ -191,6 +196,8 @@ decodeMessageFd bb fd = do
     Just msg -> return msg
     Nothing -> liftIO (fail "decodeMessageFd: impossible: got Nothing")
 {-# INLINE decodeMessageFd #-}
+
+#endif
 
 -- | Conduit for encoding 'Message's to 'ByteString's.
 conduitEncode :: (Monad m, Store a) => C.Conduit (Message a) m ByteString

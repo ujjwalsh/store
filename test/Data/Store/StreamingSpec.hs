@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 module Data.Store.StreamingSpec where
 
 import           Control.Exception (try)
@@ -49,8 +50,10 @@ spec = do
       it "Throws an Exception on incomplete messages." decodeIncomplete
       it "Throws an Exception on messages that are shorter than indicated." decodeTooShort
       it "Throws an Exception on messages that are longer than indicated." decodeTooLong
+#ifndef mingw32_HOST_OS
     describe "Socket" $ do
       it "Decodes data trickling through a socket." $ property decodeTricklingMessageFd
+#endif
 
 roundtrip :: [Int] -> Property IO
 roundtrip xs = monadic $ do
@@ -119,6 +122,17 @@ askMoreBS n x = monadic $ BB.with (Just 10) $ \ bb -> do
         Free _ -> return False
     Pure _ -> return False
 
+canPeekBS :: Integer -> Property IO
+canPeekBS x = monadic $ BB.with (Just 10) $ \ bb -> do
+  let bs = encodeMessage (Message x)
+  BB.copyByteString bb bs
+  peekResult <- runFreeT (fromFT (peekMessageBS bb))
+  case peekResult of
+    Free _ -> return False
+    Pure (Message x') -> return $ x' == x
+
+#ifndef mingw32_HOST_OS
+
 socketFd :: Socket -> Fd
 socketFd (MkSocket fd _ _ _ _) = Fd fd
 
@@ -149,15 +163,6 @@ withServer cont = do
   putMVar doneVar (error "withServer: impossible: read from doneVar")
   return x
 
-canPeekBS :: Integer -> Property IO
-canPeekBS x = monadic $ BB.with (Just 10) $ \ bb -> do
-  let bs = encodeMessage (Message x)
-  BB.copyByteString bb bs
-  peekResult <- runFreeT (fromFT (peekMessageBS bb))
-  case peekResult of
-    Free _ -> return False
-    Pure (Message x') -> return $ x' == x
-
 decodeTricklingMessageFd :: Integer -> Property IO
 decodeTricklingMessageFd x = monadic $ do
   let bs = encodeMessage (Message x)
@@ -176,6 +181,8 @@ decodeTricklingMessageFd x = monadic $ do
           threadDelay (10 * 1000))
         (decodeMessageFd bb (socketFd sock2))
       return (x == x')
+
+#endif
 
 decodeIncomplete :: IO ()
 decodeIncomplete = BB.with (Just 0) $ \ bb -> do
