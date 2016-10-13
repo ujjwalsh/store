@@ -148,7 +148,7 @@ peekMessageHeader fill bb = go
 -- header, and then the actual data.
 peekMessage :: (MonadIO m, Store a) => FillByteBuffer i m -> ByteBuffer -> PeekMessage i m (Message a)
 peekMessage fill bb =
-  Message <$> (peekSized fill bb =<< peekMessageHeader fill bb)
+  fmap Message (peekSized fill bb =<< peekMessageHeader fill bb)
 {-# INLINE peekMessage #-}
 
 -- | Decode a 'Message' from a 'ByteBuffer' and an action that can get
@@ -191,7 +191,7 @@ decodeMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> m (Message a)
 decodeMessageFd bb fd = do
   mbMsg <- decodeMessage
     (\bb_ needed () -> void (BB.fillFromFd bb_ fd needed)) bb
-    (Just () <$ liftIO (threadWaitRead fd))
+    (liftIO (threadWaitRead fd) >> return (Just ()))
   case mbMsg of
     Just msg -> return msg
     Nothing -> liftIO (fail "decodeMessageFd: impossible: got Nothing")
