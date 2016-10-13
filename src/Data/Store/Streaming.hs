@@ -51,7 +51,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.List as C
 import           Data.Store
 import           Data.Store.Impl (getSize)
-import           Data.Store.Core (tooManyBytes, decodeIOWithFromPtr, unsafeEncodeWith)
+import           Data.Store.Core (decodeIOWithFromPtr, unsafeEncodeWith)
 import qualified Data.Text as T
 import           Data.Word
 import           Foreign.Ptr
@@ -162,8 +162,8 @@ decodeMessage :: (Store a, MonadIO m) => FillByteBuffer i m -> ByteBuffer -> m (
 decodeMessage fill bb getInp = runMaybeT $
   iterTM (\consumeInp -> consumeInp =<< MaybeT getInp) (peekMessage fill bb) <|>
   (do available <- BB.availableBytes bb
-      unless (available == 0) $
-        liftIO $ tooManyBytes available available "Data.Store.Message.Message"
+      unless (available == 0) $ liftIO $ throwIO $ PeekException available $ T.pack $
+        "Data.Store.Streaming.decodeMessage: could not get enough bytes to decode message"
       empty)
 {-# INLINE decodeMessage #-}  
 
