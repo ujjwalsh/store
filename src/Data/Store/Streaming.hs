@@ -34,6 +34,7 @@ module Data.Store.Streaming
        , peekMessageBS
        , decodeMessageBS
 #ifndef mingw32_HOST_OS
+       , ReadMoreDataFromFd(..)
        , peekMessageFd
        , decodeMessageFd
 #endif
@@ -180,9 +181,14 @@ decodeMessageBS = decodeMessage (\bb _ bs -> BB.copyByteString bb bs)
 
 #ifndef mingw32_HOST_OS
 
+-- | We use this type as a more descriptive unit to signal that more input
+-- should be read from the Fd.
+data ReadMoreDataFromFd = ReadMoreDataFromFd
+  deriving (Eq, Show)
+
 -- | Peeks a message from a _non blocking_ 'Fd'.
-peekMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> PeekMessage () m (Message a)
-peekMessageFd bb fd = peekMessage (\bb_ needed () -> void (BB.fillFromFd bb_ fd needed)) bb
+peekMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> PeekMessage ReadMoreDataFromFd m (Message a)
+peekMessageFd bb fd = peekMessage (\bb_ needed ReadMoreDataFromFd -> void (BB.fillFromFd bb_ fd needed)) bb
 {-# INLINE peekMessageFd #-}
 
 -- Decodes all the message using 'registerFd' to find out when a 'Socket' is
@@ -190,8 +196,8 @@ peekMessageFd bb fd = peekMessage (\bb_ needed () -> void (BB.fillFromFd bb_ fd 
 decodeMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> m (Message a)
 decodeMessageFd bb fd = do
   mbMsg <- decodeMessage
-    (\bb_ needed () -> void (BB.fillFromFd bb_ fd needed)) bb
-    (liftIO (threadWaitRead fd) >> return (Just ()))
+    (\bb_ needed ReadMoreDataFromFd -> void (BB.fillFromFd bb_ fd needed)) bb
+    (liftIO (threadWaitRead fd) >> return (Just ReadMoreDataFromFd))
   case mbMsg of
     Just msg -> return msg
     Nothing -> liftIO (fail "decodeMessageFd: impossible: got Nothing")
