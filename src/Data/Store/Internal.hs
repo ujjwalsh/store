@@ -273,9 +273,9 @@ peekMutableSequence new write = do
 -- | Skip n bytes forward.
 {-# INLINE skip #-}
 skip :: Int -> Peek ()
-skip len = Peek $ \end ptr -> do
+skip len = Peek $ \ps ptr -> do
     let ptr2 = ptr `plusPtr` len
-        remaining = end `minusPtr` ptr
+        remaining = peekStateEndPtr ps `minusPtr` ptr
     when (len > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
         tooManyBytes len remaining "skip"
     return (ptr2, ())
@@ -284,12 +284,13 @@ skip len = Peek $ \end ptr -> do
 -- advances the offset beyond the isolated region.
 {-# INLINE isolate #-}
 isolate :: Int -> Peek a -> Peek a
-isolate len m = Peek $ \end ptr -> do
-    let ptr2 = ptr `plusPtr` len
+isolate len m = Peek $ \ps ptr -> do
+    let end = peekStateEndPtr ps
+        ptr2 = ptr `plusPtr` len
         remaining = end `minusPtr` ptr
     when (len > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
         tooManyBytes len remaining "isolate"
-    (ptr', x) <- runPeek m end ptr
+    (ptr', x) <- runPeek m ps ptr
     when (ptr' > end) $
         throwIO $ PeekException (ptr' `minusPtr` end) "Overshot end of isolated bytes"
     return (ptr2, x)
