@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-|
 Module: Data.Store.Streaming
 Description: A thin streaming layer that uses 'Store' for serialisation.
@@ -25,16 +27,24 @@ module Data.Store.Streaming
          -- * Encoding 'Message's
        , encodeMessage
          -- * Decoding 'Message's
-       , PeekMessage (..)
+       , PeekMessage
+       , FillByteBuffer
        , peekMessage
        , decodeMessage
+       , peekMessageBS
+       , decodeMessageBS
+#ifndef mingw32_HOST_OS
+       , ReadMoreDataFromFd(..)
+       , peekMessageFd
+       , decodeMessageFd
+#endif
          -- * Conduits for encoding and decoding
        , conduitEncode
        , conduitDecode
        ) where
 
 import           Control.Exception (throwIO)
-import           Control.Monad (liftM)
+import           Control.Monad (unless, void)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource (MonadResource)
 import           Data.ByteString (ByteString)
@@ -42,7 +52,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.List as C
 import           Data.Store
 import           Data.Store.Impl (getSize)
-import           Data.Store.Core (tooManyBytes, decodeIOWithFromPtr, unsafeEncodeWith)
+import           Data.Store.Core (decodeIOWithFromPtr, unsafeEncodeWith)
 import qualified Data.Text as T
 import           Data.Word
 import           Foreign.Ptr
@@ -50,6 +60,12 @@ import qualified Foreign.Storable as Storable
 import           Prelude
 import           System.IO.ByteBuffer (ByteBuffer)
 import qualified System.IO.ByteBuffer as BB
+import           Control.Monad.Trans.Free.Church (FT, iterTM, wrap)
+import           Control.Monad.Trans.Maybe (MaybeT(MaybeT), runMaybeT)
+import           Control.Applicative ((<|>), empty)
+import           Control.Monad.Trans.Class (lift)
+import           System.Posix.Types (Fd(..))
+import           GHC.Conc (threadWaitRead)
 
 -- | If @a@ is an instance of 'Store', @Message a@ can be serialised
 -- and deserialised in a streaming fashion.
@@ -86,91 +102,108 @@ encodeMessage (Message x) =
 {-# INLINE encodeMessage #-}
 
 -- | The result of peeking at the next message can either be a
--- successfully deserialised 'Message', or a request for more input.
-data PeekMessage m a = Done (Message a)
-                     | NeedMoreInput (ByteString -> m (PeekMessage m a))
+-- successfully deserialised object, or a request for more input.
+type PeekMessage i m a = FT ((->) i) m a
 
--- | Decode a 'Message' of known size from a 'ByteBuffer'.
-peekSized :: (MonadIO m, Store a) => ByteBuffer -> Int -> m (PeekMessage m a)
-peekSized bb n =
-    BB.unsafeConsume bb n >>= \case
-        Right ptr -> liftM (Done . Message) $ decodeFromPtr ptr n
-        Left _ -> return $ NeedMoreInput (\ bs -> BB.copyByteString bb bs
-                                                  >> peekSized bb n)
-{-# INLINE peekSized #-}
+needMoreInput :: Monad m => PeekMessage i m i
+needMoreInput = wrap return
+{-# INLINE needMoreInput #-}
 
--- | Decode a header (magic number and 'SizeTag') from a 'ByteBuffer'.
-peekMessageHeader :: MonadIO m => ByteBuffer -> m (PeekMessage m SizeTag)
-peekMessageHeader bb = do
-    available <- BB.availableBytes bb
-    if available < headerLength
-        then return $ NeedMoreInput (\bs -> BB.copyByteString bb bs
-                                            >> peekMessageHeader bb)
-        else peekSized bb magicLength >>= \case
-          Done (Message x) | x == messageMagic -> peekSized bb sizeTagLength
-          Done (Message x) -> liftIO . throwIO $ PeekException 0 . T.pack $ "Wrong message magic, " ++ show x
-          NeedMoreInput _ -> fail "Internal error in peekMessageHeader."
-{-# INLINE peekMessageHeader #-}
-
--- | Decode some 'Message' from a 'ByteBuffer', by first reading its
--- header, and then the actual 'Message'.
-peekMessage :: (MonadIO m, Store a) => ByteBuffer -> m (PeekMessage m a)
-peekMessage bb =
-   peekMessageHeader bb >>= \case
-        (Done (Message n)) -> peekSized bb n
-        NeedMoreInput _ ->
-            return $ NeedMoreInput (\ bs -> BB.copyByteString bb bs
-                                            >> peekMessage bb)
-{-# INLINE peekMessage #-}
-
--- | Decode a 'Message' from a 'ByteBuffer' and an action that can get
--- additional 'ByteString's to refill the buffer when necessary.
+-- | Given some sort of input, fills the 'ByteBuffer' with it.
 --
--- The only conditions under which this function will give 'Nothing',
--- is when the 'ByteBuffer' contains zero bytes, and refilling yields
--- 'Nothing'.  If there is some data available, but not enough to
--- decode the whole 'Message', a 'PeekException' will be thrown.
-decodeMessage :: (MonadIO m, Store a)
-            => ByteBuffer -> m (Maybe ByteString) -> m (Maybe (Message a))
-decodeMessage bb getBs =
-    decodeHeader bb getBs >>= \case
-        Nothing -> return Nothing
-        Just n -> decodeSized bb getBs n
-{-# INLINE decodeMessage #-}
-
-decodeHeader :: MonadIO m
-              => ByteBuffer
-              -> m (Maybe ByteString)
-              -> m (Maybe SizeTag)
-decodeHeader bb getBs =
-    peekMessageHeader bb >>= \case
-        (Done (Message n)) -> return (Just n)
-        (NeedMoreInput _) -> getBs >>= \case
-            Just bs -> BB.copyByteString bb bs >> decodeHeader bb getBs
-            Nothing -> BB.availableBytes bb >>= \case
-                0 -> return Nothing
-                n -> liftIO $ tooManyBytes headerLength n "Data.Store.Message.SizeTag"
-{-# INLINE decodeHeader #-}
-
-decodeSized :: (MonadIO m, Store a)
-            => ByteBuffer
-            -> m (Maybe ByteString)
-            -> Int
-            -> m (Maybe (Message a))
-decodeSized bb getBs n =
-    peekSized bb n >>= \case
-        Done message -> return (Just message)
-        NeedMoreInput _ -> getBs >>= \case
-            Just bs -> BB.copyByteString bb bs >> decodeSized bb getBs n
-            Nothing -> BB.availableBytes bb >>= \ available ->
-                liftIO $ tooManyBytes n available "Data.Store.Message.Message"
-{-# INLINE decodeSized #-}
+-- The 'Int' is how many bytes we'd like: this is useful when the filling
+-- function is 'fillFromFd', where we can specify a max size.
+type FillByteBuffer i m = ByteBuffer -> Int -> i -> m ()
 
 -- | Decode a value, given a 'Ptr' and the number of bytes that make
 -- up the encoded message.
 decodeFromPtr :: (MonadIO m, Store a) => Ptr Word8 -> Int -> m a
 decodeFromPtr ptr n = liftIO $ decodeIOWithFromPtr peek ptr n
 {-# INLINE decodeFromPtr #-}
+
+peekSized :: (MonadIO m, Store a) => FillByteBuffer i m -> ByteBuffer -> Int -> PeekMessage i m a
+peekSized fill bb n = go
+  where
+    go = do
+      mbPtr <- BB.unsafeConsume bb n
+      case mbPtr of
+        Left needed -> do
+          inp <- needMoreInput
+          lift (fill bb needed inp)
+          go
+        Right ptr -> decodeFromPtr ptr n
+{-# INLINE peekSized #-}
+
+-- | Decode a header (magic number and 'SizeTag') from a 'ByteBuffer'.
+peekMessageHeader :: MonadIO m => FillByteBuffer i m -> ByteBuffer -> PeekMessage i m SizeTag
+peekMessageHeader fill bb = go
+  where
+    go = do
+      messageMagic' <- peekSized fill bb magicLength
+      unless (messageMagic == messageMagic') $
+        liftIO . throwIO $ PeekException 0 . T.pack $ "Wrong message magic, " ++ show messageMagic'
+      peekSized fill bb sizeTagLength
+{-# INLINE peekMessageHeader #-}
+
+-- | Decode some object from a 'ByteBuffer', by first reading its
+-- header, and then the actual data.
+peekMessage :: (MonadIO m, Store a) => FillByteBuffer i m -> ByteBuffer -> PeekMessage i m (Message a)
+peekMessage fill bb =
+  fmap Message (peekSized fill bb =<< peekMessageHeader fill bb)
+{-# INLINE peekMessage #-}
+
+-- | Decode a 'Message' from a 'ByteBuffer' and an action that can get
+-- additional inputs to refill the buffer when necessary.
+--
+-- The only conditions under which this function will give 'Nothing',
+-- is when the 'ByteBuffer' contains zero bytes, and refilling yields
+-- 'Nothing'.  If there is some data available, but not enough to
+-- decode the whole 'Message', a 'PeekException' will be thrown.
+decodeMessage :: (Store a, MonadIO m) => FillByteBuffer i m -> ByteBuffer -> m (Maybe i) -> m (Maybe (Message a))
+decodeMessage fill bb getInp = runMaybeT $
+  iterTM (\consumeInp -> consumeInp =<< MaybeT getInp) (peekMessage fill bb) <|>
+  (do available <- BB.availableBytes bb
+      unless (available == 0) $ liftIO $ throwIO $ PeekException available $ T.pack $
+        "Data.Store.Streaming.decodeMessage: could not get enough bytes to decode message"
+      empty)
+{-# INLINE decodeMessage #-}  
+
+-- | Decode some 'Message' from a 'ByteBuffer', by first reading its
+-- header, and then the actual 'Message'.
+peekMessageBS :: (MonadIO m, Store a) => ByteBuffer -> PeekMessage ByteString m (Message a)
+peekMessageBS = peekMessage (\bb _ bs -> BB.copyByteString bb bs)
+{-# INLINE peekMessageBS #-}
+
+decodeMessageBS :: (MonadIO m, Store a)
+            => ByteBuffer -> m (Maybe ByteString) -> m (Maybe (Message a))
+decodeMessageBS = decodeMessage (\bb _ bs -> BB.copyByteString bb bs)
+{-# INLINE decodeMessageBS #-}
+
+#ifndef mingw32_HOST_OS
+
+-- | We use this type as a more descriptive unit to signal that more input
+-- should be read from the Fd.
+data ReadMoreDataFromFd = ReadMoreDataFromFd
+  deriving (Eq, Show)
+
+-- | Peeks a message from a _non blocking_ 'Fd'.
+peekMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> PeekMessage ReadMoreDataFromFd m (Message a)
+peekMessageFd bb fd = peekMessage (\bb_ needed ReadMoreDataFromFd -> void (BB.fillFromFd bb_ fd needed)) bb
+{-# INLINE peekMessageFd #-}
+
+-- Decodes all the message using 'registerFd' to find out when a 'Socket' is
+-- ready for reading.
+decodeMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> m (Message a)
+decodeMessageFd bb fd = do
+  mbMsg <- decodeMessage
+    (\bb_ needed ReadMoreDataFromFd -> void (BB.fillFromFd bb_ fd needed)) bb
+    (liftIO (threadWaitRead fd) >> return (Just ReadMoreDataFromFd))
+  case mbMsg of
+    Just msg -> return msg
+    Nothing -> liftIO (fail "decodeMessageFd: impossible: got Nothing")
+{-# INLINE decodeMessageFd #-}
+
+#endif
 
 -- | Conduit for encoding 'Message's to 'ByteString's.
 conduitEncode :: (Monad m, Store a) => C.Conduit (Message a) m ByteString
@@ -191,7 +224,7 @@ conduitDecode bufSize =
       go
   where
     go buffer = do
-        mmessage <- decodeMessage buffer C.await
+        mmessage <- decodeMessageBS buffer C.await
         case mmessage of
             Nothing -> return ()
             Just message -> C.yield message >> go buffer
