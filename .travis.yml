@@ -98,8 +98,6 @@ before_install:
   then
     echo 'jobs: $ncpus' >> $HOME/.cabal/config
   fi
-# Install hsc2hs, a necessary build tool
-- stack install $ARGS hsc2hs
 
 # Get the list of packages from the stack.yaml file
 - PACKAGES=$(stack --install-ghc query locals | grep '^ *path' | sed 's@^ *path:@@')
@@ -112,6 +110,8 @@ install:
   case "$BUILD" in
     stack)
       stack --no-terminal --install-ghc $ARGS test --bench --only-dependencies
+      # Install hsc2hs, a necessary build tool
+      stack install $ARGS hsc2hs
       ;;
     cabal)
       cabal --version
