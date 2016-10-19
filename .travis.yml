@@ -102,6 +102,9 @@ before_install:
 # Get the list of packages from the stack.yaml file
 - PACKAGES=$(stack --install-ghc query locals | grep '^ *path' | sed 's@^ *path:@@')
 
+# Install hsc2hs
+- stack install hsc2hs
+
 install:
 - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
 - if [ -f configure.ac ]; then autoreconf -i; fi

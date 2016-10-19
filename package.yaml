@@ -73,7 +73,10 @@ dependencies:
   - unordered-containers >=0.2.5.1
   - vector >=0.10.12.3
   - void >=0.5.11
-
+  - free >=4.11
+  - network >=2.6.0.2
+  - streaming-commons >=0.1.10.0
+  - async >=2.0.2
 library:
   source-dirs: src
   other-modules:
