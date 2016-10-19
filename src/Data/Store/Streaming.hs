@@ -44,7 +44,7 @@ module Data.Store.Streaming
        ) where
 
 import           Control.Exception (throwIO)
-import           Control.Monad (unless, void)
+import           Control.Monad (unless)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource (MonadResource)
 import           Data.ByteString (ByteString)
@@ -62,7 +62,6 @@ import           System.IO.ByteBuffer (ByteBuffer)
 import qualified System.IO.ByteBuffer as BB
 import           Control.Monad.Trans.Free.Church (FT, iterTM, wrap)
 import           Control.Monad.Trans.Maybe (MaybeT(MaybeT), runMaybeT)
-import           Control.Applicative ((<|>), empty)
 import           Control.Monad.Trans.Class (lift)
 import           System.Posix.Types (Fd(..))
 import           GHC.Conc (threadWaitRead)
@@ -160,12 +159,15 @@ peekMessage fill bb =
 -- 'Nothing'.  If there is some data available, but not enough to
 -- decode the whole 'Message', a 'PeekException' will be thrown.
 decodeMessage :: (Store a, MonadIO m) => FillByteBuffer i m -> ByteBuffer -> m (Maybe i) -> m (Maybe (Message a))
-decodeMessage fill bb getInp = runMaybeT $
-  iterTM (\consumeInp -> consumeInp =<< MaybeT getInp) (peekMessage fill bb) <|>
-  (do available <- BB.availableBytes bb
+decodeMessage fill bb getInp = do
+  mbRes <- runMaybeT (iterTM (\consumeInp -> consumeInp =<< MaybeT getInp) (peekMessage fill bb))
+  case mbRes of
+    Just x -> return (Just x)
+    Nothing -> do
+      available <- BB.availableBytes bb
       unless (available == 0) $ liftIO $ throwIO $ PeekException available $ T.pack $
         "Data.Store.Streaming.decodeMessage: could not get enough bytes to decode message"
-      empty)
+      return Nothing
 {-# INLINE decodeMessage #-}  
 
 -- | Decode some 'Message' from a 'ByteBuffer', by first reading its
@@ -188,7 +190,8 @@ data ReadMoreData = ReadMoreData
 
 -- | Peeks a message from a _non blocking_ 'Fd'.
 peekMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> PeekMessage ReadMoreData m (Message a)
-peekMessageFd bb fd = peekMessage (\bb_ needed ReadMoreData -> void (BB.fillFromFd bb_ fd needed)) bb
+peekMessageFd bb fd =
+  peekMessage (\bb_ needed ReadMoreData -> do _ <- BB.fillFromFd bb_ fd needed; return ()) bb
 {-# INLINE peekMessageFd #-}
 
 -- Decodes all the message using 'registerFd' to find out when a 'Socket' is
@@ -196,7 +199,7 @@ peekMessageFd bb fd = peekMessage (\bb_ needed ReadMoreData -> void (BB.fillFrom
 decodeMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> m (Message a)
 decodeMessageFd bb fd = do
   mbMsg <- decodeMessage
-    (\bb_ needed ReadMoreData -> void (BB.fillFromFd bb_ fd needed)) bb
+    (\bb_ needed ReadMoreData -> do _ <- BB.fillFromFd bb_ fd needed; return ()) bb
     (liftIO (threadWaitRead fd) >> return (Just ReadMoreData))
   case mbMsg of
     Just msg -> return msg
