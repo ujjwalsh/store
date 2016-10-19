@@ -1,5 +1,6 @@
 {-@ LIQUID "--no-termination" @-}
 {-@ LIQUID "--short-names"    @-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE CPP #-}
@@ -33,16 +34,20 @@ module System.IO.ByteBuffer
 #endif
          -- * Consuming bytes from the buffer
        , consume, unsafeConsume
+         -- * Exceptions
+       , ByteBufferException (..)
        ) where
 
 import           Control.Applicative
-import           Control.Exception.Lifted (bracket, throwIO)
-import           Control.Monad.IO.Class
+import           Control.Exception (SomeException, throwIO)
+import           Control.Exception.Lifted (Exception, bracket, handle)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import           Data.IORef
 import           Data.Maybe (fromMaybe)
+import           Data.Typeable (Typeable)
 import           Data.Word
 import           Foreign.ForeignPtr
 import qualified Foreign.Marshal.Alloc as Alloc
@@ -69,8 +74,13 @@ import           System.Posix.Types (Fd (..))
 --   the range from @ptr `plusPtr` consumedBytes@ to @ptr `plusPtr`
 --   containedBytes@.
 --
--- The first two of these items are encoded in Liquid Haskell, and can
+-- The first two invariants are encoded in Liquid Haskell, and can
 -- be statically checked.
+--
+-- If an Exception occurs during an operation that modifies a
+-- 'ByteBuffer', the 'ByteBuffer' is invalidated and can no longer be
+-- used.  Trying to access the 'ByteBuffer' subsequently will result
+-- in a 'ByteBufferException' being thrown.
 {-@
 data BBRef = BBRef
     { size :: {v: Int | v >= 0 }
@@ -92,10 +102,44 @@ data BBRef = BBRef {
       -- the 'ByteBuffer'
     }
 
-type ByteBuffer = IORef BBRef
+-- | Exception that is thrown when an invalid 'ByteBuffer' is being used that is no longer valid.
+--
+-- A 'ByteBuffer' is considered to be invalid if
+--
+-- - it has explicitly been freed
+-- - an Exception has occured during an operation that modified it
+data ByteBufferException = ByteBufferException
+    { _bbeLocation :: !String
+      -- ^ function name that caused the exception
+    , _bbeException :: !String
+      -- ^ printed representation of the exception
+    }
+    deriving (Typeable, Eq)
+instance Show ByteBufferException where
+    show (ByteBufferException loc e) = concat
+        ["ByteBufferException: ByteBuffer was invalidated because of Exception thrown in "
+        , loc , ": ", e]
+instance Exception ByteBufferException
+
+type ByteBuffer = IORef (Either ByteBufferException BBRef)
+
+-- | On any Exception, this will invalidate the ByteBuffer and re-throw the Exception.
+bbHandler ::
+       String
+       -- ^ location information: function from which the exception was thrown
+    -> ByteBuffer
+       -- ^ this 'ByteBuffer' will be invalidated when an Exception occurs
+    -> SomeException
+    -> IO a
+bbHandler loc bb e = writeIORef bb (Left $ ByteBufferException loc (show e)) >> throwIO e
+
+-- | Try to use the 'BBRef' of a 'ByteBuffer', or throw a 'ByteBufferException' if it's invalid.
+useBBRef :: MonadIO m => (BBRef -> IO a) -> ByteBuffer -> m a
+useBBRef f bb = liftIO (readIORef bb >>= either throwIO f)
+{-# INLINE useBBRef #-}
 
 totalSize :: MonadIO m => ByteBuffer -> m Int
-totalSize bb = liftIO $ size <$> readIORef bb
+totalSize = useBBRef (return . size)
 {-# INLINE totalSize #-}
 
 isEmpty :: MonadIO m => ByteBuffer -> m Bool
@@ -106,9 +150,7 @@ isEmpty bb = liftIO $ (==0) <$> availableBytes bb
 -- have been copied to, but not yet read from the 'ByteBuffer'.
 {-@ availableBytes :: MonadIO m => ByteBuffer -> m {v: Int | v >= 0} @-}
 availableBytes :: MonadIO m => ByteBuffer -> m Int
-availableBytes bb = do
-    BBRef{..} <- liftIO $ readIORef bb
-    return $ contained - consumed
+availableBytes = useBBRef (\BBRef{..} -> return (contained - consumed))
 {-# INLINE availableBytes #-}
 
 -- | Allocates a new ByteBuffer with a given buffer size filling from
@@ -126,16 +168,22 @@ new :: MonadIO m
 new ml = liftIO $ do
     let l = max 0 . fromMaybe (4*1024*1024) $ ml
     newPtr <- Alloc.mallocBytes l
-    newIORef BBRef { ptr = newPtr
-                   , size = l
-                   , contained = 0
-                   , consumed = 0
-                   }
+    newIORef $ Right BBRef
+        { ptr = newPtr
+        , size = l
+        , contained = 0
+        , consumed = 0
+        }
 {-# INLINE new #-}
 
 -- | Free a byte buffer.
 free :: MonadIO m => ByteBuffer -> m ()
-free bb = liftIO $ readIORef bb >>= Alloc.free . ptr
+free bb = liftIO $ readIORef bb >>= \case
+    Right bbref -> do
+        Alloc.free $ ptr bbref
+        writeIORef bb $
+            Left (ByteBufferException "free" "ByteBuffer has explicitly been freed and is no longer valid.")
+    Left _ -> return () -- the ByteBuffer is either invalid or has already been freed.
 {-# INLINE free #-}
 
 -- | Perform some action with a bytebuffer, with automatic allocation
@@ -194,28 +242,30 @@ enlargeBBRef bbref minSize= do
 -- If necessary, the 'ByteBuffer' is enlarged and/or already consumed
 -- bytes are dropped.
 copyByteString :: MonadIO m => ByteBuffer -> ByteString -> m ()
-copyByteString bb bs = liftIO $ do
-    let (bsFptr, bsOffset, bsSize) = BS.toForeignPtr bs
-    bbref <- readIORef bb
-    -- if the byteBuffer is too small, resize it.
-    let available = contained bbref - consumed bbref -- bytes not yet consumed
-    bbref' <- if size bbref < bsSize + available
-                then enlargeBBRef bbref (bsSize + available)
-                else return bbref
-    -- if it is currently too full, reset it
-    bbref'' <- if bsSize + contained bbref' > size bbref'
-                 then resetBBRef bbref'
-                 else return bbref'
-    -- now we can safely copy.
-    withForeignPtr bsFptr $ \ bsPtr ->
-        copyBytes (ptr bbref'' `plusPtr` contained bbref'')
-                  (bsPtr `plusPtr` bsOffset)
-                  bsSize
-    writeIORef bb BBRef {
-        size = size bbref''
-        , contained = contained bbref'' + bsSize
-        , consumed = consumed bbref''
-        , ptr = ptr bbref''}
+copyByteString bb bs =
+    useBBRef (handle (bbHandler "copyByteString" bb) . go) bb
+  where
+    go bbref = do
+        let (bsFptr, bsOffset, bsSize) = BS.toForeignPtr bs
+        -- if the byteBuffer is too small, resize it.
+        let available = contained bbref - consumed bbref -- bytes not yet consumed
+        bbref' <- if size bbref < bsSize + available
+                  then enlargeBBRef bbref (bsSize + available)
+                  else return bbref
+        -- if it is currently too full, reset it
+        bbref'' <- if bsSize + contained bbref' > size bbref'
+                   then resetBBRef bbref'
+                   else return bbref'
+        -- now we can safely copy.
+        withForeignPtr bsFptr $ \ bsPtr ->
+            copyBytes (ptr bbref'' `plusPtr` contained bbref'')
+            (bsPtr `plusPtr` bsOffset)
+            bsSize
+        writeIORef bb $ Right BBRef {
+            size = size bbref''
+            , contained = contained bbref'' + bsSize
+            , consumed = consumed bbref''
+            , ptr = ptr bbref''}
 {-# INLINE copyByteString #-}
 
 #ifndef mingw32_HOST_OS
@@ -227,12 +277,13 @@ copyByteString bb bs = liftIO $ do
 -- Returns how many bytes could be read non-blockingly.
 fillFromFd :: MonadIO m => ByteBuffer -> Fd -> Int -> m Int
 fillFromFd bb sock maxBytes = if maxBytes < 0
-  then fail ("fillFromFd: negative argument (" ++ show maxBytes ++ ")")
-  else liftIO $ do
-    bbref <- readIORef bb
-    (bbref', readBytes) <- fillBBRefFromFd sock bbref maxBytes
-    writeIORef bb bbref'
-    return readBytes
+    then fail ("fillFromFd: negative argument (" ++ show maxBytes ++ ")")
+    else useBBRef (handle (bbHandler "fillFromFd" bb) . go) bb
+  where
+    go bbref = do
+        (bbref', readBytes) <- fillBBRefFromFd sock bbref maxBytes
+        writeIORef bb $ Right bbref'
+        return readBytes
 {-# INLINE fillFromFd #-}
 
 {-
@@ -314,14 +365,16 @@ unsafeConsume :: MonadIO m
         -> m (Either Int (Ptr Word8))
         -- ^ Will be @Left missing@ when there are only @n-missing@
         -- bytes left in the 'ByteBuffer'.
-unsafeConsume bb n = liftIO $ do
-    bbref <- readIORef bb
-    let available = contained bbref - consumed bbref
-    if available < n
-        then return $ Left (n - available)
-        else do
-          writeIORef bb bbref { consumed = consumed bbref + n }
-          return $ Right (ptr bbref `plusPtr` consumed bbref)
+unsafeConsume bb n =
+    useBBRef (handle (bbHandler "unsafeConsume" bb) . go) bb
+  where
+    go bbref = do
+        let available = contained bbref - consumed bbref
+        if available < n
+            then return $ Left (n - available)
+            else do
+                writeIORef bb $ Right bbref { consumed = consumed bbref + n }
+                return $ Right (ptr bbref `plusPtr` consumed bbref)
 {-# INLINE unsafeConsume #-}
 
 -- | As `unsafeConsume`, but instead of returning a `Ptr` into the
