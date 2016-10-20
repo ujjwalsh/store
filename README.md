@@ -33,14 +33,6 @@ It also features:
 
 * TH generation of testcases.
 
-## Architecture limitations
-
-`Store` does not currently work at all on architectures which lack efficient
-unaligned memory access (for example, older ARM processors). This is not a
-fundamental limitation, but we do not currently require ARM or PowerPC support.
-See [#37](https://github.com/fpco/store/issues/37) and
-[#47](https://github.com/fpco/store/issues/47).
-
 ## Blog posts
 
 * [Initial release announcement](https://www.fpcomplete.com/blog/2016/05/store-package)
