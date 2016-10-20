@@ -29,5 +29,5 @@ library:
   source-dirs: src
 
 when:
-  - condition: flag(force-alignment) || arch(PPC) || arch(PPC64) || arch(Mips) || arch(Sparc)
+  - condition: flag(force-alignment) || arch(PPC) || arch(PPC64) || arch(Mips) || arch(Sparc) || arch(Arm)
     cpp-options: -DALIGNED_MEMORY

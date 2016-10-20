@@ -38,7 +38,7 @@ library
     , transformers >=0.3.0.0 && < 1.0
     , ghc-prim >=0.3.1.0 && < 1.0
     , text >=1.2.0.4 && < 2.0
-  if flag(force-alignment) || arch(PPC) || arch(PPC64) || arch(Mips) || arch(Sparc)
+  if flag(force-alignment) || arch(PPC) || arch(PPC64) || arch(Mips) || arch(Sparc) || arch(Arm)
     cpp-options: -DALIGNED_MEMORY
   exposed-modules:
       Data.Store.Core
