@@ -1,5 +1,6 @@
 {-@ LIQUID "--no-termination" @-}
 {-@ LIQUID "--short-names"    @-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -222,7 +223,7 @@ resetBBRef bbref = do
 -- bytes long.
 {-@ enlargeBBRef :: b:BBRef -> i:Nat -> IO {v:BBRef | size v >= i && contained v == contained b && consumed v == consumed b} @-}
 enlargeBBRef :: BBRef -> Int -> IO BBRef
-enlargeBBRef bbref minSize= do
+enlargeBBRef bbref minSize = do
         let getNewSize s | s >= minSize = s
             getNewSize s = getNewSize $ (ceiling . (*(1.5 :: Double)) . fromIntegral) (max 1 s)
             newSize = getNewSize (size bbref)
