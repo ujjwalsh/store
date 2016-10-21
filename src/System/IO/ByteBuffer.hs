@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-@ LIQUID "--no-termination" @-}
 {-@ LIQUID "--short-names"    @-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -41,7 +42,7 @@ module System.IO.ByteBuffer
 
 import           Control.Applicative
 import           Control.Exception (SomeException, throwIO)
-import           Control.Exception.Lifted (Exception, bracket, handle)
+import           Control.Exception.Lifted (Exception, bracket, catch)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.ByteString (ByteString)
@@ -132,15 +133,16 @@ bbHandler ::
        -- ^ location information: function from which the exception was thrown
     -> ByteBuffer
        -- ^ this 'ByteBuffer' will be invalidated when an Exception occurs
-    -> SomeException
     -> IO a
-bbHandler loc bb e = do
+    -> IO a
+bbHandler loc bb f = f `catch` \(e :: SomeException) -> do
     readIORef bb >>= \case
         Right bbref -> do
             Alloc.free (ptr bbref)
             writeIORef bb (Left $ ByteBufferException loc (show e))
         Left _ -> return ()
     throwIO e
+{-# INLINE bbHandler #-}
 
 -- | Try to use the 'BBRef' of a 'ByteBuffer', or throw a 'ByteBufferException' if it's invalid.
 useBBRef :: MonadIO m => (BBRef -> IO a) -> ByteBuffer -> m a
@@ -252,7 +254,7 @@ enlargeBBRef bbref minSize = do
 -- bytes are dropped.
 copyByteString :: MonadIO m => ByteBuffer -> ByteString -> m ()
 copyByteString bb bs =
-    useBBRef (handle (bbHandler "copyByteString" bb) . go) bb
+    useBBRef (bbHandler "copyByteString" bb . go) bb
   where
     go bbref = do
         let (bsFptr, bsOffset, bsSize) = BS.toForeignPtr bs
@@ -287,7 +289,7 @@ copyByteString bb bs =
 fillFromFd :: MonadIO m => ByteBuffer -> Fd -> Int -> m Int
 fillFromFd bb sock maxBytes = if maxBytes < 0
     then fail ("fillFromFd: negative argument (" ++ show maxBytes ++ ")")
-    else useBBRef (handle (bbHandler "fillFromFd" bb) . go) bb
+    else useBBRef (bbHandler "fillFromFd" bb . go) bb
   where
     go bbref = do
         (bbref', readBytes) <- fillBBRefFromFd sock bbref maxBytes
@@ -375,7 +377,7 @@ unsafeConsume :: MonadIO m
         -- ^ Will be @Left missing@ when there are only @n-missing@
         -- bytes left in the 'ByteBuffer'.
 unsafeConsume bb n =
-    useBBRef (handle (bbHandler "unsafeConsume" bb) . go) bb
+    useBBRef (bbHandler "unsafeConsume" bb . go) bb
   where
     go bbref = do
         let available = contained bbref - consumed bbref
