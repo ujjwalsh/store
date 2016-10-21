@@ -128,14 +128,14 @@ type ByteBuffer = IORef (Either ByteBufferException BBRef)
 -- | On any Exception, this will invalidate the ByteBuffer and re-throw the Exception.
 --
 -- Invalidating the 'ByteBuffer' includes freeing the underlying pointer.
-bbHandler ::
-       String
+bbHandler :: MonadIO m
+    => String
        -- ^ location information: function from which the exception was thrown
     -> ByteBuffer
        -- ^ this 'ByteBuffer' will be invalidated when an Exception occurs
-    -> IO a
-    -> IO a
-bbHandler loc bb f = f `catch` \(e :: SomeException) -> do
+    -> (BBRef -> IO a)
+    -> m a
+bbHandler loc bb f = liftIO $ useBBRef f bb `catch` \(e :: SomeException) -> do
     readIORef bb >>= \case
         Right bbref -> do
             Alloc.free (ptr bbref)
@@ -145,12 +145,12 @@ bbHandler loc bb f = f `catch` \(e :: SomeException) -> do
 {-# INLINE bbHandler #-}
 
 -- | Try to use the 'BBRef' of a 'ByteBuffer', or throw a 'ByteBufferException' if it's invalid.
-useBBRef :: MonadIO m => (BBRef -> IO a) -> ByteBuffer -> m a
-useBBRef f bb = liftIO (readIORef bb >>= either throwIO f)
+useBBRef :: (BBRef -> IO a) -> ByteBuffer -> IO a
+useBBRef f bb = readIORef bb >>= either throwIO f
 {-# INLINE useBBRef #-}
 
 totalSize :: MonadIO m => ByteBuffer -> m Int
-totalSize = useBBRef (return . size)
+totalSize = liftIO . useBBRef (return . size)
 {-# INLINE totalSize #-}
 
 isEmpty :: MonadIO m => ByteBuffer -> m Bool
@@ -161,7 +161,7 @@ isEmpty bb = liftIO $ (==0) <$> availableBytes bb
 -- have been copied to, but not yet read from the 'ByteBuffer'.
 {-@ availableBytes :: MonadIO m => ByteBuffer -> m {v: Int | v >= 0} @-}
 availableBytes :: MonadIO m => ByteBuffer -> m Int
-availableBytes = useBBRef (\BBRef{..} -> return (contained - consumed))
+availableBytes = liftIO . useBBRef (\BBRef{..} -> return (contained - consumed))
 {-# INLINE availableBytes #-}
 
 -- | Allocates a new ByteBuffer with a given buffer size filling from
@@ -254,7 +254,7 @@ enlargeBBRef bbref minSize = do
 -- bytes are dropped.
 copyByteString :: MonadIO m => ByteBuffer -> ByteString -> m ()
 copyByteString bb bs =
-    useBBRef (bbHandler "copyByteString" bb . go) bb
+    bbHandler "copyByteString" bb go
   where
     go bbref = do
         let (bsFptr, bsOffset, bsSize) = BS.toForeignPtr bs
@@ -289,7 +289,7 @@ copyByteString bb bs =
 fillFromFd :: MonadIO m => ByteBuffer -> Fd -> Int -> m Int
 fillFromFd bb sock maxBytes = if maxBytes < 0
     then fail ("fillFromFd: negative argument (" ++ show maxBytes ++ ")")
-    else useBBRef (bbHandler "fillFromFd" bb . go) bb
+    else bbHandler "fillFromFd" bb go
   where
     go bbref = do
         (bbref', readBytes) <- fillBBRefFromFd sock bbref maxBytes
@@ -377,7 +377,7 @@ unsafeConsume :: MonadIO m
         -- ^ Will be @Left missing@ when there are only @n-missing@
         -- bytes left in the 'ByteBuffer'.
 unsafeConsume bb n =
-    useBBRef (bbHandler "unsafeConsume" bb . go) bb
+    bbHandler "unsafeConsume" bb go
   where
     go bbref = do
         let available = contained bbref - consumed bbref
@@ -455,4 +455,3 @@ _get3 (_,_,x) = x
                                  && _get2 v <= (fplen (_get1 v))
                                  && _get3 v >= 0
                                  && ((_get3 v) + (_get2 v)) <= (fplen (_get1 v))} @-}
-
