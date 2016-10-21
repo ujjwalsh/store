@@ -125,6 +125,8 @@ instance Exception ByteBufferException
 type ByteBuffer = IORef (Either ByteBufferException BBRef)
 
 -- | On any Exception, this will invalidate the ByteBuffer and re-throw the Exception.
+--
+-- Invalidating the 'ByteBuffer' includes freeing the underlying pointer.
 bbHandler ::
        String
        -- ^ location information: function from which the exception was thrown
@@ -132,7 +134,12 @@ bbHandler ::
        -- ^ this 'ByteBuffer' will be invalidated when an Exception occurs
     -> SomeException
     -> IO a
-bbHandler loc bb e = writeIORef bb (Left $ ByteBufferException loc (show e)) >> throwIO e
+bbHandler loc bb e = do
+    readIORef bb >>= \case
+        Right bbref -> Alloc.free (ptr bbref)
+        Left _ -> return ()
+    writeIORef bb (Left $ ByteBufferException loc (show e))
+    throwIO e
 
 -- | Try to use the 'BBRef' of a 'ByteBuffer', or throw a 'ByteBufferException' if it's invalid.
 useBBRef :: MonadIO m => (BBRef -> IO a) -> ByteBuffer -> m a
