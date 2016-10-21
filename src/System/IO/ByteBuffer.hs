@@ -136,9 +136,10 @@ bbHandler ::
     -> IO a
 bbHandler loc bb e = do
     readIORef bb >>= \case
-        Right bbref -> Alloc.free (ptr bbref)
+        Right bbref -> do
+            Alloc.free (ptr bbref)
+            writeIORef bb (Left $ ByteBufferException loc (show e))
         Left _ -> return ()
-    writeIORef bb (Left $ ByteBufferException loc (show e))
     throwIO e
 
 -- | Try to use the 'BBRef' of a 'ByteBuffer', or throw a 'ByteBufferException' if it's invalid.
