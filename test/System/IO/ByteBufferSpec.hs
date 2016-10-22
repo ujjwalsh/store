@@ -1,9 +1,16 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 module System.IO.ByteBufferSpec where
 
+import           Control.Exception
 import qualified Data.ByteString as BS
+import           Data.Typeable (Typeable)
 import qualified System.IO.ByteBuffer as BB
 import           Test.Hspec
+
+data MyException = MyException
+    deriving (Eq, Show, Typeable)
+instance Exception MyException
 
 spec :: Spec
 spec = describe "ByteBuffer" $ do
@@ -35,6 +42,13 @@ spec = describe "ByteBuffer" $ do
             bbSize <- BB.totalSize bb
             bbSize `shouldBe` BS.length bs1
             bbIsEmpty bb
-
+    it "should raise a ByteBufferException when used after freed" $ BB.with Nothing $ \bb -> do
+        BB.free bb
+        BB.totalSize bb `shouldThrow` \(BB.ByteBufferException loc e) ->
+            loc == "free" && e == "ByteBuffer has explicitly been freed and is no longer valid."
+    it "should raise a ByteBufferException after a failed operation" $ BB.with Nothing $ \bb -> do
+        BB.copyByteString bb (throw MyException) `shouldThrow` (\MyException -> True)
+        BB.consume bb 10 `shouldThrow` \(BB.ByteBufferException loc e) ->
+            loc == "copyByteString" && e == show MyException
 bbIsEmpty :: BB.ByteBuffer -> Expectation
 bbIsEmpty bb = BB.isEmpty bb >>= (`shouldBe` True)
