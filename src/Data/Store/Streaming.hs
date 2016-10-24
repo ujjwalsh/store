@@ -168,7 +168,7 @@ decodeMessage fill bb getInp = do
       unless (available == 0) $ liftIO $ throwIO $ PeekException available $ T.pack $
         "Data.Store.Streaming.decodeMessage: could not get enough bytes to decode message"
       return Nothing
-{-# INLINE decodeMessage #-}  
+{-# INLINE decodeMessage #-}
 
 -- | Decode some 'Message' from a 'ByteBuffer', by first reading its
 -- header, and then the actual 'Message'.
@@ -185,17 +185,23 @@ decodeMessageBS = decodeMessage (\bb _ bs -> BB.copyByteString bb bs)
 
 -- | We use this type as a more descriptive unit to signal that more input
 -- should be read from the Fd.
+--
+-- This data-type is only available on POSIX systems (essentially, non-windows)
 data ReadMoreData = ReadMoreData
   deriving (Eq, Show)
 
 -- | Peeks a message from a _non blocking_ 'Fd'.
+--
+-- This function is only available on POSIX systems (essentially, non-windows)
 peekMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> PeekMessage ReadMoreData m (Message a)
 peekMessageFd bb fd =
   peekMessage (\bb_ needed ReadMoreData -> do _ <- BB.fillFromFd bb_ fd needed; return ()) bb
 {-# INLINE peekMessageFd #-}
 
--- Decodes all the message using 'registerFd' to find out when a 'Socket' is
+-- | Decodes all the message using 'registerFd' to find out when a 'Socket' is
 -- ready for reading.
+--
+-- This function is only available on POSIX systems (essentially, non-windows)
 decodeMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> m (Message a)
 decodeMessageFd bb fd = do
   mbMsg <- decodeMessage
