@@ -1,9 +1,9 @@
--- This file has been generated from package.yaml by hpack version 0.14.1.
+-- This file has been generated from package.yaml by hpack version 0.14.0.
 --
 -- see: https://github.com/sol/hpack
 
 name:           store-core
-version:        0.2.0.2
+version:        0.3
 synopsis:       Fast and lightweight binary serialization
 category:       Serialization, Data
 homepage:       https://github.com/fpco/store#readme
