@@ -1,5 +1,14 @@
 # ChangeLog
 
+## 0.3
+
+* Uses store-core-0.3.*, which has support for alignment sensitive
+  architectures.
+
+* Adds support for streaming decode from file descriptor, not supported on
+  windows. As part of this addition, the API for "Data.Store.Streaming" has
+  changed.
+
 ## 0.2.1.2
 
 * Fixes a bug that could could result in attempting to malloc a negative
