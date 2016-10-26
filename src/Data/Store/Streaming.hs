@@ -23,7 +23,6 @@ Each message starts with a fixed magic number, in order to detect
 module Data.Store.Streaming
        ( -- * 'Message's to stream data using 'Store' for serialisation.
          Message (..)
-       , headerLength
          -- * Encoding 'Message's
        , encodeMessage
          -- * Decoding 'Message's
@@ -56,7 +55,6 @@ import           Data.Store.Core (decodeIOWithFromPtr, unsafeEncodeWith)
 import qualified Data.Text as T
 import           Data.Word
 import           Foreign.Ptr
-import qualified Foreign.Storable as Storable
 import           Prelude
 import           System.IO.ByteBuffer (ByteBuffer)
 import qualified System.IO.ByteBuffer as BB
@@ -65,27 +63,11 @@ import           Control.Monad.Trans.Maybe (MaybeT(MaybeT), runMaybeT)
 import           Control.Monad.Trans.Class (lift)
 import           System.Posix.Types (Fd(..))
 import           GHC.Conc (threadWaitRead)
+import           Data.Store.Streaming.Internal
 
 -- | If @a@ is an instance of 'Store', @Message a@ can be serialised
 -- and deserialised in a streaming fashion.
 newtype Message a = Message { fromMessage :: a } deriving (Eq, Show)
-
--- | Type used to store the length of a 'Message'.
-type SizeTag = Int
-
--- | Some fixed arbitrary magic number that precedes every 'Message'.
-messageMagic :: Word64
-messageMagic = 18205256374652458875
-
-magicLength :: Int
-magicLength = Storable.sizeOf messageMagic
-
-sizeTagLength :: Int
-sizeTagLength = Storable.sizeOf (undefined :: SizeTag)
-
--- | Number of bytes needed for the magic number and size tag.
-headerLength :: Int
-headerLength = magicLength + sizeTagLength
 
 -- | Encode a 'Message' to a 'ByteString'.
 encodeMessage :: Store a => Message a -> ByteString
