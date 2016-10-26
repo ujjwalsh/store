@@ -4,8 +4,13 @@
 {-# LANGUAGE CPP #-}
 module Data.Store.StreamingSpec where
 
+import           Control.Concurrent (threadDelay)
+import           Control.Concurrent.Async (race, concurrently)
+import           Control.Concurrent.MVar
 import           Control.Exception (try)
 import           Control.Monad (void, (<=<), forM_, unless)
+import           Control.Monad.Trans.Free (runFreeT, FreeF(..))
+import           Control.Monad.Trans.Free.Church (fromFT)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString as BS
 import           Data.Conduit ((=$=), ($$))
@@ -16,21 +21,17 @@ import           Data.Monoid
 import           Data.Store.Core (unsafeEncodeWith)
 import           Data.Store.Internal
 import           Data.Store.Streaming
+import           Data.Store.Streaming.Internal
+import           Data.Streaming.Network (runTCPServer, runTCPClient, clientSettingsTCP, serverSettingsTCP, setAfterBind)
+import           Data.Streaming.Network.Internal (AppData(..))
+import           Data.Void (absurd, Void)
+import           Network.Socket (Socket(..), socketPort)
+import           Network.Socket.ByteString (send)
 import qualified System.IO.ByteBuffer as BB
+import           System.Posix.Types (Fd(..))
 import           Test.Hspec
 import           Test.Hspec.SmallCheck
 import           Test.SmallCheck
-import           Network.Socket (Socket(..), socketPort)
-import           Network.Socket.ByteString (send)
-import           System.Posix.Types (Fd(..))
-import           Data.Streaming.Network (runTCPServer, runTCPClient, clientSettingsTCP, serverSettingsTCP, setAfterBind)
-import           Data.Streaming.Network.Internal (AppData(..))
-import           Control.Concurrent.MVar
-import           Control.Concurrent.Async (race, concurrently)
-import           Data.Void (absurd, Void)
-import           Control.Concurrent (threadDelay)
-import           Control.Monad.Trans.Free (runFreeT, FreeF(..))
-import           Control.Monad.Trans.Free.Church (fromFT)
 
 spec :: Spec
 spec = do
