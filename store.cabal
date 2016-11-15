@@ -40,7 +40,7 @@ library
     , store-core >=0.3 && <0.4
     , th-utilities >=0.2
     , primitive >=0.6
-    , th-reify-many >=0.1.6
+    , th-reify-many >=0.1.3
     , array >=0.5.0.0
     , base-orphans >=0.4.3
     , base64-bytestring >= 0.1.1
@@ -104,7 +104,7 @@ test-suite store-test
     , store-core >=0.3 && <0.4
     , th-utilities >=0.2
     , primitive >=0.6
-    , th-reify-many >=0.1.6
+    , th-reify-many >=0.1.3
     , array >=0.5.0.0
     , base-orphans >=0.4.3
     , base64-bytestring >= 0.1.1
@@ -161,7 +161,7 @@ test-suite store-weigh
     , store-core >=0.3 && <0.4
     , th-utilities >=0.2
     , primitive >=0.6
-    , th-reify-many >=0.1.6
+    , th-reify-many >=0.1.3
     , array >=0.5.0.0
     , base-orphans >=0.4.3
     , base64-bytestring >= 0.1.1
@@ -218,7 +218,7 @@ benchmark store-bench
     , store-core >=0.3 && <0.4
     , th-utilities >=0.2
     , primitive >=0.6
-    , th-reify-many >=0.1.6
+    , th-reify-many >=0.1.3
     , array >=0.5.0.0
     , base-orphans >=0.4.3
     , base64-bytestring >= 0.1.1
