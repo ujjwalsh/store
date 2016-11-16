@@ -392,6 +392,10 @@ spec = do
                             , BS.drop (sizeOf (10 :: Int)) bs
                             ]
         evaluate (decodeEx bs' :: BS.ByteString) `shouldThrow` isTooManyBytesException
+    it "Handles unaligned access" $ do
+        assertRoundtrip verbose (250 :: Word8, 40918 :: Word16, 120471416 :: Word32)
+        assertRoundtrip verbose (250 :: Word8, 10.1 :: Float, 8697.65 :: Double)
+        (return () :: IO ())
 
 isPokeException :: Test.Hspec.Selector PokeException
 isPokeException = const True
