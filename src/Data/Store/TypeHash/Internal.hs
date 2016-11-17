@@ -30,10 +30,6 @@ import           Language.Haskell.TH.ReifyMany (reifyMany)
 import           Language.Haskell.TH.Syntax (Lift(lift))
 import           Prelude
 
-{-# DEPRECATED mkManyHasTypeHash, mkHasTypeHash
-    "Use of Data.Store.TypeHash isn't recommended, as the hashes are too unstable for most uses.  Please instead consider using Data.Store.Version.  See https://github.com/fpco/store/issues/53"
-  #-}
-
 newtype Tagged a = Tagged { unTagged :: a }
     deriving (Eq, Ord, Show, Data, Typeable, Generic)
 
