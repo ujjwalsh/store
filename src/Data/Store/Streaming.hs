@@ -115,22 +115,27 @@ peekSized fill bb n = go
         Right ptr -> decodeFromPtr ptr n
 {-# INLINE peekSized #-}
 
--- | Decode a header (magic number and 'SizeTag') from a 'ByteBuffer'.
-peekMessageHeader :: MonadIO m => FillByteBuffer i m -> ByteBuffer -> PeekMessage i m SizeTag
-peekMessageHeader fill bb = go
-  where
-    go = do
-      messageMagic' <- peekSized fill bb magicLength
-      unless (messageMagic == messageMagic') $
-        liftIO . throwIO $ PeekException 0 . T.pack $ "Wrong message magic, " ++ show messageMagic'
-      peekSized fill bb sizeTagLength
-{-# INLINE peekMessageHeader #-}
+-- | Read and check the magic number from a 'ByteBuffer'
+peekMessageMagic :: MonadIO m => FillByteBuffer i m -> ByteBuffer -> PeekMessage i m ()
+peekMessageMagic fill bb =
+    peekSized fill bb magicLength >>= \case
+      mm | mm == messageMagic -> return ()
+      mm -> liftIO . throwIO $ PeekException 0 . T.pack $
+          "Wrong message magic, " ++ show mm
+{-# INLINE peekMessageMagic #-}
+
+-- | Decode a 'SizeTag' from a 'ByteBuffer'.
+peekMessageSizeTag :: MonadIO m => FillByteBuffer i m -> ByteBuffer -> PeekMessage i m SizeTag
+peekMessageSizeTag fill bb = peekSized fill bb sizeTagLength
+{-# INLINE peekMessageSizeTag #-}
 
 -- | Decode some object from a 'ByteBuffer', by first reading its
 -- header, and then the actual data.
 peekMessage :: (MonadIO m, Store a) => FillByteBuffer i m -> ByteBuffer -> PeekMessage i m (Message a)
 peekMessage fill bb =
-  fmap Message (peekSized fill bb =<< peekMessageHeader fill bb)
+  fmap Message $ do
+    peekMessageMagic fill bb
+    peekMessageSizeTag fill bb >>= peekSized fill bb
 {-# INLINE peekMessage #-}
 
 -- | Decode a 'Message' from a 'ByteBuffer' and an action that can get
@@ -141,15 +146,25 @@ peekMessage fill bb =
 -- 'Nothing'.  If there is some data available, but not enough to
 -- decode the whole 'Message', a 'PeekException' will be thrown.
 decodeMessage :: (Store a, MonadIO m) => FillByteBuffer i m -> ByteBuffer -> m (Maybe i) -> m (Maybe (Message a))
-decodeMessage fill bb getInp = do
-  mbRes <- runMaybeT (iterTM (\consumeInp -> consumeInp =<< MaybeT getInp) (peekMessage fill bb))
-  case mbRes of
-    Just x -> return (Just x)
+decodeMessage fill bb getInp =
+  maybeDecode (peekMessageMagic fill bb) >>= \case
+    Just () -> maybeDecode (peekMessageSizeTag fill bb >>= peekSized fill bb) >>= \case
+      Just x -> return (Just (Message x))
+      Nothing -> do
+        -- We have already read the message magic, so a failure to
+        -- read the whole message means we have an incomplete message.
+        available <- BB.availableBytes bb
+        liftIO $ throwIO $ PeekException available $ T.pack
+          "Data.Store.Streaming.decodeMessage: could not get enough bytes to decode message"
     Nothing -> do
       available <- BB.availableBytes bb
-      unless (available == 0) $ liftIO $ throwIO $ PeekException available $ T.pack $
+      -- At this point, we have not consumed anything yet, so if bb is
+      -- empty, there simply was no message to read.
+      unless (available == 0) $ liftIO $ throwIO $ PeekException available $ T.pack
         "Data.Store.Streaming.decodeMessage: could not get enough bytes to decode message"
       return Nothing
+  where
+    maybeDecode m = runMaybeT (iterTM (\consumeInp -> consumeInp =<< MaybeT getInp) m)
 {-# INLINE decodeMessage #-}
 
 -- | Decode some 'Message' from a 'ByteBuffer', by first reading its
