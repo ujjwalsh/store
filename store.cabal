@@ -209,7 +209,6 @@ test-suite store-weigh
       Data.Store.StreamingSpec
       Data.StoreSpec
       Data.StoreSpec.TH
-      Spec
       System.IO.ByteBufferSpec
   default-language: Haskell2010
 
