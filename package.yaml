@@ -97,6 +97,7 @@ tests:
   store-weigh:
     source-dirs: test
     main: Allocations.hs
+    other-modules: []
     ghc-options: -threaded -rtsopts -with-rtsopts=-N -with-rtsopts=-T -O2
     dependencies:
       - store
