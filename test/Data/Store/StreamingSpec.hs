@@ -49,10 +49,7 @@ spec = do
   describe "decodeMessage" $ do
     describe "ByteString" $ do
       it "Throws an Exception on incomplete messages." decodeIncomplete
-{-  See https://github.com/fpco/store/issues/87
       it "Throws an Exception on messages that are shorter than indicated." decodeTooShort
-      it "Throws an Exception on messages that are longer than indicated." decodeTooLong
--}
 #ifndef mingw32_HOST_OS
     describe "Socket" $ do
       it "Decodes data trickling through a socket." $ property decodeTricklingMessageFd
@@ -198,28 +195,14 @@ incompleteInput =
   let bs = encodeMessage (Message (42 :: Integer))
   in BS.take (BS.length bs - 1) bs
 
-{-  See https://github.com/fpco/store/issues/87
-decodeTooLong :: IO ()
-decodeTooLong = BB.with Nothing $ \bb -> do
-    BB.copyByteString bb (encodeMessageTooLong . Message $ (1 :: Int))
-    (decodeMessageBS bb (return Nothing) :: IO (Maybe (Message Int)))
-        `shouldThrow` \PeekException{} -> True
-
 decodeTooShort :: IO ()
 decodeTooShort = BB.with Nothing $ \bb -> do
     BB.copyByteString bb (encodeMessageTooShort . Message $ (1 :: Int))
     (decodeMessageBS bb (return Nothing) :: IO (Maybe (Message Int)))
         `shouldThrow` \PeekException{} -> True
 
-encodeMessageTooLong :: Message Int -> BS.ByteString
-encodeMessageTooLong msg =
-    BS.append encoded (BS.replicate 8 0)
-  where
-    encoded = encodeMessage msg
-
 encodeMessageTooShort :: Message Int -> BS.ByteString
 encodeMessageTooShort msg =
     BS.take (BS.length encoded - (getSize (0 :: Int))) encoded
   where
     encoded = encodeMessage msg
--}
