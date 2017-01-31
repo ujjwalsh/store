@@ -1,5 +1,10 @@
 # ChangeLog
 
+## Unreleased
+
+* Fix to derivation of primitive vectors, only relevant when built with
+  primitive-0.6.2.0 or later
+
 ## 0.3
 
 * Uses store-core-0.3.*, which has support for alignment sensitive
