@@ -290,7 +290,7 @@ deriveManyStorePrimVector = do
             `M.difference`
             stores
     forM (M.toList primInsts) $ \primInst -> case primInst of
-        ([instTy], TypeclassInstance cs ty _) -> do
+        ([_], TypeclassInstance cs ty _) -> do
             let argTy = head (tail (unAppsT ty))
             sizeExpr <- [|
                 VarSize $ \x ->
@@ -309,7 +309,7 @@ deriveManyStorePrimVector = do
                 poke len
                 pokeFromByteArray array (offset * sz) (len * sz)
                 |]
-            return $ makeStoreInstance cs instTy sizeExpr peekExpr pokeExpr
+            return $ makeStoreInstance cs (AppT (ConT ''PV.Vector) argTy) sizeExpr peekExpr pokeExpr
         _ -> fail "Invariant violated in derivemanyStorePrimVector"
 
 
