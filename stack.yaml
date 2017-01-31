@@ -1,10 +1,6 @@
-resolver: lts-5.8
+resolver: lts-7.18
 packages:
 - .
 - store-core
 - location: deps/weigh
   extra-dep: true
-extra-deps:
-- th-lift-instances-0.1.7
-- th-utilities-0.2.0.1
-- th-reify-many-0.1.6
