@@ -64,15 +64,17 @@ class Store a where
 
     default size :: (Generic a, GStoreSize (Rep a)) => Size a
     size = genericSize
-    {-# INLINE size #-}
 
     default poke :: (Generic a, GStorePoke (Rep a)) => a -> Poke ()
     poke = genericPoke
-    {-# INLINE poke #-}
 
     default peek :: (Generic a , GStorePeek (Rep a)) => Peek a
     peek = genericPeek
-    {-# INLINE peek #-}
+
+    -- NB: Do not INLINE the default implementations of size, poke, or peek!
+    -- Doing so can lead to enormous memory blowup (a maximum residency of
+    -- 5.17 GB with GHC 8.0.2 has been observed). For more information, please
+    -- read issue #91.
 
 ------------------------------------------------------------------------
 -- Utilities for encoding / decoding strict ByteStrings
