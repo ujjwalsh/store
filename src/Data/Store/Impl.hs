@@ -22,6 +22,7 @@ import           Control.Applicative
 import           Control.Exception (try)
 import           Control.Monad
 import qualified Data.ByteString as BS
+import           Data.Functor.Contravariant (Contravariant(..))
 import           Data.Proxy
 import           Data.Store.Core
 import           Data.Typeable (Typeable, typeRep)
@@ -117,6 +118,11 @@ data Size a
     = VarSize (a -> Int)
     | ConstSize !Int
     deriving Typeable
+
+instance Contravariant Size where
+  contramap f sz = case sz of
+    ConstSize n -> ConstSize n
+    VarSize g -> VarSize (\x -> g (f x))
 
 -- | Get the number of bytes needed to store the given value. See
 -- 'size'.

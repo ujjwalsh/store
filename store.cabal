@@ -1,4 +1,4 @@
--- This file has been generated from package.yaml by hpack version 0.14.1.
+-- This file has been generated from package.yaml by hpack version 0.15.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -78,6 +78,7 @@ library
     , network >=2.6.0.2
     , streaming-commons >=0.1.10.0
     , async >=2.0.2
+    , contravariant >=1.3
   exposed-modules:
       Data.Store
       Data.Store.Internal
@@ -142,6 +143,7 @@ test-suite store-test
     , network >=2.6.0.2
     , streaming-commons >=0.1.10.0
     , async >=2.0.2
+    , contravariant >=1.3
     , store
   other-modules:
       Data.Store.StreamingSpec
@@ -199,6 +201,7 @@ test-suite store-weigh
     , network >=2.6.0.2
     , streaming-commons >=0.1.10.0
     , async >=2.0.2
+    , contravariant >=1.3
     , store
     , weigh
     , criterion
@@ -256,6 +259,7 @@ benchmark store-bench
     , network >=2.6.0.2
     , streaming-commons >=0.1.10.0
     , async >=2.0.2
+    , contravariant >=1.3
     , criterion
     , store
   if flag(comparison-bench)
