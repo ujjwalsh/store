@@ -5,6 +5,10 @@
 * Fix to derivation of primitive vectors, only relevant when built with
   primitive-0.6.2.0 or later
 
+* Removes INLINE pragmas on the generic default methods.  This
+  dramatically improves compilation time on recent GHC versions.
+  See [#91](https://github.com/fpco/store/issues/91).
+
 ## 0.3
 
 * Uses store-core-0.3.*, which has support for alignment sensitive
