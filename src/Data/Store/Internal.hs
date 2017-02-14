@@ -39,7 +39,7 @@ module Data.Store.Internal
     -- ** Size type
     , Size(..)
     , getSize, getSizeWith
-    , contramapSize, combineSize, combineSizeWith, addSize
+    , combineSize, combineSizeWith, addSize
     -- ** Store instances in terms of IsSequence
     , sizeSequence, pokeSequence, peekSequence
     -- ** Store instances in terms of IsSet
@@ -76,6 +76,7 @@ import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, ma
 import           Data.Data (Data)
 import           Data.Fixed (Fixed (..), Pico)
 import           Data.Foldable (forM_, foldl')
+import           Data.Functor.Contravariant
 import           Data.HashMap.Strict (HashMap)
 import           Data.HashSet (HashSet)
 import           Data.Hashable (Hashable)
@@ -620,7 +621,7 @@ instance Store Integer where
 -- instance Store GHC.Fingerprint.Types.Fingerprint where
 
 instance Store (Fixed a) where
-    size = contramapSize (\(MkFixed x) -> x) (size :: Size Integer)
+    size = contramap (\(MkFixed x) -> x) (size :: Size Integer)
     poke (MkFixed x) = poke x
     peek = MkFixed <$> peek
     {-# INLINE size #-}
@@ -649,7 +650,7 @@ instance Store a => Store (Ratio a) where
     {-# INLINE poke #-}
 
 instance Store Time.Day where
-    size = contramapSize Time.toModifiedJulianDay (size :: Size Integer)
+    size = contramap Time.toModifiedJulianDay (size :: Size Integer)
     poke = poke . Time.toModifiedJulianDay
     peek = Time.ModifiedJulianDay <$> peek
     {-# INLINE size #-}
@@ -657,7 +658,7 @@ instance Store Time.Day where
     {-# INLINE poke #-}
 
 instance Store Time.DiffTime where
-    size = contramapSize (realToFrac :: Time.DiffTime -> Pico) (size :: Size Pico)
+    size = contramap (realToFrac :: Time.DiffTime -> Pico) (size :: Size Pico)
     poke = (poke :: Pico -> Poke ()) . realToFrac
     peek = Time.picosecondsToDiffTime <$> peek
     {-# INLINE size #-}

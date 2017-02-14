@@ -9,6 +9,8 @@
   dramatically improves compilation time on recent GHC versions.
   See [#91](https://github.com/fpco/store/issues/91).
 
+* Adds `instance Contravariant Size`
+
 ## 0.3
 
 * Uses store-core-0.3.*, which has support for alignment sensitive

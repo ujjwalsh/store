@@ -139,13 +139,6 @@ getSizeWith (VarSize f) x = f x
 getSizeWith (ConstSize n) _ = n
 {-# INLINE getSizeWith #-}
 
--- | This allows for changing the type used as an input when the 'Size'
--- is 'VarSize'.
-contramapSize :: (a -> b) -> Size b -> Size a
-contramapSize f (VarSize g) = VarSize (g . f)
-contramapSize _ (ConstSize n) = ConstSize n
-{-# INLINE contramapSize #-}
-
 -- | Create an aggregate 'Size' by providing functions to split the
 -- input into two pieces.
 --
@@ -194,7 +187,7 @@ sizeStorableTy ty = ConstSize (sizeOf (error msg :: a))
 -- Generics
 
 genericSize :: (Generic a, GStoreSize (Rep a)) => Size a
-genericSize = contramapSize from gsize
+genericSize = contramap from gsize
 {-# INLINE genericSize #-}
 
 genericPoke :: (Generic a, GStorePoke (Rep a)) => a -> Poke ()
@@ -219,7 +212,7 @@ class GStorePoke f where gpoke :: f a -> Poke ()
 class GStorePeek f where gpeek :: Peek (f a)
 
 instance GStoreSize f => GStoreSize (M1 i c f) where
-    gsize = contramapSize unM1 gsize
+    gsize = contramap unM1 gsize
     {-# INLINE gsize #-}
 instance GStorePoke f => GStorePoke (M1 i c f) where
     gpoke = gpoke . unM1
@@ -229,7 +222,7 @@ instance GStorePeek f => GStorePeek (M1 i c f) where
     {-# INLINE gpeek #-}
 
 instance Store a => GStoreSize (K1 i a) where
-    gsize = contramapSize unK1 size
+    gsize = contramap unK1 size
     {-# INLINE gsize #-}
 instance Store a => GStorePoke (K1 i a) where
     gpoke = poke . unK1

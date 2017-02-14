@@ -16,6 +16,7 @@ import qualified Crypto.Hash.SHA1 as SHA1
 import qualified Data.ByteString as BS
 import           Data.Char (isUpper, isLower)
 import           Data.Data (Data)
+import           Data.Functor.Contravariant
 import           Data.Generics (listify)
 import           Data.List (sortBy)
 import           Data.Monoid ((<>))
@@ -40,7 +41,7 @@ newtype Tagged a = Tagged { unTagged :: a }
 instance NFData a => NFData (Tagged a)
 
 instance (Store a, HasTypeHash a) => Store (Tagged a) where
-    size = addSize 20 (contramapSize unTagged size)
+    size = addSize 20 (contramap unTagged size)
     peek = do
         tag <- peek
         let expected = typeHash (Proxy :: Proxy a)
