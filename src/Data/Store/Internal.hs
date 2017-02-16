@@ -279,7 +279,7 @@ skip len = Peek $ \ps ptr -> do
         remaining = peekStateEndPtr ps `minusPtr` ptr
     when (len > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
         tooManyBytes len remaining "skip"
-    return (ptr2, ())
+    return $ PeekResult ptr2 ()
 
 -- | Isolate the input to n bytes, skipping n bytes forward. Fails if @m@
 -- advances the offset beyond the isolated region.
@@ -291,10 +291,10 @@ isolate len m = Peek $ \ps ptr -> do
         remaining = end `minusPtr` ptr
     when (len > remaining) $ -- Do not perform the check on the new pointer, since it could have overflowed
         tooManyBytes len remaining "isolate"
-    (ptr', x) <- runPeek m ps ptr
+    PeekResult ptr' x <- runPeek m ps ptr
     when (ptr' > end) $
         throwIO $ PeekException (ptr' `minusPtr` end) "Overshot end of isolated bytes"
-    return (ptr2, x)
+    return $ PeekResult ptr2 x
 
 ------------------------------------------------------------------------
 -- Instances for types based on flat representations
@@ -753,3 +753,4 @@ instance Store NameFlavour where
 $(reifyManyWithoutInstances ''Store [''Info] (const True) >>=
 --   mapM (\name -> deriveStore [] (ConT name) .dtCons =<< reifyDataType name))
    mapM (\name -> return (deriveGenericInstance [] (ConT name))))
+
