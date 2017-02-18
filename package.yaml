@@ -26,7 +26,7 @@ dependencies:
   - base >=4.7 && <5
 
   # Core package tightly packaged to this package
-  - store-core >=0.3 && <0.4
+  - store-core >=0.4 && <0.5
 
   # Utilities package tightly coupled to the TH code
   - th-utilities >=0.2

@@ -37,7 +37,7 @@ library
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2
   build-depends:
       base >=4.7 && <5
-    , store-core >=0.3 && <0.4
+    , store-core >=0.4 && <0.5
     , th-utilities >=0.2
     , primitive >=0.6
     , th-reify-many >=0.1.6
@@ -102,7 +102,7 @@ test-suite store-test
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , store-core >=0.3 && <0.4
+    , store-core >=0.4 && <0.5
     , th-utilities >=0.2
     , primitive >=0.6
     , th-reify-many >=0.1.6
@@ -160,7 +160,7 @@ test-suite store-weigh
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N -with-rtsopts=-T -O2
   build-depends:
       base >=4.7 && <5
-    , store-core >=0.3 && <0.4
+    , store-core >=0.4 && <0.5
     , th-utilities >=0.2
     , primitive >=0.6
     , th-reify-many >=0.1.6
@@ -218,7 +218,7 @@ benchmark store-bench
   ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N1 -with-rtsopts=-s -with-rtsopts=-qg
   build-depends:
       base >=4.7 && <5
-    , store-core >=0.3 && <0.4
+    , store-core >=0.4 && <0.5
     , th-utilities >=0.2
     , primitive >=0.6
     , th-reify-many >=0.1.6

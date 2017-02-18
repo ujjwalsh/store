@@ -1,5 +1,10 @@
 # ChangeLog
 
+## 0.4 (unreleased)
+
+* Changes result of Peek function to be strict.
+  (See [#98](https://github.com/fpco/store/pull/98))
+
 ## 0.3
 
 * Adds support for alignment sensitive architectures, by using temporary buffers
