@@ -13,7 +13,7 @@
 module Data.Store.Core
     ( -- * Core Types
       Poke(..), PokeException(..), pokeException
-    , Peek(..), PeekException(..), peekException, tooManyBytes
+    , Peek(..), PeekResult(..), PeekException(..), peekException, tooManyBytes
     , PokeState, pokeStatePtr
     , PeekState, peekStateEndPtr
     , Offset
@@ -174,26 +174,29 @@ pokeException msg = Poke $ \_ off -> throwIO (PokeException off msg)
 -- together to get more complicated deserializers. This machinery keeps
 -- track of the current 'Ptr' and end-of-buffer 'Ptr'.
 newtype Peek a = Peek
-    { runPeek :: PeekState -> Ptr Word8 -> IO (Ptr Word8, a)
+    { runPeek :: PeekState -> Ptr Word8 -> IO (PeekResult a)
       -- ^ Run the 'Peek' action, with a 'Ptr' to the end of the buffer
       -- where data is poked, and a 'Ptr' to the current position. The
       -- result is the 'Ptr', along with a return value.
       --
       -- May throw a 'PeekException' if the memory contains invalid
       -- values.
-    }
-   deriving Functor
+    } deriving (Functor)
+
+-- | A result of a 'Peek' action containing the current 'Ptr' and a return value.
+data PeekResult a = PeekResult {-# UNPACK #-} !(Ptr Word8) !a
+    deriving (Functor)
 
 instance Applicative Peek where
-    pure x = Peek (\_ ptr -> return (ptr, x))
+    pure x = Peek (\_ ptr -> return $ PeekResult ptr x)
     {-# INLINE pure #-}
     Peek f <*> Peek g = Peek $ \end ptr1 -> do
-        (ptr2, f') <- f end ptr1
-        (ptr3, g') <- g end ptr2
-        return (ptr3, f' g')
+        PeekResult ptr2 f' <- f end ptr1
+        PeekResult ptr3 g' <- g end ptr2
+        return $ PeekResult ptr3 (f' g')
     {-# INLINE (<*>) #-}
     Peek f *> Peek g = Peek $ \end ptr1 -> do
-        (ptr2, _) <- f end ptr1
+        PeekResult ptr2 _ <- f end ptr1
         g end ptr2
     {-# INLINE (*>) #-}
 
@@ -203,7 +206,7 @@ instance Monad Peek where
     (>>) = (*>)
     {-# INLINE (>>) #-}
     Peek x >>= f = Peek $ \end ptr1 -> do
-        (ptr2, x') <- x end ptr1
+        PeekResult ptr2 x' <- x end ptr1
         runPeek (f x') end ptr2
     {-# INLINE (>>=) #-}
     fail = peekException . T.pack
@@ -219,11 +222,11 @@ instance PrimMonad Peek where
     type PrimState Peek = RealWorld
     primitive action = Peek $ \_ ptr -> do
         x <- primitive (unsafeCoerce# action)
-        return (ptr, x)
+        return $ PeekResult ptr x
     {-# INLINE primitive #-}
 
 instance MonadIO Peek where
-    liftIO f = Peek $ \_ ptr -> (ptr, ) <$> f
+    liftIO f = Peek $ \_ ptr -> PeekResult ptr <$> f
     {-# INLINE liftIO #-}
 
 -- | Holds a 'peekStatePtr', which is passed in to each 'Peek' action.
@@ -385,7 +388,7 @@ decodeIOPortionWithFromPtr :: Peek a -> Ptr Word8 -> Int -> IO (Offset, a)
 decodeIOPortionWithFromPtr mypeek ptr len =
     let end = ptr `plusPtr` len
         remaining = end `minusPtr` ptr
-    in do (ptr2, x') <-
+    in do PeekResult ptr2 x' <-
 #if ALIGNED_MEMORY
               allocaBytesAligned alignBufferSize 8 $ \aptr -> do
                   runPeek mypeek (PeekState end aptr) ptr
@@ -464,7 +467,7 @@ peekStorableTy ty = Peek $ \ps ptr -> do
 #else
     x <- Storable.peek (castPtr ptr)
 #endif
-    return (ptr', x)
+    return $ PeekResult ptr' x
 {-# INLINE peekStorableTy #-}
 
 ------------------------------------------------------------------------
@@ -499,7 +502,7 @@ peekToPlainForeignPtr ty len =
         fp <- BS.mallocByteString len
         withForeignPtr fp $ \targetPtr ->
             BS.memcpy targetPtr (castPtr sourcePtr) len
-        return (ptr2, castForeignPtr fp)
+        return $ PeekResult ptr2 (castForeignPtr fp)
 {-# INLINE peekToPlainForeignPtr #-}
 
 -- | Copy a section of memory, based on a 'Ptr', to the output. Note
@@ -544,7 +547,7 @@ peekToByteArray ty len =
         marr <- newByteArray len
         copyAddrToByteArray sourcePtr marr 0 len
         x <- unsafeFreezeByteArray marr
-        return (ptr2, x)
+        return $ PeekResult ptr2 x
 {-# INLINE peekToByteArray #-}
 
 -- | Wrapper around @copyByteArrayToAddr#@ primop.
@@ -558,3 +561,4 @@ copyAddrToByteArray :: Ptr a -> MutableByteArray (PrimState IO) -> Int -> Int ->
 copyAddrToByteArray (Ptr addr) (MutableByteArray arr) (I# offset) (I# len) =
     IO (\s -> (# copyAddrToByteArray# addr arr offset len s, () #))
 {-# INLINE copyAddrToByteArray  #-}
+
