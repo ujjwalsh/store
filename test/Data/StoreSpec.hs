@@ -307,7 +307,7 @@ spec = do
             , [t| X |]
             ])
     describe "Manually listed polymorphic store instances"
-        $(smallcheckManyStore verbose 2
+        $(smallcheckManyStore verbose 4
             [ [t| SV.Vector Int8 |]
             , [t| V.Vector  Int8 |]
             , [t| SerialRatio     Int8 |]
