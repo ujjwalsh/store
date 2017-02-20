@@ -242,8 +242,8 @@ peekMap = mapFromList <$> peek
 -- < 0.4.
 --
 -- See https://github.com/fpco/store/issues/97.
-markMapPokedInAscendingOrder :: Word8
-markMapPokedInAscendingOrder = 0xFF
+markMapPokedInAscendingOrder :: Word32
+markMapPokedInAscendingOrder = 0xFFFFFFFF
 
 -- | Ensure the presence of a given magic value.
 --
