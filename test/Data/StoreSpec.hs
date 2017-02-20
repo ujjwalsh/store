@@ -396,6 +396,12 @@ spec = do
         assertRoundtrip verbose (250 :: Word8, 40918 :: Word16, 120471416 :: Word32)
         assertRoundtrip verbose (250 :: Word8, 10.1 :: Float, 8697.65 :: Double)
         (return () :: IO ())
+    it "Expects the right marker when deserializing ordered maps (#97)" $ do
+        let m = mapFromList [(1, ()), (2, ()), (3, ())] :: HashMap Int ()
+            bs = encode m
+        (decodeEx bs :: HashMap Int ()) `shouldBe` m
+        evaluate (decodeEx bs :: Map Int ()) `shouldThrow` isUnexpectedMarkerException
+        evaluate (decodeEx bs :: IntMap ()) `shouldThrow` isUnexpectedMarkerException
 
 isPokeException :: Test.Hspec.Selector PokeException
 isPokeException = const True
@@ -405,3 +411,7 @@ isNegativeBytesException (PeekException _ t) = "Attempted to read negative numbe
 
 isTooManyBytesException :: Test.Hspec.Selector PeekException
 isTooManyBytesException (PeekException _ t) = "Attempted to read too many bytes" `T.isPrefixOf` t
+
+isUnexpectedMarkerException :: Test.Hspec.Selector PeekException
+isUnexpectedMarkerException (PeekException _ t) =
+    "Expected marker: " `T.isPrefixOf` t
