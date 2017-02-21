@@ -84,6 +84,7 @@ import           Data.IntMap (IntMap)
 import           Data.IntSet (IntSet)
 import qualified Data.List.NonEmpty as NE
 import           Data.Map (Map)
+import qualified Data.Map.Strict as Map
 import           Data.MonoTraversable
 import           Data.Monoid
 import           Data.Orphans ()
@@ -92,6 +93,7 @@ import           Data.Proxy (Proxy(..))
 import           Data.Sequence (Seq)
 import           Data.Sequences (IsSequence, Index, replicateM)
 import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Store.Impl
 import           Data.Store.Core
 import           Data.Store.TH.Internal
@@ -461,7 +463,12 @@ instance Store a => Store (Seq a) where
     {-# INLINE poke #-}
 
 instance (Store a, Ord a) => Store (Set a) where
-    size = sizeSet
+    size =
+        VarSize $ \t ->
+            sizeOf (undefined :: Int) +
+            case size of
+                ConstSize n -> n * Set.size t
+                VarSize f -> Set.foldl' (\acc a -> acc + f a) 0 t
     poke = pokeSet
     peek = peekSet
     {-# INLINE size #-}
@@ -485,7 +492,16 @@ instance Store a => Store (IntMap a) where
     {-# INLINE poke #-}
 
 instance (Ord k, Store k, Store a) => Store (Map k a) where
-    size = sizeMap
+    size =
+        VarSize $ \t ->
+            sizeOf (undefined :: Int) +
+            case (size, size) of
+                (ConstSize nk, ConstSize na) -> (nk + na) * Map.size t
+                (szk, sza) ->
+                    Map.foldlWithKey'
+                        (\acc k a -> acc + getSizeWith szk k + getSizeWith sza a)
+                        0
+                        t
     poke = pokeMap
     peek = peekMap
     {-# INLINE size #-}
