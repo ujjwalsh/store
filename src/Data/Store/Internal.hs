@@ -549,7 +549,7 @@ instance Store a => Store (IntMap a) where
 instance (Ord k, Store k, Store a) => Store (Map k a) where
     size =
         VarSize $ \t ->
-            sizeOf (undefined :: Int) +
+            sizeOf markMapPokedInAscendingOrder + sizeOf (undefined :: Int) +
             case (size, size) of
                 (ConstSize nk, ConstSize na) -> (nk + na) * Map.size t
                 (szk, sza) ->
