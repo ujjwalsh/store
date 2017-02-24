@@ -518,7 +518,12 @@ instance Store a => Store (Seq a) where
     {-# INLINE poke #-}
 
 instance (Store a, Ord a) => Store (Set a) where
-    size = sizeSet
+    size =
+        VarSize $ \t ->
+            sizeOf (undefined :: Int) +
+            case size of
+                ConstSize n -> n * Set.size t
+                VarSize f -> Set.foldl' (\acc a -> acc + f a) 0 t
     poke = pokeSet
     peek = Set.fromDistinctAscList <$> peek
     {-# INLINE size #-}
@@ -542,7 +547,16 @@ instance Store a => Store (IntMap a) where
     {-# INLINE poke #-}
 
 instance (Ord k, Store k, Store a) => Store (Map k a) where
-    size = sizeOrdMap
+    size =
+        VarSize $ \t ->
+            sizeOf (undefined :: Int) +
+            case (size, size) of
+                (ConstSize nk, ConstSize na) -> (nk + na) * Map.size t
+                (szk, sza) ->
+                    Map.foldlWithKey'
+                        (\acc k a -> acc + getSizeWith szk k + getSizeWith sza a)
+                        0
+                        t
     poke = pokeOrdMap
     peek = peekOrdMapWith Map.fromDistinctAscList
     {-# INLINE size #-}
