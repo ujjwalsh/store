@@ -243,7 +243,7 @@ peekMap = mapFromList <$> peek
 --
 -- See https://github.com/fpco/store/issues/97.
 markMapPokedInAscendingOrder :: Word32
-markMapPokedInAscendingOrder = 0xFFFFFFFF
+markMapPokedInAscendingOrder = 1217678090
 
 -- | Ensure the presence of a given magic value.
 --
