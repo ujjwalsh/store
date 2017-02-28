@@ -46,6 +46,8 @@ module Data.Store.Internal
     , sizeSet, pokeSet, peekSet
     -- ** Store instances in terms of IsMap
     , sizeMap, pokeMap, peekMap
+    -- *** Utilities for ordered maps
+    , sizeOrdMap, pokeOrdMap, peekOrdMapWith
     -- ** Store instances in terms of IArray
     , sizeArray, pokeArray, peekArray
     -- ** Store instances in terms of Generic
@@ -81,7 +83,9 @@ import           Data.HashMap.Strict (HashMap)
 import           Data.HashSet (HashSet)
 import           Data.Hashable (Hashable)
 import           Data.IntMap (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import           Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import qualified Data.List.NonEmpty as NE
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
@@ -218,11 +222,7 @@ pokeMap
     :: (Store (ContainerKey t), Store (MapValue t), IsMap t)
     => t
     -> Poke ()
-pokeMap t = do
-    poke (olength t)
-    ofoldl' (\acc (k, x) -> poke k >> poke x >> acc)
-            (return ())
-            (mapToList t)
+pokeMap = pokeSequence . mapToList
 {-# INLINE pokeMap #-}
 
 -- | Implement 'peek' for an 'IsMap' of where both 'ContainerKey' and
@@ -232,6 +232,61 @@ peekMap
     => Peek t
 peekMap = mapFromList <$> peek
 {-# INLINE peekMap #-}
+
+------------------------------------------------------------------------
+-- Utilities for defining 'Store' instances for ordered containers like
+-- 'IntMap' and 'Map'
+
+-- | Marker for maps that are encoded in ascending order instead of the
+-- descending order mistakenly implemented in 'peekMap' in store versions
+-- < 0.4.
+--
+-- See https://github.com/fpco/store/issues/97.
+markMapPokedInAscendingOrder :: Word32
+markMapPokedInAscendingOrder = 0xFFFFFFFF
+
+-- | Ensure the presence of a given magic value.
+--
+-- Throws a 'PeekException' if the value isn't present.
+peekMagic
+    :: (Eq a, Show a, Store a)
+    => a -> Peek ()
+peekMagic x = do
+    x' <- peek
+    when (x' /= x) $
+        fail ("Expected marker: " ++ show x ++ " but got: " ++ show x')
+{-# INLINE peekMagic #-}
+
+-- | Like 'sizeMap' but should only be used for ordered containers where
+-- 'Data.Containers.mapToList' returns an ascending list.
+sizeOrdMap
+    :: forall t.
+       (Store (ContainerKey t), Store (MapValue t), IsMap t)
+    => Size t
+sizeOrdMap =
+    combineSizeWith (const markMapPokedInAscendingOrder) id size sizeMap
+{-# INLINE sizeOrdMap #-}
+
+-- | Like 'pokeMap' but should only be used for ordered containers where
+-- 'Data.Containers.mapToList' returns an ascending list.
+pokeOrdMap
+    :: (Store (ContainerKey t), Store (MapValue t), IsMap t)
+    => t -> Poke ()
+pokeOrdMap x = poke markMapPokedInAscendingOrder >> pokeMap x
+{-# INLINE pokeOrdMap #-}
+
+-- | Decode the results of 'pokeOrdMap' using a given function to construct
+-- the map.
+peekOrdMapWith
+    :: (Store (ContainerKey t), Store (MapValue t))
+    => ([(ContainerKey t, MapValue t)] -> t)
+       -- ^ A function to construct the map from an ascending list such as
+       -- 'Map.fromDistinctAscList'.
+    -> Peek t
+peekOrdMapWith f = do
+    peekMagic markMapPokedInAscendingOrder
+    f <$> peek
+{-# INLINE peekOrdMapWith #-}
 
 {-
 ------------------------------------------------------------------------
@@ -470,7 +525,7 @@ instance (Store a, Ord a) => Store (Set a) where
                 ConstSize n -> n * Set.size t
                 VarSize f -> Set.foldl' (\acc a -> acc + f a) 0 t
     poke = pokeSet
-    peek = peekSet
+    peek = Set.fromDistinctAscList <$> peek
     {-# INLINE size #-}
     {-# INLINE peek #-}
     {-# INLINE poke #-}
@@ -478,15 +533,15 @@ instance (Store a, Ord a) => Store (Set a) where
 instance Store IntSet where
     size = sizeSet
     poke = pokeSet
-    peek = peekSet
+    peek = IntSet.fromDistinctAscList <$> peek
     {-# INLINE size #-}
     {-# INLINE peek #-}
     {-# INLINE poke #-}
 
 instance Store a => Store (IntMap a) where
-    size = sizeMap
-    poke = pokeMap
-    peek = peekMap
+    size = sizeOrdMap
+    poke = pokeOrdMap
+    peek = peekOrdMapWith IntMap.fromDistinctAscList
     {-# INLINE size #-}
     {-# INLINE peek #-}
     {-# INLINE poke #-}
@@ -494,7 +549,7 @@ instance Store a => Store (IntMap a) where
 instance (Ord k, Store k, Store a) => Store (Map k a) where
     size =
         VarSize $ \t ->
-            sizeOf (undefined :: Int) +
+            sizeOf markMapPokedInAscendingOrder + sizeOf (undefined :: Int) +
             case (size, size) of
                 (ConstSize nk, ConstSize na) -> (nk + na) * Map.size t
                 (szk, sza) ->
@@ -502,8 +557,8 @@ instance (Ord k, Store k, Store a) => Store (Map k a) where
                         (\acc k a -> acc + getSizeWith szk k + getSizeWith sza a)
                         0
                         t
-    poke = pokeMap
-    peek = peekMap
+    poke = pokeOrdMap
+    peek = peekOrdMapWith Map.fromDistinctAscList
     {-# INLINE size #-}
     {-# INLINE peek #-}
     {-# INLINE poke #-}
