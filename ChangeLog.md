@@ -1,5 +1,21 @@
 # ChangeLog
 
+## 0.4.0
+
+* Breaking change in the encoding of Map / Set / IntMap / IntSet,
+  to use ascending key order. Attempting to decode data written by
+  prior versions of store (and vice versa) will almost always fail
+  with a decent error message. If you're unlucky enough to have a
+  collision in the data with a random Word32 magic number, then the
+  error may not be so clear, or in extremely rare cases,
+  successfully decode, yielding incorrect results. See
+  [#97](https://github.com/fpco/store/issues/97) and
+  [#101](https://github.com/fpco/store/pull/101).
+
+
+* Performance improvement of the 'Peek' monad, by introducing more
+  strictness.  This required a change to the internal API.
+
 ## 0.3.1
 
 * Fix to derivation of primitive vectors, only relevant when built with
