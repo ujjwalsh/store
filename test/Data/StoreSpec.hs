@@ -414,4 +414,4 @@ isTooManyBytesException (PeekException _ t) = "Attempted to read too many bytes"
 
 isUnexpectedMarkerException :: Test.Hspec.Selector PeekException
 isUnexpectedMarkerException (PeekException _ t) =
-    "Expected marker: " `T.isPrefixOf` t
+    "Expected marker for ascending Map / IntMap: " `T.isPrefixOf` t
