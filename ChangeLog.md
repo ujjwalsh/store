@@ -1,6 +1,6 @@
 # ChangeLog
 
-## 0.4.0
+## 0.4.1
 
 * Breaking change in the encoding of Map / Set / IntMap / IntSet,
   to use ascending key order. Attempting to decode data written by
@@ -15,6 +15,16 @@
 
 * Performance improvement of the 'Peek' monad, by introducing more
   strictness.  This required a change to the internal API.
+
+* API and behavior of 'Data.Store.Version' changed. Previously, it
+  would check the version tag after decoding the contents. It now
+  also stores a magic Word32 tag at the beginning, so that it fails
+  more gracefully when decoding input that lacks encoded version
+  info.
+
+## 0.4.0
+
+Deprecated in favor of 0.4.1
 
 ## 0.3.1
 
