@@ -23,16 +23,13 @@
 -- will be minimized when directly feasible.
 module Data.Store.Version
     ( StoreVersion(..)
-    , WithVersion(..)
     , VersionConfig(..)
     , hashedVersionConfig
     , namedVersionConfig
-    , wrapVersion
-    , checkVersion
-    , VersionCheckException(..)
+    , encodeWithVersionQ
+    , decodeWithVersionQ
     ) where
 
-import           Control.Exception
 import           Control.Monad
 import           Control.Monad.Trans.State
 import qualified Crypto.Hash.SHA1 as SHA1
@@ -48,6 +45,7 @@ import           Data.Text.Encoding (encodeUtf8, decodeUtf8, decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Data.Text.IO as T
 import           Data.Typeable.Internal (TypeRep(..))
+import           Data.Word (Word32)
 import           GHC.Generics (Generic)
 import           Language.Haskell.TH
 import           System.Directory
@@ -58,11 +56,6 @@ import           TH.Utilities
 
 newtype StoreVersion = StoreVersion { unStoreVersion :: BS.ByteString }
     deriving (Eq, Show, Ord, Data, Typeable, Generic, Store)
-
-data WithVersion a = WithVersion a StoreVersion
-    deriving (Eq, Show, Ord, Data, Typeable, Generic)
-
-instance Store a => Store (WithVersion a)
 
 -- | Configuration for the version checking of a particular type.
 data VersionConfig a = VersionConfig
@@ -92,13 +85,13 @@ namedVersionConfig name hash = VersionConfig
     , vcRenames = M.empty
     }
 
-wrapVersion :: Data a => VersionConfig a -> Q Exp
-wrapVersion = impl Wrap
+encodeWithVersionQ :: Data a => VersionConfig a -> Q Exp
+encodeWithVersionQ = impl Encode
 
-checkVersion :: Data a => VersionConfig a -> Q Exp
-checkVersion = impl Check
+decodeWithVersionQ :: Data a => VersionConfig a -> Q Exp
+decodeWithVersionQ = impl Decode
 
-data WhichFunc = Wrap | Check
+data WhichFunc = Encode | Decode
 
 impl :: forall a. Data a => WhichFunc -> VersionConfig a -> Q Exp
 impl wf vc = do
@@ -131,15 +124,16 @@ impl wf vc = do
                         ", but " ++ show expectedHash ++ " is specified.\n" ++
                         "The data used to construct the hash has been written to " ++ show newPath ++
                         extraMsg ++ "\n"
+    let atype = typeRepToType (typeRep proxy)
     case wf of
-        Wrap -> [e| (\x -> (x :: $(typeRepToType (typeRep proxy))) `WithVersion` $(version)) |]
-        Check -> [e| (\(WithVersion x gotVersion) ->
-                        if gotVersion /= $(version)
-                            then Left (VersionCheckException
-                                { expectedVersion = $(version)
-                                , receivedVersion = gotVersion
-                                })
-                            else Right x) |]
+        Encode -> [e| \x -> ( getSize markEncodedVersion + getSize $(version) + getSize x
+                            , poke markEncodedVersion >> poke $(version) >> poke (x :: $(atype))) |]
+        Decode -> [e| do
+            peekMagic "version tag" markEncodedVersion
+            gotVersion <- peek
+            if gotVersion /= $(version)
+                then fail (displayVersionError $(version) gotVersion)
+                else peek :: Peek $(atype) |]
 
 {-
                             txtWithComments <- runIO $ T.readFile path
@@ -286,26 +280,11 @@ tcFun = tyConOf (Proxy :: Proxy (Int -> Int))
 tyConOf :: Typeable a => Proxy a -> TyCon
 tyConOf = typeRepTyCon . typeRep
 
-data VersionCheckException = VersionCheckException
-    { expectedVersion :: StoreVersion
-    , receivedVersion :: StoreVersion
-    } deriving
-#if MIN_VERSION_base(4,8,0)
-        (Typeable, Show)
-
-instance Exception VersionCheckException where
-    displayException = displayVCE
-#else
-        (Typeable)
-
-instance Show VersionCheckException where
-    show = displayVCE
-
-instance Exception VersionCheckException
-#endif
-
-displayVCE :: VersionCheckException -> String
-displayVCE VersionCheckException{..} =
+displayVersionError :: StoreVersion -> StoreVersion -> String
+displayVersionError expectedVersion receivedVersion =
     "Mismatch detected by Data.Store.Version - expected " ++
     T.unpack (decodeUtf8With lenientDecode (unStoreVersion expectedVersion)) ++ " but got " ++
     T.unpack (decodeUtf8With lenientDecode (unStoreVersion receivedVersion))
+
+markEncodedVersion :: Word32
+markEncodedVersion = 3908297288

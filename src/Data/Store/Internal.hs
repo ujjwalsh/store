@@ -56,6 +56,7 @@ module Data.Store.Internal
     , GStorePeek, genericPeek
     -- ** Peek utilities
     , skip, isolate
+    , peekMagic
     -- ** Static Size type
     --
     -- This portion of the library is still work-in-progress.
@@ -250,11 +251,11 @@ markMapPokedInAscendingOrder = 1217678090
 -- Throws a 'PeekException' if the value isn't present.
 peekMagic
     :: (Eq a, Show a, Store a)
-    => a -> Peek ()
-peekMagic x = do
+    => String -> a -> Peek ()
+peekMagic markedThing x = do
     x' <- peek
     when (x' /= x) $
-        fail ("Expected marker: " ++ show x ++ " but got: " ++ show x')
+        fail ("Expected marker for " ++ markedThing ++ ": " ++ show x ++ " but got: " ++ show x')
 {-# INLINE peekMagic #-}
 
 -- | Like 'sizeMap' but should only be used for ordered containers where
@@ -284,7 +285,7 @@ peekOrdMapWith
        -- 'Map.fromDistinctAscList'.
     -> Peek t
 peekOrdMapWith f = do
-    peekMagic markMapPokedInAscendingOrder
+    peekMagic "ascending Map / IntMap" markMapPokedInAscendingOrder
     f <$> peek
 {-# INLINE peekOrdMapWith #-}
 
@@ -824,4 +825,3 @@ instance Store NameFlavour where
 $(reifyManyWithoutInstances ''Store [''Info] (const True) >>=
 --   mapM (\name -> deriveStore [] (ConT name) .dtCons =<< reifyDataType name))
    mapM (\name -> return (deriveGenericInstance [] (ConT name))))
-
