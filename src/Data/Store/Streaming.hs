@@ -86,7 +86,7 @@ encodeMessage (Message x) =
 -- successfully deserialised object, or a request for more input.
 type PeekMessage i m a = FT ((->) i) m a
 
-needMoreInput :: Monad m => PeekMessage i m i
+needMoreInput :: PeekMessage i m i
 needMoreInput = wrap return
 {-# INLINE needMoreInput #-}
 
@@ -217,7 +217,7 @@ conduitEncode = C.map encodeMessage
 {-# INLINE conduitEncode #-}
 
 -- | Conduit for decoding 'Message's from 'ByteString's.
-conduitDecode :: (MonadIO m, MonadResource m, Store a)
+conduitDecode :: (MonadResource m, Store a)
               => Maybe Int
               -- ^ Initial length of the 'ByteBuffer' used for
               -- buffering the incoming 'ByteString's.  If 'Nothing',
