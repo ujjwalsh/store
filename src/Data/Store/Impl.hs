@@ -90,26 +90,22 @@ class Store a where
 -- this package) combined with auomatic definition of instances.
 encode :: Store a => a -> BS.ByteString
 encode x = unsafeEncodeWith (poke x) (getSize x)
-{-# INLINE encode #-}
 
 -- | Decodes a value from a 'BS.ByteString'. Returns an exception if
 -- there's an error while decoding, or if decoding undershoots /
 -- overshoots the end of the buffer.
 decode :: Store a => BS.ByteString -> Either PeekException a
 decode = unsafePerformIO . try . decodeIO
-{-# INLINE decode #-}
 
 -- | Decodes a value from a 'BS.ByteString', potentially throwing
 -- exceptions. It is an exception to not consume all input.
 decodeEx :: Store a => BS.ByteString -> a
 decodeEx = unsafePerformIO . decodeIO
-{-# INLINE decodeEx #-}
 
 -- | Decodes a value from a 'BS.ByteString', potentially throwing
 -- exceptions. It is an exception to not consume all input.
 decodeIO :: Store a => BS.ByteString -> IO a
 decodeIO = decodeIOWith peek
-{-# INLINE decodeIO #-}
 
 ------------------------------------------------------------------------
 -- Size

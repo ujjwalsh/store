@@ -80,7 +80,6 @@ encodeMessage (Message x) =
         poke messageMagic
         poke bodyLength
         poke x
-{-# INLINE encodeMessage #-}
 
 -- | The result of peeking at the next message can either be a
 -- successfully deserialised object, or a request for more input.
@@ -88,7 +87,6 @@ type PeekMessage i m a = FT ((->) i) m a
 
 needMoreInput :: PeekMessage i m i
 needMoreInput = wrap return
-{-# INLINE needMoreInput #-}
 
 -- | Given some sort of input, fills the 'ByteBuffer' with it.
 --
@@ -100,7 +98,6 @@ type FillByteBuffer i m = ByteBuffer -> Int -> i -> m ()
 -- up the encoded message.
 decodeFromPtr :: (MonadIO m, Store a) => Ptr Word8 -> Int -> m a
 decodeFromPtr ptr n = liftIO $ decodeIOWithFromPtr peek ptr n
-{-# INLINE decodeFromPtr #-}
 
 peekSized :: (MonadIO m, Store a) => FillByteBuffer i m -> ByteBuffer -> Int -> PeekMessage i m a
 peekSized fill bb n = go
@@ -113,7 +110,6 @@ peekSized fill bb n = go
           lift (fill bb needed inp)
           go
         Right ptr -> decodeFromPtr ptr n
-{-# INLINE peekSized #-}
 
 -- | Read and check the magic number from a 'ByteBuffer'
 peekMessageMagic :: MonadIO m => FillByteBuffer i m -> ByteBuffer -> PeekMessage i m ()
@@ -122,12 +118,10 @@ peekMessageMagic fill bb =
       mm | mm == messageMagic -> return ()
       mm -> liftIO . throwIO $ PeekException 0 . T.pack $
           "Wrong message magic, " ++ show mm
-{-# INLINE peekMessageMagic #-}
 
 -- | Decode a 'SizeTag' from a 'ByteBuffer'.
 peekMessageSizeTag :: MonadIO m => FillByteBuffer i m -> ByteBuffer -> PeekMessage i m SizeTag
 peekMessageSizeTag fill bb = peekSized fill bb sizeTagLength
-{-# INLINE peekMessageSizeTag #-}
 
 -- | Decode some object from a 'ByteBuffer', by first reading its
 -- header, and then the actual data.
@@ -136,7 +130,6 @@ peekMessage fill bb =
   fmap Message $ do
     peekMessageMagic fill bb
     peekMessageSizeTag fill bb >>= peekSized fill bb
-{-# INLINE peekMessage #-}
 
 -- | Decode a 'Message' from a 'ByteBuffer' and an action that can get
 -- additional inputs to refill the buffer when necessary.
@@ -165,18 +158,15 @@ decodeMessage fill bb getInp =
       return Nothing
   where
     maybeDecode m = runMaybeT (iterTM (\consumeInp -> consumeInp =<< MaybeT getInp) m)
-{-# INLINE decodeMessage #-}
 
 -- | Decode some 'Message' from a 'ByteBuffer', by first reading its
 -- header, and then the actual 'Message'.
 peekMessageBS :: (MonadIO m, Store a) => ByteBuffer -> PeekMessage ByteString m (Message a)
 peekMessageBS = peekMessage (\bb _ bs -> BB.copyByteString bb bs)
-{-# INLINE peekMessageBS #-}
 
 decodeMessageBS :: (MonadIO m, Store a)
             => ByteBuffer -> m (Maybe ByteString) -> m (Maybe (Message a))
 decodeMessageBS = decodeMessage (\bb _ bs -> BB.copyByteString bb bs)
-{-# INLINE decodeMessageBS #-}
 
 #ifndef mingw32_HOST_OS
 
@@ -193,7 +183,6 @@ data ReadMoreData = ReadMoreData
 peekMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> PeekMessage ReadMoreData m (Message a)
 peekMessageFd bb fd =
   peekMessage (\bb_ needed ReadMoreData -> do _ <- BB.fillFromFd bb_ fd needed; return ()) bb
-{-# INLINE peekMessageFd #-}
 
 -- | Decodes all the message using 'registerFd' to find out when a 'Socket' is
 -- ready for reading.
@@ -207,14 +196,12 @@ decodeMessageFd bb fd = do
   case mbMsg of
     Just msg -> return msg
     Nothing -> liftIO (fail "decodeMessageFd: impossible: got Nothing")
-{-# INLINE decodeMessageFd #-}
 
 #endif
 
 -- | Conduit for encoding 'Message's to 'ByteString's.
 conduitEncode :: (Monad m, Store a) => C.Conduit (Message a) m ByteString
 conduitEncode = C.map encodeMessage
-{-# INLINE conduitEncode #-}
 
 -- | Conduit for decoding 'Message's from 'ByteString's.
 conduitDecode :: (MonadResource m, Store a)
@@ -234,4 +221,3 @@ conduitDecode bufSize =
         case mmessage of
             Nothing -> return ()
             Just message -> C.yield message >> go buffer
-{-# INLINE conduitDecode #-}

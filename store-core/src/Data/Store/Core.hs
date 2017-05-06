@@ -313,7 +313,6 @@ unsafeEncodeWith f l =
                 }
         (o, ()) <- runPoke f ps 0
         checkOffset o l
-{-# INLINE unsafeEncodeWith #-}
 
 #if ALIGNED_MEMORY
 alignBufferSize :: Int
@@ -339,21 +338,18 @@ checkOffset o l
 -- consume all input.
 decodeWith :: Peek a -> ByteString -> Either PeekException a
 decodeWith mypeek = unsafePerformIO . try . decodeIOWith mypeek
-{-# INLINE decodeWith #-}
 
 -- | Decodes a value from a 'ByteString', potentially throwing
 -- exceptions, and taking a 'Peek' to run. It is an exception to not
 -- consume all input.
 decodeExWith :: Peek a -> ByteString -> a
 decodeExWith f = unsafePerformIO . decodeIOWith f
-{-# INLINE decodeExWith #-}
 
 -- | Similar to 'decodeExWith', but it allows there to be more of the
 -- buffer remaining. The 'Offset' of the buffer contents immediately
 -- after the decoded value is returned.
 decodeExPortionWith :: Peek a -> ByteString -> (Offset, a)
 decodeExPortionWith f = unsafePerformIO . decodeIOPortionWith f
-{-# INLINE decodeExPortionWith #-}
 
 -- | Decodes a value from a 'ByteString', potentially throwing
 -- exceptions, and taking a 'Peek' to run. It is an exception to not
@@ -363,7 +359,6 @@ decodeIOWith mypeek (BS.PS x s len) =
     withForeignPtr x $ \ptr0 ->
         let ptr = ptr0 `plusPtr` s
         in decodeIOWithFromPtr mypeek ptr len
-{-# INLINE decodeIOWith #-}
 
 -- | Similar to 'decodeExPortionWith', but runs in the 'IO' monad.
 decodeIOPortionWith :: Peek a -> ByteString -> IO (Offset, a)
@@ -371,7 +366,6 @@ decodeIOPortionWith mypeek (BS.PS x s len) =
     withForeignPtr x $ \ptr0 ->
         let ptr = ptr0 `plusPtr` s
         in decodeIOPortionWithFromPtr mypeek ptr len
-{-# INLINE decodeIOPortionWith #-}
 
 -- | Like 'decodeIOWith', but using 'Ptr' and length instead of a
 -- 'ByteString'.
@@ -381,7 +375,6 @@ decodeIOWithFromPtr mypeek ptr len = do
     if len /= offset
        then throwIO $ PeekException (len - offset) "Didn't consume all input."
        else return x
-{-# INLINE decodeIOWithFromPtr #-}
 
 -- | Like 'decodeIOPortionWith', but using 'Ptr' and length instead of a 'ByteString'.
 decodeIOPortionWithFromPtr :: Peek a -> Ptr Word8 -> Int -> IO (Offset, a)
@@ -399,7 +392,6 @@ decodeIOPortionWithFromPtr mypeek ptr len =
           if len > remaining -- Do not perform the check on the new pointer, since it could have overflowed
               then throwIO $ PeekException (end `minusPtr` ptr2) "Overshot end of buffer"
               else return (ptr2 `minusPtr` ptr, x')
-{-# INLINE decodeIOPortionWithFromPtr #-}
 
 ------------------------------------------------------------------------
 -- Utilities for defining 'Store' instances based on 'Storable'
@@ -486,7 +478,6 @@ pokeFromForeignPtr sourceFp sourceOffset len =
                       len
         let !newOffset = targetOffset + len
         return (newOffset, ())
-{-# INLINE pokeFromForeignPtr #-}
 
 -- | Allocate a plain ForeignPtr (no finalizers), of the specified
 -- length and fill it with bytes from the input.
@@ -503,7 +494,6 @@ peekToPlainForeignPtr ty len =
         withForeignPtr fp $ \targetPtr ->
             BS.memcpy targetPtr (castPtr sourcePtr) len
         return $ PeekResult ptr2 (castForeignPtr fp)
-{-# INLINE peekToPlainForeignPtr #-}
 
 -- | Copy a section of memory, based on a 'Ptr', to the output. Note
 -- that this operation is unsafe, because the offset and length
@@ -517,7 +507,6 @@ pokeFromPtr sourcePtr sourceOffset len =
                   len
         let !newOffset = targetOffset + len
         return (newOffset, ())
-{-# INLINE pokeFromPtr #-}
 
 -- TODO: have a safer variant with the check?
 
@@ -531,7 +520,6 @@ pokeFromByteArray sourceArr sourceOffset len =
         copyByteArrayToAddr sourceArr sourceOffset target len
         let !newOffset = targetOffset + len
         return (newOffset, ())
-{-# INLINE pokeFromByteArray #-}
 
 -- | Allocate a ByteArray of the specified length and fill it with bytes
 -- from the input.
@@ -548,7 +536,6 @@ peekToByteArray ty len =
         copyAddrToByteArray sourcePtr marr 0 len
         x <- unsafeFreezeByteArray marr
         return $ PeekResult ptr2 x
-{-# INLINE peekToByteArray #-}
 
 -- | Wrapper around @copyByteArrayToAddr#@ primop.
 copyByteArrayToAddr :: ByteArray# -> Int -> Ptr a -> Int -> IO ()
@@ -561,4 +548,3 @@ copyAddrToByteArray :: Ptr a -> MutableByteArray (PrimState IO) -> Int -> Int ->
 copyAddrToByteArray (Ptr addr) (MutableByteArray arr) (I# offset) (I# len) =
     IO (\s -> (# copyAddrToByteArray# addr arr offset len s, () #))
 {-# INLINE copyAddrToByteArray  #-}
-

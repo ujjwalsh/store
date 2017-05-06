@@ -142,7 +142,6 @@ bbHandler loc bb f = liftIO $ useBBRef f bb `catch` \(e :: SomeException) -> do
             writeIORef bb (Left $ ByteBufferException loc (show e))
         Left _ -> return ()
     throwIO e
-{-# INLINE bbHandler #-}
 
 -- | Try to use the 'BBRef' of a 'ByteBuffer', or throw a 'ByteBufferException' if it's invalid.
 useBBRef :: (BBRef -> IO a) -> ByteBuffer -> IO a
@@ -185,7 +184,6 @@ new ml = liftIO $ do
         , contained = 0
         , consumed = 0
         }
-{-# INLINE new #-}
 
 -- | Free a byte buffer.
 free :: MonadIO m => ByteBuffer -> m ()
@@ -195,7 +193,6 @@ free bb = liftIO $ readIORef bb >>= \case
         writeIORef bb $
             Left (ByteBufferException "free" "ByteBuffer has explicitly been freed and is no longer valid.")
     Left _ -> return () -- the ByteBuffer is either invalid or has already been freed.
-{-# INLINE free #-}
 
 -- | Perform some action with a bytebuffer, with automatic allocation
 -- and deallocation.
@@ -224,7 +221,6 @@ resetBBRef bbref = do
                  , consumed = 0
                  , ptr = ptr bbref
                  }
-{-# INLINE resetBBRef #-}
 
 -- | Make sure the buffer is at least @minSize@ bytes long.
 --
@@ -246,7 +242,6 @@ enlargeBBRef bbref minSize = do
                      , consumed = consumed bbref
                      , ptr = ptr'
                      }
-{-# INLINE enlargeBBRef #-}
 
 -- | Copy the contents of a 'ByteString' to a 'ByteBuffer'.
 --
@@ -277,7 +272,6 @@ copyByteString bb bs =
             , contained = contained bbref'' + bsSize
             , consumed = consumed bbref''
             , ptr = ptr bbref''}
-{-# INLINE copyByteString #-}
 
 #ifndef mingw32_HOST_OS
 
@@ -295,7 +289,6 @@ fillFromFd bb sock maxBytes = if maxBytes < 0
         (bbref', readBytes) <- fillBBRefFromFd sock bbref maxBytes
         writeIORef bb $ Right bbref'
         return readBytes
-{-# INLINE fillFromFd #-}
 
 {-
 Note: I'd like to use these two definitions:
@@ -352,7 +345,6 @@ fillBBRefFromFd (Fd sock) bbref0 maxBytes = do
           else do
             let bbref' = bbref{ contained = contained + bytes }
             go (readBytes + bytes) bbref'
-{-# INLINE fillBBRefFromFd #-}
 
 foreign import ccall unsafe "recv"
   -- c_recv returns -1 in the case of errors.
@@ -386,7 +378,6 @@ unsafeConsume bb n =
             else do
                 writeIORef bb $ Right bbref { consumed = consumed bbref + n }
                 return $ Right (ptr bbref `plusPtr` consumed bbref)
-{-# INLINE unsafeConsume #-}
 
 -- | As `unsafeConsume`, but instead of returning a `Ptr` into the
 -- contents of the `ByteBuffer`, it returns a `ByteString` containing
@@ -404,7 +395,6 @@ consume bb n = do
             bs <- liftIO $ createBS ptr n
             return (Right bs)
         Left missing -> return (Left missing)
-{-# INLINE consume #-}
 
 {-@ createBS :: p:(Ptr Word8) -> {v:Nat | v <= plen p} -> IO ByteString @-}
 createBS :: Ptr Word8 -> Int -> IO ByteString
@@ -412,7 +402,6 @@ createBS ptr n = do
   fp  <- mallocForeignPtrBytes n
   withForeignPtr fp (\p -> copyBytes p ptr n)
   return (BS.PS fp 0 n)
-{-# INLINE createBS #-}
 
 -- below are liquid haskell qualifiers, and specifications for external functions.
 

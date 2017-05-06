@@ -395,11 +395,8 @@ makeStoreInstance cs ty sizeExpr peekExpr pokeExpr =
         cs
         (AppT (ConT ''Store) ty)
         [ ValD (VarP 'size) (NormalB sizeExpr) []
-        , PragmaD (InlineP 'size Inline FunLike AllPhases)
         , ValD (VarP 'peek) (NormalB peekExpr) []
-        , PragmaD (InlineP 'peek Inline FunLike AllPhases)
         , ValD (VarP 'poke) (NormalB pokeExpr) []
-        , PragmaD (InlineP 'poke Inline FunLike AllPhases)
         ]
 
 -- TODO: either generate random types that satisfy instances with
