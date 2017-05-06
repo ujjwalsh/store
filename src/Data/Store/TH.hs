@@ -2,9 +2,9 @@
 
 -- | This module exports TH utilities intended to be useful to users.
 --
--- However, the visible exports do not show the main things that will be
--- useful, which is using TH to generate 'Store' instances, via
--- "TH.Derive".  It's used like this:
+-- 'makeStore' can be used to generate a 'Store' instance for types,
+-- when all the type variables also require 'Store' instances. If some
+-- do not, then instead use "TH.Derive" like this:
 --
 -- @
 --     data Foo = Foo Int | Bar Int
@@ -14,6 +14,9 @@
 --         |]))
 -- @
 --
+-- Note that when used with datatypes that require type variables, the
+-- ScopedTypeVariables extension is required.
+--
 -- One advantage of using this Template Haskell definition of Store
 -- instances is that in some cases they can be faster than the instances
 -- defined via Generics. Specifically, sum types which can yield
@@ -21,9 +24,9 @@
 -- The instances generated via generics always use 'VarSize' for sum
 -- types.
 module Data.Store.TH
-    (
+    ( makeStore
     -- * Testing Store instances
-      smallcheckManyStore
+    , smallcheckManyStore
     , checkRoundtrip
     , assertRoundtrip
     ) where
@@ -37,6 +40,7 @@ import Prelude
 import Test.Hspec
 import Test.Hspec.SmallCheck (property)
 import Test.SmallCheck
+import Data.Store.TH.Internal (makeStore)
 
 ------------------------------------------------------------------------
 -- Testing

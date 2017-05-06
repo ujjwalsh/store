@@ -16,6 +16,7 @@ module Data.Store.TH.Internal
     , deriveManyStorePrimVector
     , deriveManyStoreUnboxVector
     , deriveStore
+    , makeStore
     -- * Misc utilties used in Store test
     , getAllInstanceTypes1
     , isMonoType
@@ -46,13 +47,25 @@ import           Prelude
 import           Safe (headMay)
 import           TH.Derive (Deriver(..))
 import           TH.ReifySimple
-import           TH.Utilities (expectTyCon1, dequalify, plainInstanceD)
+import           TH.Utilities (expectTyCon1, dequalify, plainInstanceD, appsT)
 
 instance Deriver (Store a) where
     runDeriver _ preds ty = do
         argTy <- expectTyCon1 ''Store ty
         dt <- reifyDataTypeSubstituted argTy
         (:[]) <$> deriveStore preds argTy (dtCons dt)
+
+-- | Given the name of a type, generate a Store instance for it,
+-- assuming that all type variables also need to be Store instances.
+--
+-- Note that when used with datatypes that require type variables, the
+-- ScopedTypeVariables extension is required.
+makeStore :: Name -> Q [Dec]
+makeStore name = do
+    dt <- reifyDataType name
+    preds <- mapM (\tv -> [t| Store $(varT tv) |]) (dtTvs dt)
+    let argTy = appsT (ConT name) (map VarT (dtTvs dt))
+    (:[]) <$> deriveStore preds argTy (dtCons dt)
 
 deriveStore :: Cxt -> Type -> [DataCon] -> Q Dec
 deriveStore preds headTy cons0 =
