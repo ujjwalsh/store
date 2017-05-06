@@ -1,6 +1,11 @@
 # ChangeLog
 
-## 0.4 (unreleased)
+## 0.4.1
+
+* Less aggressive inlining, resulting in faster compilation / simplifier
+  not running out of ticks
+
+## 0.4
 
 * Changes result of Peek function to be strict.
   (See [#98](https://github.com/fpco/store/pull/98))

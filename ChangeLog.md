@@ -1,5 +1,14 @@
 # ChangeLog
 
+## 0.4.3
+
+* Less aggressive inlining, resulting in faster compilation / simplifier
+  not running out of ticks
+
+## 0.4.2
+
+* Fixed testsuite
+
 ## 0.4.1
 
 * Breaking change in the encoding of Map / Set / IntMap / IntSet,
