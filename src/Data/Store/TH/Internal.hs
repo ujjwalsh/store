@@ -63,8 +63,8 @@ instance Deriver (Store a) where
 makeStore :: Name -> Q [Dec]
 makeStore name = do
     dt <- reifyDataType name
-    preds <- mapM (\tv -> [t| Store $(varT tv) |]) (dtTvs dt)
-    let argTy = appsT (ConT name) (map VarT (dtTvs dt))
+    let preds = map (storePred . VarT) (dtTvs dt)
+        argTy = appsT (ConT name) (map VarT (dtTvs dt))
     (:[]) <$> deriveStore preds argTy (dtCons dt)
 
 deriveStore :: Cxt -> Type -> [DataCon] -> Q Dec
@@ -257,16 +257,10 @@ instance Store Bar where
 
 deriveTupleStoreInstance :: Int -> Dec
 deriveTupleStoreInstance n =
-    deriveGenericInstance (map storeCxt tvs)
+    deriveGenericInstance (map storePred tvs)
                           (foldl1 AppT (TupleT n : tvs))
   where
     tvs = take n (map (VarT . mkName . (:[])) ['a'..'z'])
-    storeCxt ty =
-#if MIN_VERSION_template_haskell(2,10,0)
-        AppT (ConT ''Store) ty
-#else
-        ClassP ''Store [ty]
-#endif
 
 deriveGenericInstance :: Cxt -> Type -> Dec
 deriveGenericInstance cs ty = plainInstanceD cs (AppT (ConT ''Store) ty) []
@@ -350,12 +344,6 @@ deriveManyStoreUnboxVector = do
                     concatMap (map snd . dcFields) cons
             -}
             let extraPreds = map (storePred . AppT (ConT ''UV.Vector)) $ listify isVarT ty
-                storePred =
-#if MIN_VERSION_template_haskell(2,10,0)
-                    AppT (ConT ''Store)
-#else
-                    ClassP ''Store . (:[])
-#endif
             deriveStore (nub (preds ++ extraPreds)) ty cons
         _ -> fail "impossible case in deriveManyStoreUnboxVector"
 
@@ -437,3 +425,11 @@ getTyHead (SigT x _) = getTyHead x
 getTyHead (ForallT _ _ x) = getTyHead x
 getTyHead (AppT l _) = getTyHead l
 getTyHead x = x
+
+storePred :: Type -> Pred
+storePred ty =
+#if MIN_VERSION_template_haskell(2,10,0)
+        AppT (ConT ''Store) ty
+#else
+        ClassP ''Store [ty]
+#endif
