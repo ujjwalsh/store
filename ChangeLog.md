@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 0.4.3.1
+
+* Fixed compilation on GHC 7.8
+
 ## 0.4.3
 
 * Less aggressive inlining, resulting in faster compilation / simplifier
