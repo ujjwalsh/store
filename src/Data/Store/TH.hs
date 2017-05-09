@@ -7,10 +7,16 @@
 -- do not, then instead use "TH.Derive" like this:
 --
 -- @
---     data Foo = Foo Int | Bar Int
+--     {-# LANGUAGE TemplateHaskell #-}
+--     {-# LANGUAGE ScopedTypeVariables #-}
+--
+--     import TH.Derive
+--     import Data.Store
+--
+--     data Foo a = Foo a | Bar Int
 --
 --     $($(derive [d|
---         instance Deriving (Store Foo)
+--         instance Store a => Deriving (Store (Foo a))
 --         |]))
 -- @
 --
