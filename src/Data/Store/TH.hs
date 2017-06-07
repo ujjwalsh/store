@@ -7,8 +7,8 @@
 -- do not, then instead use "TH.Derive" like this:
 --
 -- @
---     {-# LANGUAGE TemplateHaskell #-}
---     {-# LANGUAGE ScopedTypeVariables #-}
+--     \{\-\# LANGUAGE TemplateHaskell \#\-\}
+--     \{\-\# LANGUAGE ScopedTypeVariables \#\-\}
 --
 --     import TH.Derive
 --     import Data.Store
