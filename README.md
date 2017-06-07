@@ -15,7 +15,7 @@ libraries:
   the default, so that the most common endianness has no overhead.
 
 * Instead of implementing lazy serialization / deserialization involving
-  multiple input / output buffers, `peek` an `poke` always work with a single
+  multiple input / output buffers, `peek` and `poke` always work with a single
   buffer. This buffer is allocated by asking the value for its size before
   encoding. This simplifies the encoding logic, and allows for highly optimized
   tight loops.
