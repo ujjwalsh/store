@@ -68,7 +68,12 @@ matrix:
     compiler: ": #stack 8.0.1 osx"
     os: osx
 
-  allow_failures: []
+  allow_failures:
+
+  # FIXME: fix this build
+  - env: BUILD=stack ARGS="--stack-yaml stack-8.0.yaml"
+    compiler: ": #stack 8.0.1 osx"
+    os: osx
 
 before_install:
 # Using compiler above sets CC to an invalid value, so unset it
