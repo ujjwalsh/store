@@ -147,6 +147,7 @@ test-suite store-test
     , store
   other-modules:
       Data.Store.StreamingSpec
+      Data.Store.UntrustedSpec
       Data.StoreSpec
       Data.StoreSpec.TH
       System.IO.ByteBufferSpec
