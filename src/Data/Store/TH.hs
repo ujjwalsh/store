@@ -15,7 +15,7 @@
 --
 -- data Foo a = Foo a | Bar Int
 --
--- $($(derive [d|
+-- \$($(derive [d|
 --     instance Store a => Deriving (Store (Foo a))
 --     |]))
 -- @
