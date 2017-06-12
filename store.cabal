@@ -145,8 +145,10 @@ test-suite store-test
     , async >=2.0.2
     , contravariant >=1.3
     , store
+    , bifunctors
   other-modules:
       Data.Store.StreamingSpec
+      Data.Store.UntrustedSpec
       Data.StoreSpec
       Data.StoreSpec.TH
       System.IO.ByteBufferSpec
