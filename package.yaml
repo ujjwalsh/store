@@ -78,7 +78,7 @@ dependencies:
   - streaming-commons >=0.1.10.0
   - async >=2.0.2
   - contravariant >=1.3
-  - bifunctors >= 5.0
+  - bifunctors >=4.0
 library:
   source-dirs: src
   other-modules:
