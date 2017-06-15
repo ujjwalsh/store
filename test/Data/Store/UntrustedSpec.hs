@@ -39,12 +39,11 @@ spec =
                         (shouldBeRightWrong huge (sample :: L.ByteString))
                     it "Text" (shouldBeRightWrong huge (sample :: Text))
                     it "String" (shouldBeRightWrong huge (sample :: String))
-                    {- FIXME: These do too much allocation.
                     it "Vector Int" (shouldBeRightWrong huge (V.fromList list))
                     it
                         "Vector Char"
                         (shouldBeRightWrong huge (V.fromList sample))
-                    -}
+                    it "Vector unit" (shouldBeRightWrong huge (V.fromList (replicate 1000 ())))
                     it "Seq Int"
                         (shouldBeRightWrong huge (Seq.fromList sample)))
             describe
@@ -65,7 +64,8 @@ spec =
                              (Left ()))))
 
 huge :: Int64
-huge = 2^62
+huge = 2^(62::Int)
+
 
 -- | Check decode.encode==id and then check decode.badencode=>error.
 shouldBeRightWrong
