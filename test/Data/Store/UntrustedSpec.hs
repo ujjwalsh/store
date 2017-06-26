@@ -50,13 +50,13 @@ spec =
                     it "Vector Int" (shouldBeRightWrong huge (V.fromList list))
                     it
                         "Vector Char"
-                        (shouldBeRightWrong huge (V.fromList sample))
+                        (shouldBeRightWrong huge (V.fromList (sample :: [Char])))
                     it
                         "Vector unit"
                         (shouldBeRightWrong
                              huge
                              (V.fromList (replicate 1000 ())))
-                    it "Seq Int" (shouldBeRightWrong huge (Seq.fromList sample)))
+                    it "Seq Int" (shouldBeRightWrong huge (Seq.fromList (sample :: [Char]))))
             describe
                 "Maps are consistent"
                 (do it
