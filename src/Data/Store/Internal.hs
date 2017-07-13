@@ -107,7 +107,7 @@ import qualified Data.Text.Array as TA
 import qualified Data.Text.Foreign as T
 import qualified Data.Text.Internal as T
 import qualified Data.Time as Time
-import           Data.Typeable.Internal (Typeable)
+import           Data.Typeable (Typeable)
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable as SV
