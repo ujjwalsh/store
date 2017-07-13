@@ -44,7 +44,6 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8, decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Data.Text.IO as T
-import           Data.Typeable.Internal (TypeRep(..))
 import           Data.Word (Word32)
 import           GHC.Generics (Generic)
 import           Language.Haskell.TH
@@ -230,12 +229,9 @@ getStructureInfo' ignore renames _ = do
                 return (error "unexpected evaluation")
 
 showsQualTypeRep :: M.Map String String -> Int -> TypeRep -> ShowS
-#if MIN_VERSION_base(4,8,0)
-showsQualTypeRep renames p (TypeRep _ tycon _ tys) =
-#else
-showsQualTypeRep renames p (TypeRep _ tycon tys) =
-#endif
-    case tys of
+showsQualTypeRep renames p tyrep =
+  let (tycon, tys) = splitTyConApp tyrep
+  in case tys of
         [] -> showsQualTyCon renames tycon
         [x] | tycon == tcList -> showChar '[' . showsQualTypeRep renames 0 x . showChar ']'
           where
