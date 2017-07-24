@@ -8,17 +8,15 @@ import           Control.Concurrent (threadDelay)
 import           Control.Concurrent.Async (race, concurrently)
 import           Control.Concurrent.MVar
 import           Control.Exception (try)
-import           Control.Monad (void, (<=<), forM_, unless)
+import           Control.Monad (void, (<=<), forM_)
 import           Control.Monad.Trans.Free (runFreeT, FreeF(..))
 import           Control.Monad.Trans.Free.Church (fromFT)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString as BS
 import           Data.Conduit ((=$=), ($$))
 import qualified Data.Conduit.List as C
-import           Data.Int
 import           Data.List (unfoldr)
 import           Data.Monoid
-import           Data.Store.Core (unsafeEncodeWith)
 import           Data.Store.Internal
 import           Data.Store.Streaming
 import           Data.Store.Streaming.Internal
@@ -164,8 +162,8 @@ withServer cont = do
   return x
 
 decodeTricklingMessageFd :: Integer -> Property IO
-decodeTricklingMessageFd x = monadic $ do
-  let bs = encodeMessage (Message x)
+decodeTricklingMessageFd v = monadic $ do
+  let bs = encodeMessage (Message v)
   BB.with Nothing $ \bb ->
     withServer $ \sock1 sock2 -> do
       let generateChunks :: [Int] -> BS.ByteString -> [BS.ByteString]
@@ -175,12 +173,12 @@ decodeTricklingMessageFd x = monadic $ do
               then []
               else BS.take x bs_ : generateChunks xs (BS.drop x bs_)
       let chunks = generateChunks [] bs
-      ((), Message x') <- concurrently
+      ((), Message v') <- concurrently
         (forM_ chunks $ \chunk -> do
           void (send sock1 chunk)
           threadDelay (10 * 1000))
         (decodeMessageFd bb (socketFd sock2))
-      return (x == x')
+      return (v == v')
 
 #endif
 
