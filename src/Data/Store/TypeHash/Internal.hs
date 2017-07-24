@@ -78,6 +78,9 @@ reifyManyTyDecls f = reifyMany go
     go (_, ClassOpI{}) = return (False, [])
     go (_, VarI{}) = return (False, [])
     go (_, TyVarI{}) = return (False, [])
+#if MIN_VERSION_template_haskell(2,12,0)
+    go (_, PatSynI{}) = return (False, [])
+#endif
 
 -- | At compiletime, this yields a hash of the specified datatypes.
 -- Not only does this cover the datatypes themselves, but also all
