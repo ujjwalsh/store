@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans -fno-warn-deprecations #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -10,6 +10,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MonoLocalBinds #-}
 module Data.StoreSpec where
 
 import           Control.Applicative
@@ -32,7 +33,6 @@ import           Data.Map (Map)
 import           Data.Monoid
 import           Data.Primitive.Types (Addr)
 import           Data.Proxy (Proxy(..))
-import           Data.Ratio (numerator, denominator)
 import           Data.Sequence (Seq)
 import           Data.Sequences (fromList)
 import           Data.Set (Set)
@@ -61,6 +61,7 @@ import           GHC.Real (Ratio(..))
 import           Language.Haskell.TH
 import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
+import           Network.Socket
 import           Prelude
 import           System.Posix.Types
 import           Test.Hspec hiding (runIO)
@@ -82,12 +83,21 @@ $(mkManyHasTypeHash [ [t| Int32 |] ])
 -- Serial instances for (Num a, Bounded a) types. Only really
 -- appropriate for the use here.
 
+instance Bounded PortNumber where
+  minBound = 0
+  maxBound = 65535
+
 $(do let ns = [ ''CWchar, ''CUShort, ''CULong, ''CULLong, ''CIntMax
               , ''CUIntMax, ''CPtrdiff, ''CSChar, ''CShort, ''CUInt, ''CLLong
               , ''CLong, ''CInt, ''CChar, ''CSsize, ''CPid
               , ''COff, ''CMode, ''CIno, ''CDev
               , ''Word8, ''Word16, ''Word32, ''Word64, ''Word
               , ''Int8, ''Int16, ''Int32, ''Int64
+              , ''PortNumber
+#if MIN_VERSION_base(4,10,0)
+              , ''CBool, ''CClockId, ''CKey, ''CId
+              , ''CBlkSize, ''CFsBlkCnt, ''CFsFilCnt, ''CBlkCnt
+#endif
               ] ++
 #ifdef mingw32_HOST_OS
               []
@@ -279,6 +289,9 @@ spec = do
                  , [t| TypeHash |]
                  , [t| Fd |]
                  , [t| NameFlavour |]
+#if MIN_VERSION_base(4,10,0)
+                 , [t| CTimer |]
+#endif
                  ]
              let f ty = isMonoType ty && ty `notElem` omitTys
              smallcheckManyStore verbose 2 . map return . filter f $ insts)

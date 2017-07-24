@@ -115,6 +115,7 @@ import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import           Data.Void
 import           Data.Word
+import           Foreign.C.Types ()
 import           Foreign.Ptr (plusPtr, minusPtr)
 import           Foreign.Storable (Storable, sizeOf)
 import           GHC.Generics (Generic)
@@ -127,6 +128,7 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.Instances ()
 import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
+import           Network.Socket (AddrInfo)
 import           Prelude
 import           TH.Derive
 
@@ -747,7 +749,28 @@ $(return $ map deriveTupleStoreInstance [2..7])
 
 $(deriveManyStoreUnboxVector)
 
-$(deriveManyStoreFromStorable (\_ -> True))
+$(deriveManyStoreFromStorable
+  -- TODO: Figure out why on GHC-8.2.1 this internal datatype is visible
+  -- in the instances of Storable. Here's a gist of an attempt at
+  -- debugging the issue:
+  --
+  -- https://gist.github.com/mgsloan/a7c416b961015949d3b5674ce053bbf6
+  --
+  -- The mysterious thing is why this is happening despite not having a
+  -- direct import of Data.Text.Encoding.
+  (\ty ->
+    case ty of
+      ConT n | nameModule n == Just "Data.Text.Encoding"
+            && nameBase n == "DecoderState" -> False
+      ConT n | nameModule n == Just "Data.Text.Encoding"
+            && nameBase n == "CodePoint" -> False
+      ConT n | nameModule n == Just "Network.Socket.Types"
+            && nameBase n == "In6Addr" -> False
+      -- AddrInfo's Storable instance is lossy, so avoid having a Store
+      -- instance for it.
+      ConT n | n == ''AddrInfo -> False
+      _ -> True
+    ))
 
 $(deriveManyStorePrimVector)
 
