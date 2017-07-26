@@ -2,8 +2,6 @@ resolver: lts-2.22
 packages:
 - .
 - store-core
-- location: deps/weigh
-  extra-dep: true
 extra-deps:
 - fail-4.9.0.0
 - th-lift-instances-0.1.4
@@ -13,3 +11,4 @@ extra-deps:
 - base-orphans-0.5.4
 - cereal-vector-0.2.0.1
 - ghc-heap-view-0.5.4
+- weigh-0.0.4

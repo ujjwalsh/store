@@ -2,12 +2,11 @@ resolver: nightly-2016-05-27
 packages:
 - .
 - store-core
-- location: deps/weigh
-  extra-dep: true
 extra-deps:
 - th-utilities-0.2.0.1
 - hspec-smallcheck-0.4.1
 - mono-traversable-0.10.2
 - dlist-instances-0.1
 - cereal-vector-0.2.0.1
+- weigh-0.0.4
 allow-newer: true
