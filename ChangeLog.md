@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 0.4.3.2
+
+* Buildable with GHC 8.2
+
 ## 0.4.3.1
 
 * Fixed compilation on GHC 7.8
