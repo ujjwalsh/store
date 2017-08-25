@@ -5,6 +5,8 @@
 * Adds some protection against untrusted input using lots of
   memory. See [#108](https://github.com/fpco/store/pull/108)
 
+## 0.4.3.2
+
 * Buildable with GHC 8.2
 
 * Fix to haddock formatting of Data.Store.TH code example
