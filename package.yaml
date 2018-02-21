@@ -87,7 +87,6 @@ tests:
     source-dirs: test
     main: Spec.hs
     other-modules:
-      - Data.Store.StreamingSpec
       - Data.Store.UntrustedSpec
       - Data.StoreSpec
       - Data.StoreSpec.TH
