@@ -317,32 +317,15 @@ pokeListLikeFoldable x = do
 -- function for initializing the sequence and a function for mutating an
 -- element at a particular index.
 peekMutableSequence
-    :: forall a r. Store a
-    => String -- ^ type
-    -> (Int -> IO r)
+    :: Store a
+    => (Int -> IO r)
     -> (r -> Int -> a -> IO ())
     -> Peek r
-peekMutableSequence ty new write = do
-    n :: Int <- peek
-    let minBufferSize :: Integer
-        minBufferSize =
-          case size :: Size a of
-            VarSize _ -> fromIntegral n -- minimum bound, assume 1 byte
-            ConstSize x -> fromIntegral n * fromIntegral x
-    remaining <-
-      Peek $ \ps sourcePtr ->
-      return $ PeekResult sourcePtr (peekStateEndPtr ps `minusPtr` sourcePtr)
-    when (minBufferSize > fromIntegral remaining) $
-      liftIO (tooManyBytes (fromIntegral minBufferSize) remaining ty)
-    case (size :: Size a) of
-      ConstSize 0 | n > maxNullaryVectorSize ->
-                    liftIO (throwIO $ PeekException remaining $ T.pack $
-                             "Max nullary vector size.")
-      _ -> return ()
+peekMutableSequence new write = do
+    n <- peek
     mut <- liftIO (new n)
     forM_ [0..n-1] $ \i -> peek >>= liftIO . write mut i
     return mut
-  where maxNullaryVectorSize = 4096
 {-# INLINE peekMutableSequence #-}
 
 ------------------------------------------------------------------------
@@ -379,7 +362,7 @@ isolate len m = Peek $ \ps ptr -> do
 instance Store a => Store (V.Vector a) where
     size = sizeSequence
     poke = pokeSequence
-    peek = V.unsafeFreeze =<< peekMutableSequence "Data.Vector.Vector" MV.new MV.write
+    peek = V.unsafeFreeze =<< peekMutableSequence MV.new MV.write
 
 instance Storable a => Store (SV.Vector a) where
     size = VarSize $ \x ->
