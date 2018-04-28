@@ -50,8 +50,8 @@ import           Data.ByteString (ByteString)
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as C
 import           Data.Store
-import           Data.Store.Impl (getSize)
 import           Data.Store.Core (decodeIOWithFromPtr, unsafeEncodeWith)
+import           Data.Store.Internal (getSize)
 import qualified Data.Text as T
 import           Data.Word
 import           Foreign.Ptr

@@ -1,3 +1,5 @@
+# store-streaming was forked from store-0.4.3.3
+
 name: store-streaming
 version: "0.1.0.0"
 synopsis: Streaming interfaces for `store`
@@ -8,33 +10,25 @@ github: fpco/store
 category: Serialization, Data
 extra-source-files:
   - ChangeLog.md
-  - README.md
-flags:
-  comparison-bench:
-    default: false
-    manual: true
-
-  small-bench:
-    default: false
-    manual: true
 
 ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2
 
-
 dependencies:
 # Meaningful constraints.
+  - async >=2.0.2
   - base >=4.7 && <5
-# Forked store-streaming from store-0.4.3.3  
-  - store >= 0.4.3.4
-  - bytestring >=0.10.4.0  
+  - bytestring >=0.10.4.0
   - conduit >=1.2.3.1
+  - free >=4.11
+  - resourcet >=1.1.9
+  - store >=0.4.3.4
+  - store-core >=0.4.1
   - streaming-commons >=0.1.10.0
   - text >=1.2.0.4
-  - async >=2.0.2  
+  - transformers >=0.3.0.0
 
 library:
   source-dirs: src
-
 
 tests:
   store-test:
@@ -46,4 +40,3 @@ tests:
     dependencies:
       - store
       - store-streaming
-
