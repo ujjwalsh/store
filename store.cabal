@@ -208,7 +208,6 @@ test-suite store-weigh
     , bifunctors >=4.0
     , store
     , weigh
-    , criterion
     , cereal
     , cereal-vector
     , vector-binary-instances
