@@ -2,6 +2,7 @@ resolver: nightly-2016-05-27
 packages:
 - .
 - store-core
+- store-streaming
 extra-deps:
 - th-utilities-0.2.0.1
 - hspec-smallcheck-0.4.1
