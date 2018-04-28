@@ -15,7 +15,7 @@ module Data.Store.Core
       Poke(..), PokeException(..), pokeException
     , Peek(..), PeekResult(..), PeekException(..), peekException, tooManyBytes
     , PokeState, pokeStatePtr, unsafeMakePokeState
-    , PeekState, peekStateEndPtr
+    , PeekState, peekStateEndPtr, unsafeMakePeekState
     , Offset
       -- * Encode ByteString
     , unsafeEncodeWith
@@ -138,17 +138,21 @@ newtype PokeState = PokeState
     }
 #endif
 
--- | Make a 'PokeState' from a buffer pointer and, if built with the
--- 'force-alignment' flag, a pointer to scratch space used during unaligned
--- writes.
-#if ALIGNED_MEMORY
+-- | Make a 'PokeState' from a buffer pointer.
+--
+-- The first argument is a pointer to the memory to write to. The second
+-- argument is an IO action which is invoked if the store package was
+-- built with the 'force-alignment' flag. The action should yield a
+-- pointer to scratch memory as large as 'alignBufferSize' (currently 32
+-- bytes).
 unsafeMakePokeState :: Ptr Word8 -- ^ pokeStatePtr
-                    -> Ptr Word8 -- ^ pokeStateAlignPtr
-                    -> PokeState
+                    -> IO (Ptr Word8) -- ^ action to produce pokeStateAlignPtr
+                    -> IO PokeState
+#if ALIGNED_MEMORY
+unsafeMakePokeState ptr f = PokeState ptr =<< f
 #else
-unsafeMakePokeState :: Ptr Word8 -> PokeState
+unsafeMakePokeState ptr _ = return $ PokeState ptr
 #endif
-unsafeMakePokeState = PokeState
 
 -- | Exception thrown while running 'poke'. Note that other types of
 -- exceptions could also be thrown. Invocations of 'fail' in the 'Poke'
@@ -253,6 +257,22 @@ data PeekState = PeekState
 #else
 newtype PeekState = PeekState
     { peekStateEndPtr :: Ptr Word8 }
+#endif
+
+-- | Make a 'PeekState' from a buffer pointer.
+--
+-- The first argument is a pointer to the memory to write to. The second
+-- argument is an IO action which is invoked if the store package was
+-- built with the 'force-alignment' flag. The action should yield a
+-- pointer to scratch memory as large as 'alignBufferSize' (currently 32
+-- bytes).
+unsafeMakePeekState :: Ptr Word8 -- ^ peekStateEndPtr
+                    -> IO (Ptr Word8) -- ^ action to produce peekStateAlignPtr
+                    -> IO PeekState
+#if ALIGNED_MEMORY
+unsafeMakePeekState ptr f = PeekState ptr =<< f
+#else
+unsafeMakePeekState ptr _ = return $ PeekState ptr
 #endif
 
 -- | Exception thrown while running 'peek'. Note that other types of
