@@ -14,7 +14,7 @@ module Data.Store.Core
     ( -- * Core Types
       Poke(..), PokeException(..), pokeException
     , Peek(..), PeekResult(..), PeekException(..), peekException, tooManyBytes
-    , PokeState, pokeStatePtr
+    , PokeState, pokeStatePtr, unsafeMakePokeState
     , PeekState, peekStateEndPtr
     , Offset
       -- * Encode ByteString
@@ -137,6 +137,18 @@ newtype PokeState = PokeState
     { pokeStatePtr :: Ptr Word8
     }
 #endif
+
+-- | Make a 'PokeState' from a buffer pointer and, if built with the
+-- 'force-alignment' flag, a pointer to scratch space used during unaligned
+-- writes.
+#if ALIGNED_MEMORY
+unsafeMakePokeState :: Ptr Word8 -- ^ pokeStatePtr
+                    -> Ptr Word8 -- ^ pokeStateAlignPtr
+                    -> PokeState
+#else
+unsafeMakePokeState :: Ptr Word8 -> PokeState
+#endif
+unsafeMakePokeState = PokeState
 
 -- | Exception thrown while running 'poke'. Note that other types of
 -- exceptions could also be thrown. Invocations of 'fail' in the 'Poke'
