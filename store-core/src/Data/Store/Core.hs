@@ -14,8 +14,8 @@ module Data.Store.Core
     ( -- * Core Types
       Poke(..), PokeException(..), pokeException
     , Peek(..), PeekResult(..), PeekException(..), peekException, tooManyBytes
-    , PokeState, pokeStatePtr, unsafeMakePokeState
-    , PeekState, peekStateEndPtr, unsafeMakePeekState
+    , PokeState, pokeStatePtr
+    , PeekState, peekStateEndPtr
     , Offset
       -- * Encode ByteString
     , unsafeEncodeWith
@@ -30,6 +30,8 @@ module Data.Store.Core
     , pokeFromForeignPtr, peekToPlainForeignPtr, pokeFromPtr
       -- * ByteArray
     , pokeFromByteArray, peekToByteArray
+      -- * Creation of PokeState / PeekState
+    , unsafeMakePokeState, unsafeMakePeekState, maybeAlignmentBufferSize
     ) where
 
 import           Control.Applicative
@@ -141,10 +143,9 @@ newtype PokeState = PokeState
 -- | Make a 'PokeState' from a buffer pointer.
 --
 -- The first argument is a pointer to the memory to write to. The second
--- argument is an IO action which is invoked if the store package was
--- built with the 'force-alignment' flag. The action should yield a
--- pointer to scratch memory as large as 'alignBufferSize' (currently 32
--- bytes).
+-- argument is an IO action which is invoked if the store-core package
+-- was built with the @force-alignment@ flag. The action should yield a
+-- pointer to scratch memory as large as 'maybeAlignmentBufferSize'.
 unsafeMakePokeState :: Ptr Word8 -- ^ pokeStatePtr
                     -> IO (Ptr Word8) -- ^ action to produce pokeStateAlignPtr
                     -> IO PokeState
@@ -262,10 +263,9 @@ newtype PeekState = PeekState
 -- | Make a 'PeekState' from a buffer pointer.
 --
 -- The first argument is a pointer to the memory to write to. The second
--- argument is an IO action which is invoked if the store package was
--- built with the 'force-alignment' flag. The action should yield a
--- pointer to scratch memory as large as 'alignBufferSize' (currently 32
--- bytes).
+-- argument is an IO action which is invoked if the store-core package
+-- was built with the @force-alignment@ flag. The action should yield a
+-- pointer to scratch memory as large as 'maybeAlignmentBufferSize'.
 unsafeMakePeekState :: Ptr Word8 -- ^ peekStateEndPtr
                     -> IO (Ptr Word8) -- ^ action to produce peekStateAlignPtr
                     -> IO PeekState
@@ -349,6 +349,18 @@ unsafeEncodeWith f l =
 #if ALIGNED_MEMORY
 alignBufferSize :: Int
 alignBufferSize = 32
+#endif
+
+-- | If store-core is built with the @force-alignment@ flag, then this
+-- will be a 'Just' value indicating the amount of memory that is
+-- expected in the alignment buffer used by 'PeekState' and 'PokeState'.
+-- Currently this will either be @Just 32@ or @Nothing@.
+maybeAlignmentBufferSize :: Maybe Int
+maybeAlignmentBufferSize =
+#if ALIGNED_MEMORY
+  Just alignBufferSize
+#else
+  Nothing
 #endif
 
 -- | Checks if the offset matches the expected length, and throw a
