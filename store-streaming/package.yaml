@@ -1,0 +1,49 @@
+name: store-streaming
+version: "0.1.0.0"
+synopsis: Streaming interfaces for `store`
+maintainer: Michael Sloan <sloan@fpcomplete.com>
+license: MIT
+copyright: 2016 FP Complete
+github: fpco/store
+category: Serialization, Data
+extra-source-files:
+  - ChangeLog.md
+  - README.md
+flags:
+  comparison-bench:
+    default: false
+    manual: true
+
+  small-bench:
+    default: false
+    manual: true
+
+ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2
+
+
+dependencies:
+# Meaningful constraints.
+  - base >=4.7 && <5
+# Forked store-streaming from store-0.4.3.3  
+  - store >= 0.4.3.4
+  - bytestring >=0.10.4.0  
+  - conduit >=1.2.3.1
+  - streaming-commons >=0.1.10.0
+  - text >=1.2.0.4
+  - async >=2.0.2  
+
+library:
+  source-dirs: src
+
+
+tests:
+  store-test:
+    source-dirs: test
+    main: Spec.hs
+    other-modules:
+      - Data.Store.StreamingSpec
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N
+    dependencies:
+      - store
+      - store-streaming
+
