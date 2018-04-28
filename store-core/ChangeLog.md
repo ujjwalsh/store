@@ -1,5 +1,12 @@
 # ChangeLog
 
+## 0.4.2
+
+* Adds `unsafeMakePokeState`, `unsafeMakePeekState`, and
+  `maybeAlignmentBufferSize`, so that library users can write their own
+  `encode` / `decode` functions.
+  See [#126](https://github.com/fpco/store/pull/126)
+
 ## 0.4.1
 
 * Less aggressive inlining, resulting in faster compilation / simplifier
