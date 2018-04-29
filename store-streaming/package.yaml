@@ -38,5 +38,10 @@ tests:
       - Data.Store.StreamingSpec
     ghc-options: -threaded -rtsopts -with-rtsopts=-N
     dependencies:
+      - hspec
+      - hspec-smallcheck
+      - network
+      - smallcheck
       - store
       - store-streaming
+      - void
