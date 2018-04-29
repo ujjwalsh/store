@@ -91,19 +91,20 @@ $(do let ns = [ ''CWchar, ''CUShort, ''CULong, ''CULLong, ''CIntMax
               , ''CUIntMax, ''CPtrdiff, ''CSChar, ''CShort, ''CUInt, ''CLLong
               , ''CLong, ''CInt, ''CChar, ''CSsize, ''CPid
               , ''COff, ''CMode, ''CIno, ''CDev
-              , ''Word8, ''Word16, ''Word32, ''Word64, ''Word
+              , ''Word8, ''Word16, ''Word32, ''Word64
               , ''Int8, ''Int16, ''Int32, ''Int64
               , ''PortNumber
+#if !MIN_VERSION_smallcheck(1,1,3)
+              , ''Word
+#endif
 #if MIN_VERSION_base(4,10,0)
               , ''CBool, ''CClockId, ''CKey, ''CId
               , ''CBlkSize, ''CFsBlkCnt, ''CFsFilCnt, ''CBlkCnt
 #endif
-              ] ++
-#ifdef mingw32_HOST_OS
-              []
-#else
-              [ ''CUid, ''CTcflag, ''CRLim, ''CNlink, ''CGid ]
+#ifndef mingw32_HOST_OS
+              , ''CUid, ''CTcflag, ''CRLim, ''CNlink, ''CGid
 #endif
+              ]
          f n = [d| instance Monad m => Serial m $(conT n) where
                       series = generate (\_ -> addMinAndMaxBounds [0, 1]) |]
      concat <$> mapM f ns)
