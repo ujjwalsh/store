@@ -7,6 +7,9 @@
 -- There are some tradeoffs here - the generics instances do not require
 -- @-XTemplateHaskell@, but they do not optimize as well for sum types
 -- that only require a constant number of bytes.
+--
+-- If you need streaming encode / decode of multiple store encoded
+-- messages, take a look at the @store-streaming@ package.
 module Data.Store
     (
     -- * Encoding and decoding strict ByteStrings.

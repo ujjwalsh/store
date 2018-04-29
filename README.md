@@ -33,6 +33,9 @@ It also features:
 
 * TH generation of testcases.
 
+* Utilities for streaming encoding / decoding of Store encoded messages, via the
+  `store-streaming` package.
+
 ## Blog posts
 
 * [Initial release announcement](https://www.fpcomplete.com/blog/2016/05/store-package)
