@@ -20,7 +20,6 @@ dependencies:
   - base >=4.7 && <5
   - primitive >=0.6 && < 1.0 # Due to removal of 'internal' from MonadPrim in 0.6
   - bytestring >=0.10.4.0 && < 1.0 # soft
-  - fail # shim for Control.Monad.Fail on older bases
   - transformers >=0.3.0.0 && < 1.0 # soft
   - ghc-prim >=0.3.1.0 && < 1.0 # soft
   - text >=1.2.0.4 && < 2.0 #soft
@@ -31,3 +30,5 @@ library:
 when:
   - condition: flag(force-alignment) || arch(PPC) || arch(PPC64) || arch(Mips) || arch(Sparc) || arch(Arm)
     cpp-options: -DALIGNED_MEMORY
+  - condition: impl(ghc < 8.0)
+    dependencies: fail # shim for Control.Monad.Fail on older bases
