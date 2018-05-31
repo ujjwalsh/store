@@ -1,5 +1,9 @@
 # ChangeLog
 
+## Unreleased
+
+* Now builds with primitive >= 0.6.4.0
+
 ## 0.4.2
 
 * Adds `unsafeMakePokeState`, `unsafeMakePeekState`, and
