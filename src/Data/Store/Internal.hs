@@ -44,7 +44,6 @@ module Data.Store.Internal
     , sizeSequence, pokeSequence, peekSequence
     -- ** Store instances in terms of IsSet
     , sizeSet, pokeSet, peekSet
-    , markMapPokedInAscendingOrder
     -- ** Store instances in terms of IsMap
     , sizeMap, pokeMap, peekMap
     -- *** Utilities for ordered maps
@@ -69,7 +68,7 @@ module Data.Store.Internal
 import           Control.Applicative
 import           Control.DeepSeq (NFData)
 import           Control.Exception (throwIO)
-import           Control.Monad (when, unless)
+import           Control.Monad (when)
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.Array.Unboxed as A
 import qualified Data.ByteString as BS
@@ -282,37 +281,15 @@ pokeOrdMap x = poke markMapPokedInAscendingOrder >> pokeMap x
 -- | Decode the results of 'pokeOrdMap' using a given function to construct
 -- the map.
 peekOrdMapWith
-    :: (Ord (ContainerKey t), Store (ContainerKey t), Store (MapValue t))
+    :: (Store (ContainerKey t), Store (MapValue t))
     => ([(ContainerKey t, MapValue t)] -> t)
        -- ^ A function to construct the map from an ascending list such as
        -- 'Map.fromDistinctAscList'.
     -> Peek t
 peekOrdMapWith f = do
     peekMagic "ascending Map / IntMap" markMapPokedInAscendingOrder
-    xs <- peek
-    remaining <-
-        Peek $ \ps sourcePtr ->
-            return $
-            PeekResult sourcePtr (peekStateEndPtr ps `minusPtr` sourcePtr)
-    unless
-        (ascending (map fst xs))
-        (liftIO
-             (throwIO
-                  (PeekException
-                       remaining
-                       "The keys in the input map are not ascending.")))
-    pure (f xs)
+    f <$> peek
 {-# INLINE peekOrdMapWith #-}
-
--- | Are all the values in the list ascending?
-ascending :: Ord a => [a] -> Bool
-ascending [] = True
-ascending (c:cs) = go c cs
-  where
-    go x (y:xs) =
-        (x < y) && go y xs
-    go _ [] = True
-{-# INLINE ascending #-}
 
 {-
 ------------------------------------------------------------------------
@@ -340,32 +317,15 @@ pokeListLikeFoldable x = do
 -- function for initializing the sequence and a function for mutating an
 -- element at a particular index.
 peekMutableSequence
-    :: forall a r. Store a
-    => String -- ^ type
-    -> (Int -> IO r)
+    :: Store a
+    => (Int -> IO r)
     -> (r -> Int -> a -> IO ())
     -> Peek r
-peekMutableSequence ty new write = do
-    n :: Int <- peek
-    let minBufferSize :: Integer
-        minBufferSize =
-          case size :: Size a of
-            VarSize _ -> fromIntegral n -- minimum bound, assume 1 byte
-            ConstSize x -> fromIntegral n * fromIntegral x
-    remaining <-
-      Peek $ \ps sourcePtr ->
-      return $ PeekResult sourcePtr (peekStateEndPtr ps `minusPtr` sourcePtr)
-    when (minBufferSize > fromIntegral remaining) $
-      liftIO (tooManyBytes (fromIntegral minBufferSize) remaining ty)
-    case (size :: Size a) of
-      ConstSize 0 | n > maxNullaryVectorSize ->
-                    liftIO (throwIO $ PeekException remaining $ T.pack $
-                             "Max nullary vector size.")
-      _ -> return ()
+peekMutableSequence new write = do
+    n <- peek
     mut <- liftIO (new n)
     forM_ [0..n-1] $ \i -> peek >>= liftIO . write mut i
     return mut
-  where maxNullaryVectorSize = 4096
 {-# INLINE peekMutableSequence #-}
 
 ------------------------------------------------------------------------
@@ -402,7 +362,7 @@ isolate len m = Peek $ \ps ptr -> do
 instance Store a => Store (V.Vector a) where
     size = sizeSequence
     poke = pokeSequence
-    peek = V.unsafeFreeze =<< peekMutableSequence "Data.Vector.Vector" MV.new MV.write
+    peek = V.unsafeFreeze =<< peekMutableSequence MV.new MV.write
 
 instance Storable a => Store (SV.Vector a) where
     size = VarSize $ \x ->
