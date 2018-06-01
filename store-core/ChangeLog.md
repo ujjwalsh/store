@@ -1,6 +1,6 @@
 # ChangeLog
 
-## Unreleased
+## 0.4.3
 
 * Now builds with primitive >= 0.6.4.0
 

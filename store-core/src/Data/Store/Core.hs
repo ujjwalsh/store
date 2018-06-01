@@ -146,6 +146,8 @@ newtype PokeState = PokeState
 -- argument is an IO action which is invoked if the store-core package
 -- was built with the @force-alignment@ flag. The action should yield a
 -- pointer to scratch memory as large as 'maybeAlignmentBufferSize'.
+--
+-- Since 0.4.2
 unsafeMakePokeState :: Ptr Word8 -- ^ pokeStatePtr
                     -> IO (Ptr Word8) -- ^ action to produce pokeStateAlignPtr
                     -> IO PokeState
@@ -266,6 +268,8 @@ newtype PeekState = PeekState
 -- argument is an IO action which is invoked if the store-core package
 -- was built with the @force-alignment@ flag. The action should yield a
 -- pointer to scratch memory as large as 'maybeAlignmentBufferSize'.
+--
+-- Since 0.4.2
 unsafeMakePeekState :: Ptr Word8 -- ^ peekStateEndPtr
                     -> IO (Ptr Word8) -- ^ action to produce peekStateAlignPtr
                     -> IO PeekState
