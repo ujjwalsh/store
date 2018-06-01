@@ -1,6 +1,8 @@
 # ChangeLog
 
-## Unreleased
+## 0.5.0
+
+* `Data.Store.Streaming` moved to a separate package, `store-streaming`.
 
 ## 0.4.3.2
 
