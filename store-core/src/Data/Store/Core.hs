@@ -36,7 +36,7 @@ module Data.Store.Core
 
 import           Control.Applicative
 import           Control.Exception (Exception(..), throwIO, try)
-import           Control.Monad (when)
+import           Control.Monad (when, ap)
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Primitive (PrimMonad (..))
 import           Data.ByteString (ByteString)
@@ -152,7 +152,7 @@ unsafeMakePokeState :: Ptr Word8 -- ^ pokeStatePtr
                     -> IO (Ptr Word8) -- ^ action to produce pokeStateAlignPtr
                     -> IO PokeState
 #if ALIGNED_MEMORY
-unsafeMakePokeState ptr f = PokeState ptr =<< f
+unsafeMakePokeState ptr f = (return $ PokeState ptr) `ap` f
 #else
 unsafeMakePokeState ptr _ = return $ PokeState ptr
 #endif
@@ -274,7 +274,7 @@ unsafeMakePeekState :: Ptr Word8 -- ^ peekStateEndPtr
                     -> IO (Ptr Word8) -- ^ action to produce peekStateAlignPtr
                     -> IO PeekState
 #if ALIGNED_MEMORY
-unsafeMakePeekState ptr f = PeekState ptr =<< f
+unsafeMakePeekState ptr f = (return $ PeekState ptr) `ap` f
 #else
 unsafeMakePeekState ptr _ = return $ PeekState ptr
 #endif
