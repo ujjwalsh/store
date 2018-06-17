@@ -152,7 +152,7 @@ unsafeMakePokeState :: Ptr Word8 -- ^ pokeStatePtr
                     -> IO (Ptr Word8) -- ^ action to produce pokeStateAlignPtr
                     -> IO PokeState
 #if ALIGNED_MEMORY
-unsafeMakePokeState ptr f = PokeState ptr =<< f
+unsafeMakePokeState ptr f = PokeState ptr <$> f
 #else
 unsafeMakePokeState ptr _ = return $ PokeState ptr
 #endif
@@ -274,7 +274,7 @@ unsafeMakePeekState :: Ptr Word8 -- ^ peekStateEndPtr
                     -> IO (Ptr Word8) -- ^ action to produce peekStateAlignPtr
                     -> IO PeekState
 #if ALIGNED_MEMORY
-unsafeMakePeekState ptr f = PeekState ptr =<< f
+unsafeMakePeekState ptr f = PeekState ptr <$> f
 #else
 unsafeMakePeekState ptr _ = return $ PeekState ptr
 #endif
