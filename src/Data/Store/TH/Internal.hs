@@ -105,7 +105,11 @@ deriveStore preds headTy cons0 =
     valName = mkName "val"
     sizeExpr =
         caseE (tupE (concatMap (map sizeAtType . snd) cons))
-              (if null sizeNames then [matchConstSize] else [matchConstSize, matchVarSize])
+              (case cons of
+                 -- Avoid overlapping matches when the case expression is ()
+                 [] -> [matchConstSize]
+                 [c] | null (snd c) -> [matchConstSize]
+                 _ -> [matchConstSize, matchVarSize])
       where
         sizeAtType :: (Name, Type) -> ExpQ
         sizeAtType (_, ty) = [| size :: Size $(return ty) |]
