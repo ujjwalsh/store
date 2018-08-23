@@ -1,6 +1,6 @@
 resolver: nightly-2016-05-27
 packages:
-- .
+- store
 - store-core
 extra-deps:
 - th-utilities-0.2.0.1
