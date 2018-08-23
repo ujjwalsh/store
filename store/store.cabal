@@ -4,7 +4,7 @@ cabal-version: >= 1.10
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f7a0e591a79ea56639e9bbb1c38c963f14bf8e9df93cc1984aac1d088757b366
+-- hash: 8535a4db2fb34c5d6ff737cb7787b8d591f5b3935811c2fae6dd31f2018acb64
 
 name:           store
 version:        0.4.3.1
@@ -176,7 +176,6 @@ test-suite store-weigh
     , conduit >=1.2.3.1
     , containers >=0.5.5.1
     , contravariant >=1.3
-    , criterion
     , cryptohash >=0.11.6
     , deepseq >=1.3.0.2
     , directory >=1.2
@@ -235,12 +234,12 @@ benchmark store-bench
     , conduit >=1.2.3.1
     , containers >=0.5.5.1
     , contravariant >=1.3
-    , criterion
     , cryptohash >=0.11.6
     , deepseq >=1.3.0.2
     , directory >=1.2
     , filepath >=1.3
     , free >=4.11
+    , gauge
     , ghc-prim >=0.3.1.0
     , hashable >=1.2.3.1
     , hspec >=2.1.2

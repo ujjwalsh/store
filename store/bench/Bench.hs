@@ -10,7 +10,8 @@ import Control.Applicative ((<$>), (<*>), (*>))
 #endif
 
 import           Control.DeepSeq
-import           Criterion.Main
+import           Gauge
+import           Gauge.Main
 import qualified Data.ByteString as BS
 import           Data.Int
 import qualified Data.IntMap.Strict as IntMap
