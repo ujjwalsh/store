@@ -23,7 +23,7 @@ ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-
 
 dependencies:
 # Meaningful constraints.
-  - base >=4.7 && <5
+  - base >=4.9.1 && <5
 
   # Core package tightly packaged to this package
   - store-core >=0.4 && <0.5

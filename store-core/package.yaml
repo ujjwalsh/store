@@ -17,7 +17,7 @@ flags:
 ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2
 
 dependencies:
-  - base >=4.7 && <5
+  - base >=4.9.1 && <5
   - primitive >=0.6 && < 1.0 # Due to removal of 'internal' from MonadPrim in 0.6
   - bytestring >=0.10.4.0 && < 1.0 # soft
   - fail # shim for Control.Monad.Fail on older bases
