@@ -84,6 +84,7 @@ import           Data.Functor.Contravariant
 import           Data.HashMap.Strict (HashMap)
 import           Data.HashSet (HashSet)
 import           Data.Hashable (Hashable)
+import           Data.Int
 import           Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import           Data.IntSet (IntSet)
@@ -691,6 +692,7 @@ instance Store a => Store (Last a)
 instance Store a => Store (Maybe a)
 instance (Store a, Store b) => Store (Either a b)
 
+
 -- FIXME: have TH deriving handle unboxed fields?
 
 ------------------------------------------------------------------------
@@ -708,6 +710,101 @@ $($(derive [d|
 -- TODO: higher arities?  Limited now by Generics instances for tuples
 $(return $ map deriveTupleStoreInstance [2..7])
 
+instance Store Word8 where
+  size = sizeStorable
+  poke = pokeStorable
+  peek = peekStorable
+instance Store Word16 where
+  size = sizeStorable
+  poke = pokeStorable
+  peek = peekStorable
+instance Store Word32 where
+  size = sizeStorable
+  poke = pokeStorable
+  peek = peekStorable
+instance Store Word64 where
+  size = sizeStorable
+  poke = pokeStorable
+  peek = peekStorable
+instance Store Word where
+  size = sizeStorable
+  poke = pokeStorable
+  peek = peekStorable
+
+instance Store Int8 where
+  size = sizeStorable
+  poke = pokeStorable
+  peek = peekStorable
+instance Store Int16 where
+  size = sizeStorable
+  poke = pokeStorable
+  peek = peekStorable
+instance Store Int32 where
+  size = sizeStorable
+  poke = pokeStorable
+  peek = peekStorable
+instance Store Int64 where
+  size = sizeStorable
+  poke = pokeStorable
+  peek = peekStorable
+instance Store Int where
+  size = sizeStorable
+  poke = pokeStorable
+  peek = peekStorable
+
+instance Store Char where
+  size = sizeStorable
+  poke = pokeStorable
+  peek = peekStorable
+
+instance Store ModName
+instance Store NameFlavour
+instance Store OccName
+instance Store Name
+instance Store NameSpace
+instance Store PkgName
+instance Store Info
+instance Store Dec
+instance Store Clause
+instance Store Pat
+instance Store Lit
+instance Store Type
+instance Store Body
+instance Store Guard
+instance Store TyVarBndr
+instance Store Exp
+instance Store Match
+instance Store Stmt
+instance Store Range
+instance Store TyLit
+instance Store Con
+instance Store Bang
+instance Store DerivClause
+instance Store DerivStrategy
+instance Store SourceUnpackedness
+instance Store FunDep
+instance Store SourceStrictness
+instance Store Overlap
+instance Store Foreign
+instance Store Callconv
+instance Store Fixity
+instance Store FixityDirection
+instance Store Pragma
+instance Store Safety
+instance Store Inline
+instance Store TySynEqn
+instance Store RuleMatch
+instance Store TypeFamilyHead
+instance Store FamilyResultSig
+instance Store Phases
+instance Store RuleBndr
+instance Store InjectivityAnn
+instance Store AnnTarget
+instance Store Role
+instance Store PatSynArgs
+instance Store PatSynDir
+
+{- Temporarily removed, let's reduce compile times
 $(deriveManyStoreUnboxVector)
 
 $(deriveManyStoreFromStorable
@@ -742,3 +839,5 @@ $(reifyManyWithoutInstances ''Store [''ModName, ''NameSpace, ''PkgName] (const T
 $(reifyManyWithoutInstances ''Store [''Info] (const True) >>=
 --   mapM (\name -> deriveStore [] (ConT name) .dtCons =<< reifyDataType name))
    mapM (\name -> return (deriveGenericInstance [] (ConT name))))
+
+-}
