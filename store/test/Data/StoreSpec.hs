@@ -91,8 +91,8 @@ $(do let ns = [ ''CWchar, ''CUShort, ''CULong, ''CULLong, ''CIntMax
               , ''CUIntMax, ''CPtrdiff, ''CSChar, ''CShort, ''CUInt, ''CLLong
               , ''CLong, ''CInt, ''CChar, ''CSsize, ''CPid
               , ''COff, ''CMode, ''CIno, ''CDev
-              , ''Word8, ''Word16, ''Word32, ''Word64, ''Word
-              , ''Int8, ''Int16, ''Int32, ''Int64
+              -- , ''Word8, ''Word16, ''Word32, ''Word64, ''Word
+              -- , ''Int8, ''Int16, ''Int32, ''Int64
               , ''PortNumber
 #if MIN_VERSION_base(4,10,0)
               , ''CBool, ''CClockId, ''CKey, ''CId
@@ -289,9 +289,6 @@ spec = do
                  , [t| TypeHash |]
                  , [t| Fd |]
                  , [t| NameFlavour |]
-#if MIN_VERSION_base(4,10,0)
-                 , [t| CTimer |]
-#endif
                  ]
              let f ty = isMonoType ty && ty `notElem` omitTys
              smallcheckManyStore verbose 2 . map return . filter f $ insts)
