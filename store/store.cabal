@@ -4,7 +4,7 @@ cabal-version: >= 1.10
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 77c21874218d4406f55e561c92b49649ec4e32eb8ecf8c8239b02800eefa8a73
+-- hash: f7a0e591a79ea56639e9bbb1c38c963f14bf8e9df93cc1984aac1d088757b366
 
 name:           store
 version:        0.4.3.1
@@ -57,7 +57,7 @@ library
     , hashable >=1.2.3.1
     , hspec >=2.1.2
     , hspec-smallcheck >=0.3.0
-    , integer-gmp >=0.5.1.0
+    , integer-gmp >=1.0
     , lifted-base >=0.2.3.3
     , monad-control >=0.3.3.0
     , mono-traversable >=0.7.0
@@ -70,7 +70,7 @@ library
     , store-core >=0.4 && <0.5
     , streaming-commons >=0.1.10.0
     , syb >=0.4.4
-    , template-haskell >=2.9.0.0
+    , template-haskell >=2.11
     , text >=1.2.0.4
     , th-lift >=0.7.1
     , th-lift-instances >=0.1.4
@@ -123,7 +123,7 @@ test-suite store-test
     , hashable >=1.2.3.1
     , hspec >=2.1.2
     , hspec-smallcheck >=0.3.0
-    , integer-gmp >=0.5.1.0
+    , integer-gmp >=1.0
     , lifted-base >=0.2.3.3
     , monad-control >=0.3.3.0
     , mono-traversable >=0.7.0
@@ -137,7 +137,7 @@ test-suite store-test
     , store-core >=0.4 && <0.5
     , streaming-commons >=0.1.10.0
     , syb >=0.4.4
-    , template-haskell >=2.9.0.0
+    , template-haskell >=2.11
     , text >=1.2.0.4
     , th-lift >=0.7.1
     , th-lift-instances >=0.1.4
@@ -186,7 +186,7 @@ test-suite store-weigh
     , hashable >=1.2.3.1
     , hspec >=2.1.2
     , hspec-smallcheck >=0.3.0
-    , integer-gmp >=0.5.1.0
+    , integer-gmp >=1.0
     , lifted-base >=0.2.3.3
     , monad-control >=0.3.3.0
     , mono-traversable >=0.7.0
@@ -200,7 +200,7 @@ test-suite store-weigh
     , store-core >=0.4 && <0.5
     , streaming-commons >=0.1.10.0
     , syb >=0.4.4
-    , template-haskell >=2.9.0.0
+    , template-haskell >=2.11
     , text >=1.2.0.4
     , th-lift >=0.7.1
     , th-lift-instances >=0.1.4
@@ -245,7 +245,7 @@ benchmark store-bench
     , hashable >=1.2.3.1
     , hspec >=2.1.2
     , hspec-smallcheck >=0.3.0
-    , integer-gmp >=0.5.1.0
+    , integer-gmp >=1.0
     , lifted-base >=0.2.3.3
     , monad-control >=0.3.3.0
     , mono-traversable >=0.7.0
@@ -259,7 +259,7 @@ benchmark store-bench
     , store-core >=0.4 && <0.5
     , streaming-commons >=0.1.10.0
     , syb >=0.4.4
-    , template-haskell >=2.9.0.0
+    , template-haskell >=2.11
     , text >=1.2.0.4
     , th-lift >=0.7.1
     , th-lift-instances >=0.1.4

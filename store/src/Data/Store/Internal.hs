@@ -613,7 +613,6 @@ peekArray = do
 {-# INLINE peekArray #-}
 
 instance Store Integer where
-#if MIN_VERSION_integer_gmp(1,0,0)
     size = VarSize $ \ x ->
         sizeOf (undefined :: Word8) + case x of
             I.S# _ -> sizeOf (undefined :: Int)
@@ -642,44 +641,6 @@ instance Store Integer where
           len <- peek :: Peek Int
           ByteArray arr <- peekToByteArray "GHC>Integer" len
           return $ I.BN# arr
-#else
-    -- May as well put in the extra effort to use the same encoding as
-    -- used for the newer integer-gmp.
-    size = VarSize $ \ x ->
-        sizeOf (undefined :: Word8) + case x of
-            I.S# _ -> sizeOf (undefined :: Int)
-            I.J# sz _ -> sizeOf (undefined :: Int) + (I# sz) * sizeOf (undefined :: Word)
-    poke (I.S# x) = poke (0 :: Word8) >> poke (I# x)
-    poke (I.J# sz arr)
-        | (I# sz) > 0 = do
-            let len = I# sz * sizeOf (undefined :: Word)
-            poke (1 :: Word8)
-            poke len
-            pokeFromByteArray arr 0 len
-        | (I# sz) < 0 = do
-            let len = negate (I# sz) * sizeOf (undefined :: Word)
-            poke (2 :: Word8)
-            poke len
-            pokeFromByteArray arr 0 len
-        | otherwise = do
-            poke (0 :: Word8)
-            poke (0 :: Int)
-    peek = do
-        tag <- peek :: Peek Word8
-        case tag of
-            0 -> fromIntegral <$> (peek :: Peek Int)
-            1 -> peekJ False
-            2 -> peekJ True
-            _ -> peekException "Invalid Integer tag"
-      where
-        peekJ neg = do
-          len <- peek :: Peek Int
-          ByteArray arr <- peekToByteArray "GHC>Integer" len
-          let (sz0, r) = len `divMod` (sizeOf (undefined :: Word))
-              !(I# sz) = if neg then negate sz0 else sz0
-          when (r /= 0) (peekException "Buffer size stored for encoded Integer not divisible by Word size (to get limb count).")
-          return (I.J# sz arr)
-#endif
 
 -- instance Store GHC.Fingerprint.Types.Fingerprint where
 
@@ -777,47 +738,6 @@ $(deriveManyStorePrimVector)
 $(reifyManyWithoutInstances ''Store [''ModName, ''NameSpace, ''PkgName] (const True) >>=
 --   mapM (\name -> deriveStore [] (ConT name) .dtCons =<< reifyDataType name))
    mapM (\name -> return (deriveGenericInstance [] (ConT name))))
-
--- Explicit definition needed because in template-haskell <= 2.9 (GHC
--- 7.8), NameFlavour contains unboxed values, causing generic deriving
--- to fail.
-#if !MIN_VERSION_template_haskell(2,10,0)
-instance Store NameFlavour where
-    size = VarSize $ \x -> getSize (0 :: Word8) + case x of
-        NameS -> 0
-        NameQ mn -> getSize mn
-        NameU i -> getSize (I# i)
-        NameL i -> getSize (I# i)
-        NameG ns pn mn -> getSize ns + getSize pn + getSize mn
-    poke NameS = poke (0 :: Word8)
-    poke (NameQ mn) = do
-        poke (1 :: Word8)
-        poke mn
-    poke (NameU i) = do
-        poke (2 :: Word8)
-        poke (I# i)
-    poke (NameL i) = do
-        poke (3 :: Word8)
-        poke (I# i)
-    poke (NameG ns pn mn) = do
-        poke (4 :: Word8)
-        poke ns
-        poke pn
-        poke mn
-    peek = do
-        tag <- peek
-        case tag :: Word8 of
-            0 -> return NameS
-            1 -> NameQ <$> peek
-            2 -> do
-                !(I# i) <- peek
-                return (NameU i)
-            3 -> do
-                !(I# i) <- peek
-                return (NameL i)
-            4 -> NameG <$> peek <*> peek <*> peek
-            _ -> peekException "Invalid NameFlavour tag"
-#endif
 
 $(reifyManyWithoutInstances ''Store [''Info] (const True) >>=
 --   mapM (\name -> deriveStore [] (ConT name) .dtCons =<< reifyDataType name))

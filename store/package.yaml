@@ -54,7 +54,7 @@ dependencies:
   - hashable >=1.2.3.1
   - hspec >=2.1.2
   - hspec-smallcheck >=0.3.0
-  - integer-gmp >=0.5.1.0
+  - integer-gmp >=1.0
   - lifted-base >=0.2.3.3
   - monad-control >=0.3.3.0
   - mono-traversable >=0.7.0
@@ -63,7 +63,7 @@ dependencies:
   - semigroups >=0.8
   - smallcheck >=1.1.1
   - syb >=0.4.4
-  - template-haskell >=2.9.0.0
+  - template-haskell >=2.11
   - text >=1.2.0.4
   - th-lift >=0.7.1
   - th-lift-instances >=0.1.4
