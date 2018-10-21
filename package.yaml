@@ -94,6 +94,7 @@ tests:
     ghc-options: -threaded -rtsopts -with-rtsopts=-N
     dependencies:
       - store
+      - clock >=0.3
   store-weigh:
     source-dirs: test
     main: Allocations.hs

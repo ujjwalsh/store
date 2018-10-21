@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 0.5.0.1
+
+* Updates to test-suite enabling `store` to build with newer dependencies.
+
 ## 0.5.0
 
 * `Data.Store.Streaming` moved to a separate package, `store-streaming`.

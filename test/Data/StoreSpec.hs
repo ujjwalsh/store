@@ -63,6 +63,7 @@ import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
 import           Network.Socket
 import           Prelude
+import           System.Clock (TimeSpec)
 import           System.Posix.Types
 import           Test.Hspec hiding (runIO)
 import           Test.SmallCheck.Series
@@ -91,8 +92,10 @@ $(do let ns = [ ''CWchar, ''CUShort, ''CULong, ''CULLong, ''CIntMax
               , ''CUIntMax, ''CPtrdiff, ''CSChar, ''CShort, ''CUInt, ''CLLong
               , ''CLong, ''CInt, ''CChar, ''CSsize, ''CPid
               , ''COff, ''CMode, ''CIno, ''CDev
+#if !MIN_VERSION_smallcheck(1,1,4)
               , ''Word8, ''Word16, ''Word32, ''Word64
               , ''Int8, ''Int16, ''Int32, ''Int64
+#endif
               , ''PortNumber
 #if !MIN_VERSION_smallcheck(1,1,3)
               , ''Word
@@ -281,8 +284,8 @@ spec :: Spec
 spec = do
     describe "Store on all monomorphic instances"
         $(do insts <- getAllInstanceTypes1 ''Store
-             omitTys <- sequence
-                 [ [t| PV.Vector Addr |]
+             omitTys0 <- sequence
+                 [ [t| Addr |]
                  , [t| CUIntPtr |]
                  , [t| CIntPtr |]
                  , [t| IntPtr |]
@@ -293,9 +296,12 @@ spec = do
 #if MIN_VERSION_base(4,10,0)
                  , [t| CTimer |]
 #endif
+                 , [t| TimeSpec |]
                  ]
+             omitTys <- (omitTys0 ++) <$> mapM (\ty -> [t| PV.Vector $(pure ty) |]) omitTys0
              let f ty = isMonoType ty && ty `notElem` omitTys
-             smallcheckManyStore verbose 2 . map return . filter f $ insts)
+                 filtered = filter f insts
+             smallcheckManyStore verbose 2 $ map return filtered)
     it "Store on non-numeric Float/Double values" $ do
         let testNonNumeric :: forall a m. (RealFloat a, Eq a, Show a, Typeable a, Store a, Monad m) => Proxy a -> m ()
             testNonNumeric _proxy = do
