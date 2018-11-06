@@ -702,6 +702,7 @@ $($(derive [d|
     instance Deriving (Store Any)
     instance Deriving (Store Void)
     instance Deriving (Store Bool)
+    instance (Store a, Store b) => Deriving (Store (Either a b))
     |]))
 
 -- TODO: higher arities?  Limited now by Generics instances for tuples

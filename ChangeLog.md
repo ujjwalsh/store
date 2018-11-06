@@ -4,6 +4,8 @@
 
 * Update to TH to support sum types with more than 62 constructors.
 
+* Uses TH to derive Either instance, so that it can sometimes have ConstSize #119.
+
 ## 0.5.0.1
 
 * Updates to test-suite enabling `store` to build with newer dependencies.
