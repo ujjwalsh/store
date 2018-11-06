@@ -95,18 +95,6 @@ tests:
     dependencies:
       - store
       - clock >=0.3
-  store-weigh:
-    source-dirs: test
-    main: Allocations.hs
-    other-modules: []
-    ghc-options: -threaded -rtsopts -with-rtsopts=-N -with-rtsopts=-T -O2
-    dependencies:
-      - store
-      - weigh
-      - criterion
-      - cereal
-      - cereal-vector
-      - vector-binary-instances
 
 benchmarks:
   store-bench:
@@ -126,3 +114,15 @@ benchmarks:
         cpp-options: -DCOMPARISON_BENCH
       - condition: flag(small-bench)
         cpp-options: -DSMALL_BENCH
+  store-weigh:
+    source-dirs: test
+    main: Allocations.hs
+    other-modules: []
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N -with-rtsopts=-T -O2
+    dependencies:
+      - store
+      - weigh
+      - criterion
+      - cereal
+      - cereal-vector
+      - vector-binary-instances
