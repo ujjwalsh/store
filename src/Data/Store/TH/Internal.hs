@@ -103,13 +103,16 @@ deriveStore preds headTy cons0 =
     sizeNames = zipWith (\_ -> mkName . ("sz" ++) . show) cons ints
     tagName = mkName "tag"
     valName = mkName "val"
-    sizeExpr =
-        caseE (tupE (concatMap (map sizeAtType . snd) cons))
-              (case cons of
-                 -- Avoid overlapping matches when the case expression is ()
-                 [] -> [matchConstSize]
-                 [c] | null (snd c) -> [matchConstSize]
-                 _ -> [matchConstSize, matchVarSize])
+    sizeExpr
+        -- Maximum size of GHC tuples
+        | length cons <= 62 =
+            caseE (tupE (concatMap (map sizeAtType . snd) cons))
+                  (case cons of
+                     -- Avoid overlapping matches when the case expression is ()
+                     [] -> [matchConstSize]
+                     [c] | null (snd c) -> [matchConstSize]
+                     _ -> [matchConstSize, matchVarSize])
+        | otherwise = varSizeExpr
       where
         sizeAtType :: (Name, Type) -> ExpQ
         sizeAtType (_, ty) = [| size :: Size $(return ty) |]
@@ -143,9 +146,11 @@ deriveStore preds headTy cons0 =
         matchVarSize :: MatchQ
         matchVarSize = do
             match (tupP (map (\(n, _) -> varP n) (concatMap snd cons)))
-                  (normalB [| VarSize $ \x -> tagSize +
-                                  $(caseE [| x |] (map matchVar cons)) |])
+                  (normalB varSizeExpr)
                   []
+        varSizeExpr :: ExpQ
+        varSizeExpr =
+            [| VarSize $ \x -> tagSize + $(caseE [| x |] (map matchVar cons)) |]
         matchVar :: (Name, [(Name, Type)]) -> MatchQ
         matchVar (cname, []) =
             match (conP cname []) (normalB [| 0 |]) []
