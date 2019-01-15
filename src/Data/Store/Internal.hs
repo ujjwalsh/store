@@ -688,7 +688,6 @@ instance Store a => Store (Product a)
 instance Store a => Store (First a)
 instance Store a => Store (Last a)
 instance Store a => Store (Maybe a)
-instance (Store a, Store b) => Store (Either a b)
 
 -- FIXME: have TH deriving handle unboxed fields?
 
