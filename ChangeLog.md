@@ -1,6 +1,6 @@
 # ChangeLog
 
-## Not yet released
+## 0.5.1.0
 
 * Update to TH to support sum types with more than 62 constructors.
 
