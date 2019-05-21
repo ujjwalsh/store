@@ -1,5 +1,11 @@
 # ChangeLog
 
+## 0.5.1.1
+
+* Update to the instances for generics, to improve error messages for
+  sum types with more than 255 constructors.  See
+  [#141](https://github.com/fpco/store/issues/141)
+
 ## 0.5.1.0
 
 * Update to TH to support sum types with more than 62 constructors.
