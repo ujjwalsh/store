@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -28,6 +30,7 @@ import           Data.Store.Core
 import           Data.Typeable (Typeable, typeRep)
 import           Data.Word
 import           Foreign.Storable (Storable, sizeOf)
+import           GHC.Exts (Constraint)
 import           GHC.Generics
 import           GHC.TypeLits
 import           Prelude
@@ -262,20 +265,36 @@ instance (GStorePeek a, GStorePeek b) => GStorePeek (a :*: b) where
 -- FIXME: check that this type level stuff dosen't get turned into
 -- costly runtime computation
 
-instance (SumArity (a :+: b) <= 255, GStoreSizeSum 0 (a :+: b))
+instance (FitsInByte (SumArity (a :+: b)), GStoreSizeSum 0 (a :+: b))
          => GStoreSize (a :+: b) where
     gsize = VarSize $ \x -> sizeOf (undefined :: Word8) + gsizeSum x (Proxy :: Proxy 0)
     {-# INLINE gsize #-}
-instance (SumArity (a :+: b) <= 255, GStorePokeSum 0 (a :+: b))
+instance (FitsInByte (SumArity (a :+: b)), GStorePokeSum 0 (a :+: b))
          => GStorePoke (a :+: b) where
     gpoke x = gpokeSum x (Proxy :: Proxy 0)
     {-# INLINE gpoke #-}
-instance (SumArity (a :+: b) <= 255, GStorePeekSum 0 (a :+: b))
+instance (FitsInByte (SumArity (a :+: b)), GStorePeekSum 0 (a :+: b))
          => GStorePeek (a :+: b) where
     gpeek = do
         tag <- peekStorable
         gpeekSum tag (Proxy :: Proxy 0)
     {-# INLINE gpeek #-}
+
+-- See https://github.com/fpco/store/issues/141 - this constraint type
+-- family machinery improves error messages for generic deriving on
+-- sum types with many constructors.
+
+type FitsInByte n = FitsInByteResult (n <=? 255)
+
+type family FitsInByteResult (b :: Bool) :: Constraint where
+    FitsInByteResult True = ()
+    FitsInByteResult False = TypeErrorMessage
+        "Generic deriving of Store instances can only be used on datatypes with fewer than 256 constructors."
+
+type family TypeErrorMessage (a :: Symbol) :: Constraint where
+#if MIN_VERSION_base(4,9,0)
+    TypeErrorMessage a = TypeError (Text a)
+#endif
 
 -- Similarly to splitting up the generic class into multiple classes, we
 -- also split up the one for sum types.
