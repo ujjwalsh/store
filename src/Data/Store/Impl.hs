@@ -287,8 +287,8 @@ instance (FitsInByte (SumArity (a :+: b)), GStorePeekSum 0 (a :+: b))
 type FitsInByte n = FitsInByteResult (n <=? 255)
 
 type family FitsInByteResult (b :: Bool) :: Constraint where
-    FitsInByteResult True = ()
-    FitsInByteResult False = TypeErrorMessage
+    FitsInByteResult 'True = ()
+    FitsInByteResult 'False = TypeErrorMessage
         "Generic deriving of Store instances can only be used on datatypes with fewer than 256 constructors."
 
 type family TypeErrorMessage (a :: Symbol) :: Constraint where
