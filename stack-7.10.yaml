@@ -4,6 +4,5 @@ packages:
 - .
 - store-core
 - store-streaming
-- ../th-utilities
-# extra-deps:
-# - th-utilities-0.2.1.0@sha256:0283459a1527382def93be35e187fc1639f8e8e1695f4960c7f08224a11ac065
+extra-deps:
+- th-utilities-0.2.3.0
