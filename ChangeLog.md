@@ -1,5 +1,10 @@
 # ChangeLog
 
+## 0.5.1.2
+
+* Fixes compilation with GHC < 8.0.  See
+  [#142](https://github.com/fpco/store/issues/142).
+
 ## 0.5.1.1
 
 * Update to the instances for generics, to improve error messages for
