@@ -37,6 +37,7 @@ module Data.Store.TH
     , assertRoundtrip
     ) where
 
+import qualified Control.Monad.Fail as Fail
 import Data.Complex ()
 import Data.Store.Impl
 import Data.Typeable (Typeable, typeOf)
@@ -60,7 +61,7 @@ smallcheckManyStore verbose depth = smallcheckMany . map testRoundtrip
         expr <- [e| property $ changeDepth (\_ -> depth) $ \x -> checkRoundtrip verbose (x :: $(return ty)) |]
         return ("Roundtrips (" ++ pprint ty ++ ")", expr)
 
-assertRoundtrip :: (Eq a, Show a, Store a, Monad m, Typeable a) => Bool -> a -> m ()
+assertRoundtrip :: (Eq a, Show a, Store a, Fail.MonadFail m, Typeable a) => Bool -> a -> m ()
 assertRoundtrip verbose x
     | checkRoundtrip verbose x = return ()
     | otherwise = fail $ "Failed to roundtrip "  ++ show (typeOf x)

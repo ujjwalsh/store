@@ -217,7 +217,7 @@ getStructureInfo' ignore renames _ = do
     goField = do
         s <- get
         case sFieldNames s of
-            [] -> fail "impossible case in getStructureInfo'"
+            [] -> error "impossible case in getStructureInfo'"
             (name:names) -> do
                 getStructureInfo' ignore renames (Proxy :: Proxy b)
                 s' <- get

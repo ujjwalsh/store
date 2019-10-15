@@ -363,7 +363,14 @@ getUnboxInfo = do
     FamilyI _ insts <- reify ''UV.Vector
     return (map (everywhere (id `extT` dequalVarT) . go) insts)
   where
-#if MIN_VERSION_template_haskell(2,11,0)
+#if MIN_VERSION_template_haskell(2,15,0)
+    go (NewtypeInstD preds _ lhs _ con _)
+      | [_, ty] <- unAppsT lhs
+      = (preds, ty, conToDataCons con)
+    go (DataInstD preds _ lhs _ cons _)
+      | [_, ty] <- unAppsT lhs
+      = (preds, ty, concatMap conToDataCons cons)
+#elif MIN_VERSION_template_haskell(2,11,0)
     go (NewtypeInstD preds _ [ty] _ con _) = (preds, ty, conToDataCons con)
     go (DataInstD preds _ [ty] _ cons _) = (preds, ty, concatMap conToDataCons cons)
 #else
