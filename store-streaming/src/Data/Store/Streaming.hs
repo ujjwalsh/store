@@ -44,6 +44,7 @@ module Data.Store.Streaming
 
 import           Control.Exception (throwIO)
 import           Control.Monad (unless)
+import           Control.Monad.Fail (MonadFail)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource (MonadResource)
 import           Data.ByteString (ByteString)
@@ -180,7 +181,7 @@ data ReadMoreData = ReadMoreData
 -- | Peeks a message from a _non blocking_ 'Fd'.
 --
 -- This function is only available on POSIX systems (essentially, non-windows)
-peekMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> PeekMessage ReadMoreData m (Message a)
+peekMessageFd :: (MonadIO m, MonadFail m, Store a) => ByteBuffer -> Fd -> PeekMessage ReadMoreData m (Message a)
 peekMessageFd bb fd =
   peekMessage (\bb_ needed ReadMoreData -> do _ <- BB.fillFromFd bb_ fd needed; return ()) bb
 
@@ -188,7 +189,7 @@ peekMessageFd bb fd =
 -- ready for reading.
 --
 -- This function is only available on POSIX systems (essentially, non-windows)
-decodeMessageFd :: (MonadIO m, Store a) => ByteBuffer -> Fd -> m (Message a)
+decodeMessageFd :: (MonadIO m, MonadFail m, Store a) => ByteBuffer -> Fd -> m (Message a)
 decodeMessageFd bb fd = do
   mbMsg <- decodeMessage
     (\bb_ needed ReadMoreData -> do _ <- BB.fillFromFd bb_ fd needed; return ()) bb
