@@ -43,6 +43,7 @@ module System.IO.ByteBuffer
 import           Control.Applicative
 import           Control.Exception (SomeException, throwIO)
 import           Control.Exception.Lifted (Exception, bracket, catch)
+import qualified Control.Monad.Fail as Fail
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.ByteString (ByteString)
@@ -280,7 +281,7 @@ copyByteString bb bs =
 -- such the ones created by the @network@ package.
 --
 -- Returns how many bytes could be read non-blockingly.
-fillFromFd :: MonadIO m => ByteBuffer -> Fd -> Int -> m Int
+fillFromFd :: (MonadIO m, Fail.MonadFail m) => ByteBuffer -> Fd -> Int -> m Int
 fillFromFd bb sock maxBytes = if maxBytes < 0
     then fail ("fillFromFd: negative argument (" ++ show maxBytes ++ ")")
     else bbHandler "fillFromFd" bb go

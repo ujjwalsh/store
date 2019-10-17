@@ -112,8 +112,10 @@ instance Monad Poke where
         (offset2, x') <- x ptr offset1
         runPoke (f x') ptr offset2
     {-# INLINE (>>=) #-}
+#if !(MIN_VERSION_base(4,13,0))
     fail = pokeException . T.pack
     {-# INLINE fail #-}
+#endif
 
 #if MIN_VERSION_base(4,9,0)
 instance Fail.MonadFail Poke where
@@ -228,8 +230,10 @@ instance Monad Peek where
         PeekResult ptr2 x' <- x end ptr1
         runPeek (f x') end ptr2
     {-# INLINE (>>=) #-}
+#if !(MIN_VERSION_base(4,13,0))
     fail = peekException . T.pack
     {-# INLINE fail #-}
+#endif
 
 #if MIN_VERSION_base(4,9,0)
 instance Fail.MonadFail Peek where
