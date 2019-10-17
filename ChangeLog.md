@@ -1,5 +1,11 @@
 # ChangeLog
 
+## 0.6.0
+
+* Now builds with GHC-8.8. This is a major version bump because
+  MonadFail constraints were added to some functions, which is
+  potentially a breaking change.
+
 ## 0.5.1.2
 
 * Fixes compilation with GHC < 8.0.  See
