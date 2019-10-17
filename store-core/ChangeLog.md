@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 0.4.4.1
+
+* Now builds with GHC-8.8.
+
 ## 0.4.4
 
 * Build fixed with  `--flag store-core:force-alignment` / on architectures
