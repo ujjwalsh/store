@@ -1,7 +1,7 @@
 # store-streaming was forked from store-0.4.3.3
 
 name: store-streaming
-version: "0.2.0.0"
+version: "0.2.0.1"
 synopsis: Streaming interfaces for `store`
 maintainer: Michael Sloan <sloan@fpcomplete.com>
 license: MIT

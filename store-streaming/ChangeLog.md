@@ -1,5 +1,11 @@
 # ChangeLog
 
+## 0.2.0.1
+
+* Now builds with GHC-7.10 - compatibility was broken in 0.6.0 due to
+  the fix for GHC-8.8. See
+  [#146][https://github.com/fpco/store/issues/146].
+
 ## 0.2.0.0
 
 * Now builds with GHC-8.8. This is a major version bump because
