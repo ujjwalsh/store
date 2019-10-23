@@ -1,5 +1,10 @@
 # ChangeLog
 
+## 0.4.4.2
+
+* Build fixed for GHC-7.10. See
+  [#146](https://github.com/fpco/store/issues/146)
+
 ## 0.4.4.1
 
 * Now builds with GHC-8.8.
