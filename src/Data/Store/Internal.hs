@@ -118,10 +118,15 @@ import           Foreign.C.Types ()
 import           Foreign.Ptr (plusPtr, minusPtr)
 import           Foreign.Storable (Storable, sizeOf)
 import           GHC.Generics (Generic)
+#ifdef INTEGER_GMP
 import qualified GHC.Integer.GMP.Internals as I
+import           GHC.Types (Int (I#))
+#else
+import           GHC.Types (Word (W#))
+import qualified GHC.Integer.Simple.Internals as I
+#endif
 import           GHC.Real (Ratio(..))
 import           GHC.TypeLits
-import           GHC.Types (Int (I#))
 import           Instances.TH.Lift ()
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Instances ()
@@ -132,8 +137,10 @@ import           Prelude
 import           TH.Derive
 
 -- Conditional import to avoid warning
+#ifdef INTEGER_GMP
 #if MIN_VERSION_integer_gmp(1,0,0)
 import           GHC.Prim (sizeofByteArray#)
+#endif
 #endif
 
 ------------------------------------------------------------------------
@@ -573,6 +580,7 @@ peekArray = do
 {-# INLINE peekArray #-}
 
 instance Store Integer where
+#ifdef INTEGER_GMP
 #if MIN_VERSION_integer_gmp(1,0,0)
     size = VarSize $ \ x ->
         sizeOf (undefined :: Word8) + case x of
@@ -639,6 +647,52 @@ instance Store Integer where
               !(I# sz) = if neg then negate sz0 else sz0
           when (r /= 0) (peekException "Buffer size stored for encoded Integer not divisible by Word size (to get limb count).")
           return (I.J# sz arr)
+#endif
+#else
+    -- May as well put in the extra effort to use the same encoding as
+    -- used for the newer integer-gmp.
+    size = VarSize $ \ x ->
+        sizeOf (undefined :: Word8) + case x of
+            I.Positive ds -> (1 + fromIntegral (numDigits ds)) * sizeOf (undefined :: Word)
+            I.Negative ds -> (1 + fromIntegral (numDigits ds)) * sizeOf (undefined :: Word)
+            I.Naught -> 0
+      where
+    poke x = case x of
+      I.Naught -> poke (0 :: Word8)
+      I.Positive ds -> do
+        poke (1 :: Word8)
+        poke (numDigits ds)
+        pokeDigits ds
+      I.Negative ds -> do
+        poke (2 :: Word8)
+        poke (numDigits ds)
+        pokeDigits ds
+      where
+        pokeDigits I.None = pure ()
+        pokeDigits (I.Some d ds) = poke (W# d) *> pokeDigits ds
+    peek = do
+      tag <- peek :: Peek Word8
+      case tag of
+        0 -> pure I.Naught
+        1 -> do
+          len <- peek :: Peek Word
+          I.Positive <$> peekDigits len
+        2 -> do
+          len <- peek :: Peek Word
+          I.Negative <$> peekDigits len
+        _ -> peekException "Invalid Integer tag"
+      where
+        peekDigits i
+          | i <= 0 = pure I.None
+          | otherwise = do
+              W# d <- peek
+              ds <- peekDigits (i - 1)
+              pure $! I.Some d ds
+
+numDigits :: I.Digits -> Word
+numDigits = go 0
+  where go !acc I.None = acc
+        go !acc (I.Some _ ds) = go (acc + 1) ds
 #endif
 
 -- instance Store GHC.Fingerprint.Types.Fingerprint where

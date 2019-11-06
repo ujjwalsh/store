@@ -31,7 +31,9 @@ import           Data.IntSet (IntSet)
 import qualified Data.List.NonEmpty as NE
 import           Data.Map (Map)
 import           Data.Monoid
+#if !MIN_VERSION_primitive(0,7,0)
 import           Data.Primitive.Types (Addr)
+#endif
 import           Data.Proxy (Proxy(..))
 import           Data.Sequence (Seq)
 import           Data.Sequences (fromList)
@@ -285,8 +287,10 @@ spec = do
     describe "Store on all monomorphic instances"
         $(do insts <- getAllInstanceTypes1 ''Store
              omitTys0 <- sequence
-                 [ [t| Addr |]
-                 , [t| CUIntPtr |]
+#if !MIN_VERSION_primitive(0,7,0)
+                 [t| Addr |] :
+#endif
+                 [ [t| CUIntPtr |]
                  , [t| CIntPtr |]
                  , [t| IntPtr |]
                  , [t| WordPtr |]

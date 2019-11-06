@@ -19,6 +19,13 @@ flags:
     default: false
     manual: true
 
+  integer-simple:
+    description: >-
+      Use the [simple integer library](http://hackage.haskell.org/package/integer-simple)
+      instead of [integer-gmp](http://hackage.haskell.org/package/integer-gmp)
+    default: False
+    manual: False
+
 ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2
 
 dependencies:
@@ -54,7 +61,6 @@ dependencies:
   - hashable >=1.2.3.1
   - hspec >=2.1.2
   - hspec-smallcheck >=0.3.0
-  - integer-gmp >=0.5.1.0
   - lifted-base >=0.2.3.3
   - monad-control >=0.3.3.0
   - mono-traversable >=0.7.0
@@ -78,6 +84,13 @@ dependencies:
   - async >=2.0.2
   - contravariant >=1.3
   - bifunctors >=4.0
+when:
+  - condition: flag(integer-simple)
+    then:
+      dependencies: integer-simple >= 0.1.1.1
+    else:
+      dependencies: integer-gmp >= 0.5.1.0
+      cpp-options: -DINTEGER_GMP
 library:
   source-dirs: src
   other-modules:
