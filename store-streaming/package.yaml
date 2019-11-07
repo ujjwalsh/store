@@ -3,7 +3,7 @@
 name: store-streaming
 version: "0.2.0.1"
 synopsis: Streaming interfaces for `store`
-maintainer: Michael Sloan <sloan@fpcomplete.com>
+maintainer: Michael Sloan <mgsloan@gmail.com>
 license: MIT
 copyright: 2016 FP Complete
 github: fpco/store
