@@ -286,7 +286,7 @@ spec :: Spec
 spec = do
     describe "Store on all monomorphic instances"
         $(do insts <- getAllInstanceTypes1 ''Store
-             omitTys0 <- sequence
+             omitTys0 <- sequence $
 #if !MIN_VERSION_primitive(0,7,0)
                  [t| Addr |] :
 #endif
