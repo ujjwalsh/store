@@ -16,6 +16,7 @@ module Data.StoreSpec where
 import           Control.Applicative
 import           Control.Exception (evaluate)
 import           Control.Monad (unless)
+import           Control.Monad.Fail (MonadFail)
 import qualified Data.Array.Unboxed as A
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -307,7 +308,7 @@ spec = do
                  filtered = filter f insts
              smallcheckManyStore verbose 2 $ map return filtered)
     it "Store on non-numeric Float/Double values" $ do
-        let testNonNumeric :: forall a m. (RealFloat a, Eq a, Show a, Typeable a, Store a, Monad m) => Proxy a -> m ()
+        let testNonNumeric :: forall a m. (RealFloat a, Eq a, Show a, Typeable a, Store a, Monad m, MonadFail m) => Proxy a -> m ()
             testNonNumeric _proxy = do
                 assertRoundtrip verbose ((1/0) :: a)
                 assertRoundtrip verbose ((-1/0) :: a)
