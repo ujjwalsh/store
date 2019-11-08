@@ -1,5 +1,12 @@
 # ChangeLog
 
+## Unreleased changes
+
+* Can now optionally be built with `integer-simple` instead of
+  `integer-gmp`, via the `integer-simple` cabal flag.  See [#147][].
+
+[#147]: https://github.com/fpco/store/pull/147
+
 ## 0.6.0.1
 
 * Now builds with GHC-7.10 - compatibility was broken in 0.6.0 due to
