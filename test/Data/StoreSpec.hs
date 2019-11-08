@@ -427,6 +427,21 @@ spec = do
         (decodeEx bs :: HashMap Int ()) `shouldBe` m
         evaluate (decodeEx bs :: Map Int ()) `shouldThrow` isUnexpectedMarkerException
         evaluate (decodeEx bs :: IntMap ()) `shouldThrow` isUnexpectedMarkerException
+    -- Test with concrete values to ensure that the integer format
+    -- does not change, and that the serialization code for
+    -- integer-simple matches integer-gmp.
+    it "Serializes (-1 :: Integer) to expected bytes" $
+      encode (-1 :: Integer) `shouldBe` "\NUL\255\255\255\255\255\255\255\255"
+    it "Serializes (0 :: Integer) to expected bytes" $ do
+      encode (0 :: Integer) `shouldBe` "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+    it "Serializes (1 :: Integer) to expected bytes" $ do
+      encode (1 :: Integer) `shouldBe` "\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+    it "Serializes (42 :: Integer) to expected bytes" $ do
+      encode (42 :: Integer) `shouldBe` "\NUL*\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+    it "Serializes (-42 :: Integer) to expected bytes" $ do
+      encode (-42 :: Integer) `shouldBe` "\NUL\214\255\255\255\255\255\255\255"
+    it "Serializes (3 ^ 200 :: Integer) to expected bytes" $ do
+      encode (3 ^ 200 :: Integer) `shouldBe` "\SOH(\NUL\NUL\NUL\NUL\NUL\NUL\NUL\161\176\248\170\RS\255\250[\"\174\167\228\246\246\236\131\182\ACKvD~\217s\253/C\243vz\147\SUB\194\158F\176><\134\213\US"
 
 isPokeException :: Test.Hspec.Selector PokeException
 isPokeException = const True
