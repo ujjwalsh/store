@@ -80,6 +80,7 @@ import           Data.Data (Data)
 import           Data.Fixed (Fixed (..), Pico)
 import           Data.Foldable (forM_, foldl')
 import           Data.Functor.Contravariant
+import           Data.Functor.Identity (Identity)
 import           Data.HashMap.Strict (HashMap)
 import           Data.HashSet (HashSet)
 import           Data.Hashable (Hashable)
@@ -741,6 +742,7 @@ instance Store a => Store (Product a)
 instance Store a => Store (First a)
 instance Store a => Store (Last a)
 instance Store a => Store (Maybe a)
+instance Store a => Store (Identity a)
 
 -- FIXME: have TH deriving handle unboxed fields?
 
