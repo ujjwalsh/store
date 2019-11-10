@@ -1,5 +1,13 @@
 # ChangeLog
 
+## 0.7.0
+
+* Fixes a bug where the `Store` instances for `Identity`, `Const`, and
+  `Complex` all have `Storable` superclasses instead of `Store. See
+  [#143][].
+
+[#143]: https://github.com/fpco/store/issues/143
+
 ## 0.6.1
 
 * Can now optionally be built with `integer-simple` instead of
