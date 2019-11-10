@@ -85,6 +85,7 @@ dependencies:
   - contravariant >=1.3
   - bifunctors >=4.0
 when:
+  # NOTE: The serialization of Integer is different when this flag is enabled.
   - condition: flag(integer-simple)
     then:
       dependencies: integer-simple >= 0.1.1.1

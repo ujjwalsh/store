@@ -3,7 +3,9 @@
 ## Unreleased changes
 
 * Can now optionally be built with `integer-simple` instead of
-  `integer-gmp`, via the `integer-simple` cabal flag.  See [#147][].
+  `integer-gmp`, via the `integer-simple` cabal flag.  Note that the
+  serialization of `Integer` with `integer-simple` differs from what
+  is used by the GMP default. See [#147][].
 
 [#147]: https://github.com/fpco/store/pull/147
 

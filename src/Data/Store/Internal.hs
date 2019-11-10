@@ -649,8 +649,7 @@ instance Store Integer where
           return (I.J# sz arr)
 #endif
 #else
-    -- May as well put in the extra effort to use the same encoding as
-    -- used for the newer integer-gmp.
+    -- NOTE: integer-simple uses a different encoding than GMP
     size = VarSize $ \ x ->
         sizeOf (undefined :: Word8) + case x of
             I.Positive ds -> (1 + fromIntegral (numDigits ds)) * sizeOf (undefined :: Word)

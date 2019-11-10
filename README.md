@@ -14,6 +14,11 @@ libraries:
   [#31](https://github.com/fpco/store/issues/31). This plan makes little endian
   the default, so that the most common endianness has no overhead.
 
+  - Another way that the serialization behavior can vary is if
+    integer-simple is used instead of GHC's default of using
+    GMP. `Integer` serialized with the `integer-simple` flag enabled
+    are not compatible with those serialized without the flag enabled.
+
 * Instead of implementing lazy serialization / deserialization involving
   multiple input / output buffers, `peek` and `poke` always work with a single
   buffer. This buffer is allocated by asking the value for its size before
