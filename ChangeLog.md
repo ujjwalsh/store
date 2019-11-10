@@ -1,6 +1,6 @@
 # ChangeLog
 
-## Unreleased changes
+## 0.6.1
 
 * Can now optionally be built with `integer-simple` instead of
   `integer-gmp`, via the `integer-simple` cabal flag.  Note that the
