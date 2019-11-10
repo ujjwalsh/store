@@ -24,11 +24,11 @@ module Data.Store.TH.Internal
 
 import           Control.Applicative
 import           Data.Complex ()
-import           Data.Generics.Aliases (extT)
-import           Data.Generics.Schemes (listify, everywhere)
+import           Data.Generics.Aliases (extT, mkQ, extQ)
+import           Data.Generics.Schemes (listify, everywhere, something)
 import           Data.List (find, nub)
 import qualified Data.Map as M
-import           Data.Maybe (fromMaybe)
+import           Data.Maybe (fromMaybe, isJust)
 import           Data.Primitive.ByteArray
 import           Data.Primitive.Types
 import           Data.Store.Core
@@ -287,12 +287,23 @@ deriveManyStoreFromStorable p = do
         \(TypeclassInstance cs ty _) ->
         let argTy = head (tail (unAppsT ty))
             tyNameLit = LitE (StringL (pprint ty)) in
-        if p argTy
+        if p argTy && not (superclassHasStorable cs)
             then Just $ makeStoreInstance cs argTy
                 (AppE (VarE 'sizeStorableTy) tyNameLit)
                 (AppE (VarE 'peekStorableTy) tyNameLit)
                 (VarE 'pokeStorable)
             else Nothing
+
+-- See #143. Often Storable superclass constraints should instead be
+-- Store constraints, so instead it just warns for these.
+superclassHasStorable :: Cxt -> Bool
+superclassHasStorable = isJust . something (mkQ Nothing justStorable `extQ` ignoreStrings)
+  where
+    justStorable :: Type -> Maybe ()
+    justStorable (ConT n) | n == ''Storable = Just ()
+    justStorable _ = Nothing
+    ignoreStrings :: String -> Maybe ()
+    ignoreStrings _ = Nothing
 
 ------------------------------------------------------------------------
 -- Vector

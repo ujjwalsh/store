@@ -76,6 +76,7 @@ import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short.Internal as SBS
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
+import           Data.Complex (Complex)
 import           Data.Data (Data)
 import           Data.Fixed (Fixed (..), Pico)
 import           Data.Foldable (forM_, foldl')
@@ -743,6 +744,8 @@ instance Store a => Store (First a)
 instance Store a => Store (Last a)
 instance Store a => Store (Maybe a)
 instance Store a => Store (Identity a)
+instance Store a => Store (Complex a)
+instance Store a => Store (Const a b)
 
 -- FIXME: have TH deriving handle unboxed fields?
 
