@@ -10,6 +10,22 @@
 --
 -- If you need streaming encode / decode of multiple store encoded
 -- messages, take a look at the @store-streaming@ package.
+--
+-- = Gotchas
+--
+-- Store is best used for communication between trusted processes and
+-- local caches.  It can certainly be used for other purposes, but the
+-- builtin set of instances have some gotchas to be aware of:
+--
+-- * Store's builtin instances serialize in a format which depends on
+--   machine endianness.
+--
+-- * Store's builtin instances trust the data when deserializing. For
+--   example, the deserialization of `Vector` will read the vector's
+--   link from the first 8 bytes. It will then allocate enough memory
+--   to store all the elements. Malicious or malformed input could
+--   cause allocation of large amounts of memory.  See
+--   https://github.com/fpco/store/issues/122
 module Data.Store
     (
     -- * Encoding and decoding strict ByteStrings.
