@@ -236,11 +236,6 @@ instance (Monad m, Serial m a) => Serial m (Tagged a)
 instance Monad m => Serial m Void where
     series = generate (\_ -> [])
 
-#if !MIN_VERSION_template_haskell(2,11,0)
-deriving instance Show NameFlavour
-deriving instance Show NameSpace
-#endif
-
 -- We define our own Serial instance for 'Ratio' because of <https://github.com/feuerbach/smallcheck/pull/34>
 
 newtype SerialRatio a = SerialRatio (Ratio a)
