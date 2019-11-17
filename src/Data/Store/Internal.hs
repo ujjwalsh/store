@@ -76,7 +76,7 @@ import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short.Internal as SBS
 import           Data.Containers (IsMap, ContainerKey, MapValue, mapFromList, mapToList, IsSet, setFromList)
-import           Data.Complex (Complex)
+import           Data.Complex (Complex (..))
 import           Data.Data (Data)
 import           Data.Fixed (Fixed (..), Pico)
 import           Data.Foldable (forM_, foldl')
@@ -721,6 +721,14 @@ instance Store a => Store (Ratio a) where
     poke (x :% y) = poke (x, y)
     peek = uncurry (:%) <$> peek
 
+-- Similarly, manual implementation due to no Generic instance for
+-- Complex in GHC-7.10 and earlier.
+
+instance Store a => Store (Complex a) where
+    size = combineSize (\(x :+ _) -> x) (\(_ :+ y) -> y)
+    poke (x :+ y) = poke (x, y)
+    peek = uncurry (:+) <$> peek
+
 instance Store Time.Day where
     size = contramap Time.toModifiedJulianDay (size :: Size Integer)
     poke = poke . Time.toModifiedJulianDay
@@ -744,7 +752,6 @@ instance Store a => Store (First a)
 instance Store a => Store (Last a)
 instance Store a => Store (Maybe a)
 instance Store a => Store (Identity a)
-instance Store a => Store (Complex a)
 instance Store a => Store (Const a b)
 
 -- FIXME: have TH deriving handle unboxed fields?
