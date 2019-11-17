@@ -1,5 +1,14 @@
 # ChangeLog
 
+## 0.7.1
+
+* Fixes compilation with GHC-7.10 due to it not defining `Generic`
+  instances for `Complex` and `Identity`. See [#142][].
+
+* Documents some gotchas about using store vs other libraries
+
+[#142]: https://github.com/fpco/store/issues/142
+
 ## 0.7.0
 
 * Fixes a bug where the `Store` instances for `Identity`, `Const`, and
