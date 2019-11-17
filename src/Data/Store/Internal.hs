@@ -81,7 +81,7 @@ import           Data.Data (Data)
 import           Data.Fixed (Fixed (..), Pico)
 import           Data.Foldable (forM_, foldl')
 import           Data.Functor.Contravariant
-import           Data.Functor.Identity (Identity)
+import           Data.Functor.Identity (Identity (..))
 import           Data.HashMap.Strict (HashMap)
 import           Data.HashSet (HashSet)
 import           Data.Hashable (Hashable)
@@ -722,12 +722,17 @@ instance Store a => Store (Ratio a) where
     peek = uncurry (:%) <$> peek
 
 -- Similarly, manual implementation due to no Generic instance for
--- Complex in GHC-7.10 and earlier.
+-- Complex and Identity in GHC-7.10 and earlier.
 
 instance Store a => Store (Complex a) where
     size = combineSize (\(x :+ _) -> x) (\(_ :+ y) -> y)
     poke (x :+ y) = poke (x, y)
     peek = uncurry (:+) <$> peek
+
+instance Store a => Store (Identity a) where
+    size = contramap (\(Identity x) -> x) size
+    poke (Identity x) = poke x
+    peek = Identity <$> peek
 
 instance Store Time.Day where
     size = contramap Time.toModifiedJulianDay (size :: Size Integer)
@@ -751,7 +756,6 @@ instance Store a => Store (Product a)
 instance Store a => Store (First a)
 instance Store a => Store (Last a)
 instance Store a => Store (Maybe a)
-instance Store a => Store (Identity a)
 instance Store a => Store (Const a b)
 
 -- FIXME: have TH deriving handle unboxed fields?
