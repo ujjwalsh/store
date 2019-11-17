@@ -1,0 +1,29 @@
+resolver: lts-2.22
+
+packages:
+- .
+- store-core
+# Store streaming intentionally omitted
+# - store-streaming
+extra-deps:
+- th-utilities-0.2.3.0
+- fail-4.9.0.0
+- th-lift-instances-0.1.14
+- th-orphans-0.13.9
+- th-reify-many-0.1.9
+- generic-deriving-1.13
+- th-lift-0.8.0.1
+- th-abstraction-0.3.1.0
+- semigroupoids-5.2.1
+- bifunctors-5.5.5
+- transformers-compat-0.5.0.3
+- base-orphans-0.8.1
+- cabal-doctest-1.0.8
+- tagged-0.8.6
+- exceptions-0.8.2.1
+- free-4.12
+- profunctors-5.5
+- resourcet-1.1.7.1
+flags:
+  generic-deriving:
+    base-4-9: false
