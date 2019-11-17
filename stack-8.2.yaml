@@ -1,0 +1,5 @@
+resolver: lts-10.6
+packages:
+- .
+- store-core
+- store-streaming
