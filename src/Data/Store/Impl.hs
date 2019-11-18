@@ -293,7 +293,7 @@ type family FitsInByteResult (b :: Bool) :: Constraint where
 
 type family TypeErrorMessage (a :: Symbol) :: Constraint where
 #if MIN_VERSION_base(4,9,0)
-    TypeErrorMessage a = TypeError (Text a)
+    TypeErrorMessage a = TypeError ('Text a)
 -- GHC < 8.0 does not support empty closed type families
 #elif __GLASGOW_HASKELL__ < 800
     TypeErrorMessage a = a ~ ""
