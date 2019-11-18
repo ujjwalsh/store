@@ -6,3 +6,4 @@ packages:
 - store-streaming
 extra-deps:
 - th-utilities-0.2.3.0
+- th-orphans-0.13.9
