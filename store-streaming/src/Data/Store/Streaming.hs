@@ -201,7 +201,7 @@ decodeMessageFd bb fd = do
 #endif
 
 -- | Conduit for encoding 'Message's to 'ByteString's.
-conduitEncode :: (Monad m, Store a) => C.ConduitT (Message a) ByteString m ()
+conduitEncode :: (Monad m, Store a) => C.Conduit (Message a) m ByteString
 conduitEncode = C.map encodeMessage
 
 -- | Conduit for decoding 'Message's from 'ByteString's.
@@ -210,7 +210,7 @@ conduitDecode :: (MonadResource m, Store a)
               -- ^ Initial length of the 'ByteBuffer' used for
               -- buffering the incoming 'ByteString's.  If 'Nothing',
               -- use the default value of 4MB.
-              -> C.ConduitT ByteString (Message a) m ()
+              -> C.Conduit ByteString m (Message a)
 conduitDecode bufSize =
     C.bracketP
       (BB.new bufSize)
