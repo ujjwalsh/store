@@ -1,5 +1,13 @@
 # ChangeLog
 
+## 0.7.2
+
+* Fixes compilation with `vector >= 0.12.1.1` by making
+  `deriveManyStoreUnboxVector` capable of handling more complex
+  instance constraints. In particular, it now correctly generates
+  instances `Store (Vector (f (g a))) => Store (Vector (Compose f g
+  a))` and `Store (Vector (f a)) => Store (Vector (Alt f a))`.
+
 ## 0.7.1
 
 * Fixes compilation with GHC-7.10 due to it not defining `Generic`

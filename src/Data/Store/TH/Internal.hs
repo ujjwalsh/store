@@ -347,24 +347,32 @@ deriveManyStoreUnboxVector :: Q [Dec]
 deriveManyStoreUnboxVector = do
     unboxes <- getUnboxInfo
     stores <- postprocess . instancesMap <$> getInstances ''Store
-    let unboxInsts =
+    unboxInstances <- postprocess . instancesMap <$> getInstances ''UV.Unbox
+    let dataFamilyDecls =
             M.fromList (map (\(preds, ty, cons) -> ([AppT (ConT ''UV.Vector) ty], (preds, cons))) unboxes)
             `M.difference`
             stores
+#if MIN_VERSION_template_haskell(2,10,0)
+        substituteConstraint (AppT (ConT n) arg)
+          | n == ''UV.Unbox = AppT (ConT ''Store) (AppT (ConT ''UV.Vector) arg)
+#else
+        substituteConstraint (ClassP n [arg])
+          | n == ''UV.Unbox = ClassP ''Store [AppT (ConT ''UV.Vector) arg]
+#endif
+        substituteConstraint x = x
     -- TODO: ideally this would use a variant of 'deriveStore' which
     -- assumes VarSize.
-    forM (M.toList unboxInsts) $ \case
-        ([ty], (preds, cons)) -> do
-            {-
-            -- While this approach is reasonable-ish, it ends up
-            -- requiring UndecidableInstances.
-            let extraPreds =
-                    map (AppT (ConT ''Store)) $
-                    filter (not . isMonoType) $
-                    concatMap (map snd . dcFields) cons
-            -}
-            let extraPreds = map (storePred . AppT (ConT ''UV.Vector)) $ listify isVarT ty
-            deriveStore (nub (preds ++ extraPreds)) ty cons
+    forM (M.toList dataFamilyDecls) $ \case
+        ([ty], (_, cons)) -> do
+            let headTy = getTyHead (unAppsT ty !! 1)
+            (preds, ty') <- case M.lookup [headTy] unboxInstances of
+              Nothing -> do
+                reportWarning $ "No Unbox instance found for " ++ pprint headTy
+                return ([], ty)
+              Just (TypeclassInstance cs (AppT _ ty') _) ->
+                return (map substituteConstraint cs, AppT (ConT ''UV.Vector) ty')
+              Just _ -> fail "Impossible case"
+            deriveStore preds ty' cons
         _ -> fail "impossible case in deriveManyStoreUnboxVector"
 
 -- TODO: Add something for this purpose to TH.ReifyDataType
@@ -389,8 +397,10 @@ getUnboxInfo = do
     go (DataInstD preds _ [ty] cons _) = (preds, ty, concatMap conToDataCons cons)
 #endif
     go x = error ("Unexpected result from reifying Unboxed Vector instances: " ++ pprint x)
+    dequalVarT :: Type -> Type
     dequalVarT (VarT n) = VarT (dequalify n)
     dequalVarT ty = ty
+
 
 ------------------------------------------------------------------------
 -- Utilities
