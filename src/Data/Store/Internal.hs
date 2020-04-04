@@ -399,6 +399,7 @@ instance Store BS.ByteString where
         fp <- peekToPlainForeignPtr "Data.ByteString.ByteString" len
         return (BS.PS fp 0 len)
 
+#if MIN_VERSION_template_haskell(2,16,0)
 -- | Template Haskell Bytes are nearly identical to ByteString, but it
 -- can't depend on ByteString.
 instance Store Bytes where
@@ -412,6 +413,7 @@ instance Store Bytes where
         len <- peek
         fp <- peekToPlainForeignPtr "Data.ByteString.ByteString" (fromIntegral len)
         return (Bytes fp 0 len)
+#endif
 
 instance Store SBS.ShortByteString where
     size = VarSize $ \x ->
