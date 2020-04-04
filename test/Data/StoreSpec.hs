@@ -23,6 +23,7 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short as SBS
 import           Data.Complex (Complex(..))
 import           Data.Containers (mapFromList, setFromList)
+import           Data.Generics (listify)
 import           Data.HashMap.Strict (HashMap)
 import           Data.HashSet (HashSet)
 import           Data.Hashable (Hashable)
@@ -139,7 +140,10 @@ $(do tys <- getAllInstanceTypes1 ''PV.Prim
                       series = fmap PV.fromList series |]
      concat <$> mapM f (filter (\ty -> length (unAppsT ty) == 1) tys))
 
--- Instance needed for generic TH instances
+{-
+-- Instances for TH are not currently needed, because the tests for
+-- serialization roundtripping are disabled due to Bytes' Eq instance,
+-- see issue #150.
 
 -- Needs to be done manually because in GHC 7.8's TH, NameFlavour uses
 -- unboxed values and cannot use generic deriving. So we skip having an
@@ -157,6 +161,7 @@ $(do thNames <- reifyManyWithoutInstances
      let ns = [ ''Any, ''All ] ++ thNames
          f n = [d| instance Monad m => Serial m $(conT n) |]
      concat <$> mapM f ns)
+-}
 
 $(do let ns = [ ''Dual, ''Sum, ''Product, ''First, ''Last ]
          f n = [d| instance (Monad m, Serial m a) => Serial m ($(conT n) a) |]
@@ -306,8 +311,10 @@ spec = do
                  , [t| TimeSpec |]
                  ]
              omitTys <- (omitTys0 ++) <$> mapM (\ty -> [t| PV.Vector $(pure ty) |]) omitTys0
-             let f ty = isMonoType ty && ty `notElem` omitTys
+             let f ty = isMonoType ty && ty `notElem` omitTys && null (listify isThName ty)
                  filtered = filter f insts
+                 -- Roundtrip testing of TH instances is disabled - see issue #150
+                 isThName n = nameModule n == Just "Language.Haskell.TH.Syntax"
              smallcheckManyStore verbose 2 $ map return filtered)
     it "Store on non-numeric Float/Double values" $ do
         let testNonNumeric :: forall a m. (RealFloat a, Eq a, Show a, Typeable a, Store a, Monad m, MonadFail m) => Proxy a -> m ()
