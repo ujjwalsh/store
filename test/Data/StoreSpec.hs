@@ -70,6 +70,7 @@ import           System.Clock (TimeSpec)
 import           System.Posix.Types
 import           Test.Hspec hiding (runIO)
 import           Test.SmallCheck.Series
+import           TH.Utilities (unAppsT)
 
 ------------------------------------------------------------------------
 -- Instances for base types
@@ -136,7 +137,7 @@ $(do let ns = [ ''CUSeconds, ''CClock, ''CTime, ''CUChar, ''CSize, ''CSigAtomic
 $(do tys <- getAllInstanceTypes1 ''PV.Prim
      let f ty = [d| instance (Serial m $(return ty), Monad m) => Serial m (PV.Vector $(return ty)) where
                       series = fmap PV.fromList series |]
-     concat <$> mapM f tys)
+     concat <$> mapM f (filter (\ty -> length (unAppsT ty) == 1) tys))
 
 -- Instance needed for generic TH instances
 
@@ -160,6 +161,12 @@ $(do thNames <- reifyManyWithoutInstances
 $(do let ns = [ ''Dual, ''Sum, ''Product, ''First, ''Last ]
          f n = [d| instance (Monad m, Serial m a) => Serial m ($(conT n) a) |]
      concat <$> mapM f ns)
+
+instance Monad m => Serial m Any where
+    series = fmap Any series
+
+instance Monad m => Serial m All where
+    series = fmap All series
 
 instance Monad m => Serial m Fingerprint where
     series = generate (\_ -> [Fingerprint 0 0, Fingerprint maxBound maxBound])
