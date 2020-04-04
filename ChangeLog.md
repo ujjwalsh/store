@@ -1,5 +1,11 @@
 # ChangeLog
 
+## 0.7.4
+
+* Fix for compilation with `ghc-8.10` in `0.7.3` did not use enough
+  CPP, and so broke builds for older versions. This release fixes
+  that.
+
 ## 0.7.3
 
 * Fixes compilation with `ghc-8.10`, particularly
