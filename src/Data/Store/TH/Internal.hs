@@ -26,7 +26,7 @@ import           Control.Applicative
 import           Data.Complex ()
 import           Data.Generics.Aliases (extT, mkQ, extQ)
 import           Data.Generics.Schemes (listify, everywhere, something)
-import           Data.List (find, nub)
+import           Data.List (find)
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe, isJust)
 import           Data.Primitive.ByteArray
