@@ -150,6 +150,9 @@ $(do tys <- getAllInstanceTypes1 ''PV.Prim
 -- instance for it.
 instance Monad m => Serial m Name where series = fmap mkName series
 
+instance Monad m => Serial m Bytes where
+  series = fmap ((\(BS.PS p o l) -> Bytes p (fromIntegral o) (fromIntegral l)) . BS.pack) series
+
 -- Serial instances for (Generic a) types.
 
 -- FIXME: generating for TH instances is probably just adding
