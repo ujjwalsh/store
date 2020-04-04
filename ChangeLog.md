@@ -1,5 +1,12 @@
 # ChangeLog
 
+## 0.7.3
+
+* Fixes compilation with `ghc-8.10`, particularly
+  `template-haskell-2.16.0.0`. See [#149][].
+
+[#149]: https://github.com/fpco/store/issues/149
+
 ## 0.7.2
 
 * Fixes compilation with `vector >= 0.12.1.1` by making
