@@ -399,6 +399,20 @@ instance Store BS.ByteString where
         fp <- peekToPlainForeignPtr "Data.ByteString.ByteString" len
         return (BS.PS fp 0 len)
 
+-- | Template Haskell Bytes are nearly identical to ByteString, but it
+-- can't depend on ByteString.
+instance Store Bytes where
+    size = VarSize $ \x ->
+        sizeOf (undefined :: Int) +
+        fromIntegral (bytesSize x)
+    poke (Bytes sourceFp sourceOffset sourceLength) = do
+        poke sourceLength
+        pokeFromForeignPtr sourceFp (fromIntegral sourceOffset) (fromIntegral sourceLength)
+    peek = do
+        len <- peek
+        fp <- peekToPlainForeignPtr "Data.ByteString.ByteString" (fromIntegral len)
+        return (Bytes fp 0 len)
+
 instance Store SBS.ShortByteString where
     size = VarSize $ \x ->
          sizeOf (undefined :: Int) +
