@@ -34,7 +34,7 @@ It also features:
 * Optimized serialization instances for many types from base, vector,
   bytestring, text, containers, time, template-haskell, and more.
 
-* TH and GHC Generics based generation of Store instances for datatypes
+* TH and GHC Generics based generation of Store instances for datatypes.
 
 * TH generation of testcases.
 
@@ -51,10 +51,10 @@ builtin set of instances have some gotchas to be aware of:
   machine endianness.
 
 * Store's builtin instances trust the data when deserializing. For
-  example, the deserialization of `Vector` will read the vector's link
-  from the first 8 bytes. It will then allocate enough memory to store
-  all the elements. Malicious or malformed input could cause
-  allocation of large amounts of memory.  See [issue #122][]
+  example, the deserialization of `Vector` will read the vector's
+  length from the first 8 bytes. It will then allocate enough memory
+  to store all the elements. Malicious or malformed input could cause
+  allocation of large amounts of memory.  See [issue #122][].
 
 [issue #122]: https://github.com/fpco/store/issues/122
 
