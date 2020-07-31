@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 0.7.5
+
+* Now only depends on `fail` shim for `ghc < 8`.
+
 ## 0.7.4
 
 * Fix for compilation with `ghc-8.10` in `0.7.3` did not use enough
