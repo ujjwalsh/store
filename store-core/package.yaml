@@ -18,7 +18,6 @@ ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-
 
 dependencies:
   - base >=4.7 && <5
-  - fail >=4.9
   - primitive >=0.6 && < 1.0 # Due to removal of 'internal' from MonadPrim in 0.6
   - bytestring >=0.10.4.0 && < 1.0 # soft
   - transformers >=0.3.0.0 && < 1.0 # soft
@@ -32,4 +31,4 @@ when:
   - condition: flag(force-alignment) || arch(PPC) || arch(PPC64) || arch(Mips) || arch(Sparc) || arch(Arm)
     cpp-options: -DALIGNED_MEMORY
   - condition: impl(ghc < 8.0)
-    dependencies: fail # shim for Control.Monad.Fail on older bases
+    dependencies: fail >=4.9 # shim for Control.Monad.Fail on older bases
