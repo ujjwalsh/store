@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 0.4.4.3
+
+* Now only depends on `fail` shim for `ghc < 8`.
+
 ## 0.4.4.2
 
 * Build fixed for GHC-7.10. See

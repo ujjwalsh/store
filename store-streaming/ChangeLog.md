@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 0.2.0.2
+
+* Now only depends on `fail` / `semigroups` shim for `ghc < 8`.
+
 ## 0.2.0.1
 
 * Now builds with GHC-7.10 - compatibility was broken in 0.6.0 due to

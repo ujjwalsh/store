@@ -1,8 +1,8 @@
 # ChangeLog
 
-## 0.7.5
+## 0.7.6
 
-* Now only depends on `fail` shim for `ghc < 8`.
+* Now only depends on `fail` / `semigroups` shim for `ghc < 8`.
 
 ## 0.7.4
 
