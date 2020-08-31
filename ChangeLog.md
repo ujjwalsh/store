@@ -1,5 +1,12 @@
 # ChangeLog
 
+## 0.7.7
+
+* Test now compiles with `smallcheck >= 1.2` and `base >= 4.14`.
+  See [#153][].
+
+[#153]: https://github.com/fpco/store/issues/153
+
 ## 0.7.6
 
 * Now only depends on `fail` / `semigroups` shim for `ghc < 8`.

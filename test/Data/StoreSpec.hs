@@ -54,7 +54,6 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Primitive as PV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
-import           Data.Void (Void)
 import           Data.Word
 import           Foreign.C.Types
 import           Foreign.Ptr
@@ -71,6 +70,10 @@ import           System.Posix.Types
 import           Test.Hspec hiding (runIO)
 import           Test.SmallCheck.Series
 import           TH.Utilities (unAppsT)
+
+#if !MIN_VERSION_smallcheck(1,2,0)
+import           Data.Void (Void)
+#endif
 
 ------------------------------------------------------------------------
 -- Instances for base types
@@ -92,21 +95,31 @@ instance Bounded PortNumber where
   minBound = 0
   maxBound = 65535
 
-$(do let ns = [ ''CWchar, ''CUShort, ''CULong, ''CULLong, ''CIntMax
+$(do let ns = [ ''PortNumber
+
+#if !MIN_VERSION_smallcheck(1,2,0)
+              , ''CWchar, ''CUShort, ''CULong, ''CULLong, ''CIntMax
               , ''CUIntMax, ''CPtrdiff, ''CSChar, ''CShort, ''CUInt, ''CLLong
-              , ''CLong, ''CInt, ''CChar, ''CSsize, ''CPid
+              , ''CLong, ''CInt, ''CChar
+#endif
+              , ''CSsize, ''CPid
               , ''COff, ''CMode, ''CIno, ''CDev
 #if !MIN_VERSION_smallcheck(1,1,4)
               , ''Word8, ''Word16, ''Word32, ''Word64
               , ''Int8, ''Int16, ''Int32, ''Int64
 #endif
-              , ''PortNumber
 #if !MIN_VERSION_smallcheck(1,1,3)
               , ''Word
 #endif
 #if MIN_VERSION_base(4,10,0)
-              , ''CBool, ''CClockId, ''CKey, ''CId
+#if !MIN_VERSION_smallcheck(1,2,0)
+              , ''CBool,
+#endif
+              , ''CClockId, ''CKey, ''CId
               , ''CBlkSize, ''CFsBlkCnt, ''CFsFilCnt, ''CBlkCnt
+#endif
+#if MIN_VERSION_base(4,14,0)
+              , ''CSocklen, ''CNfds
 #endif
 #ifndef mingw32_HOST_OS
               , ''CUid, ''CTcflag, ''CRLim, ''CNlink, ''CGid
@@ -120,9 +133,12 @@ $(do let ns = [ ''CWchar, ''CUShort, ''CULong, ''CULLong, ''CIntMax
 -- Serial instances for (Num a) types. Only really appropriate for the
 -- use here.
 
-$(do let ns = [ ''CUSeconds, ''CClock, ''CTime, ''CUChar, ''CSize, ''CSigAtomic
+$(do let ns =
+#if !MIN_VERSION_smallcheck(1,2,0)
+              [ ''CUSeconds, ''CClock, ''CTime, ''CUChar, ''CSize, ''CSigAtomic
               ,  ''CSUSeconds, ''CFloat, ''CDouble
               ] ++
+#endif
 #ifdef mingw32_HOST_OS
               []
 #else
@@ -211,8 +227,6 @@ instance Monad m => Serial m Text where
 instance (Monad m, Serial m a) => Serial m (Seq a) where
     series = fmap fromList series
 
-instance (Monad m, Serial m a) => Serial m (Complex a) where
-    series = uncurry (:+) <$> (series >< series)
 
 instance (Monad m, Serial m a, UV.Unbox a) => Serial m (UV.Vector a) where
     series = fmap fromList series
@@ -242,13 +256,17 @@ instance Monad m => Serial m Time.DiffTime where
 instance Monad m => Serial m Time.UTCTime where
     series = uncurry Time.UTCTime <$> (series >< series)
 
-instance (Monad m, Serial m a) => Serial m (NE.NonEmpty a)
-
 instance (Monad m, Serial m a) => Serial m (Tagged a)
 
--- Should probably get added to smallcheck :)
+#if !MIN_VERSION_smallcheck(1,2,0)
+instance (Monad m, Serial m a) => Serial m (Complex a) where
+    series = uncurry (:+) <$> (series >< series)
+
+instance (Monad m, Serial m a) => Serial m (NE.NonEmpty a)
+
 instance Monad m => Serial m Void where
     series = generate (\_ -> [])
+#endif
 
 -- We define our own Serial instance for 'Ratio' because of <https://github.com/feuerbach/smallcheck/pull/34>
 
