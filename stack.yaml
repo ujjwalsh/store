@@ -3,3 +3,5 @@ packages:
 - .
 - store-core
 - store-streaming
+extra-deps:
+- th-utilities-0.2.4.0
