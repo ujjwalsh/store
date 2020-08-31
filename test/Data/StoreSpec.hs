@@ -63,7 +63,6 @@ import           GHC.Fingerprint.Type (Fingerprint(..))
 import           GHC.Generics
 import           GHC.Real (Ratio(..))
 import           Language.Haskell.TH
-import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
 import           Network.Socket
 import           Prelude
