@@ -113,7 +113,7 @@ $(do let ns = [ ''PortNumber
 #endif
 #if MIN_VERSION_base(4,10,0)
 #if !MIN_VERSION_smallcheck(1,2,0)
-              , ''CBool,
+              , ''CBool
 #endif
               , ''CClockId, ''CKey, ''CId
               , ''CBlkSize, ''CFsBlkCnt, ''CFsFilCnt, ''CBlkCnt
