@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 0.2.0.3
+
+* Test compilation fixed with `network >= 3`.
+
 ## 0.2.0.2
 
 * Now only depends on `fail` / `semigroups` shim for `ghc < 8`.

@@ -23,13 +23,18 @@ import           Data.Store.Streaming.Internal
 import           Data.Streaming.Network (runTCPServer, runTCPClient, clientSettingsTCP, serverSettingsTCP, setAfterBind)
 import           Data.Streaming.Network.Internal (AppData(..))
 import           Data.Void (absurd, Void)
-import           Network.Socket (Socket(..), socketPort)
 import           Network.Socket.ByteString (send)
 import qualified System.IO.ByteBuffer as BB
 import           System.Posix.Types (Fd(..))
 import           Test.Hspec
 import           Test.Hspec.SmallCheck
 import           Test.SmallCheck
+
+#if MIN_VERSION_network(3,0,0)
+import           Network.Socket (Socket, socketPort, withFdSocket)
+#else
+import           Network.Socket (Socket(..), socketPort)
+#endif
 
 spec :: Spec
 spec = do
@@ -130,9 +135,10 @@ canPeekBS x = monadic $ BB.with (Just 10) $ \ bb -> do
     Pure (Message x') -> return $ x' == x
 
 #ifndef mingw32_HOST_OS
-
-socketFd :: Socket -> Fd
-socketFd (MkSocket fd _ _ _ _) = Fd fd
+#if !MIN_VERSION_network(3,0,0)
+withFdSocket :: Socket -> (CInt -> IO r) -> IO r
+withFdSocket (MkSocket fd _ _ _ _) f = f fd
+#endif
 
 withServer :: (Socket -> Socket -> IO a) -> IO a
 withServer cont = do
@@ -177,7 +183,7 @@ decodeTricklingMessageFd v = monadic $ do
         (forM_ chunks $ \chunk -> do
           void (send sock1 chunk)
           threadDelay (10 * 1000))
-        (decodeMessageFd bb (socketFd sock2))
+        (withFdSocket sock2 (decodeMessageFd bb . Fd))
       return (v == v')
 
 #endif
