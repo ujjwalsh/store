@@ -27,9 +27,6 @@ matrix:
   fast_finish: true
   include:
 
-  - env: BUILD=stack ARGS="--stack-yaml stack-7.8.yaml"
-    compiler: "stack + GHC-7.8"
-
   - env: BUILD=stack ARGS="--stack-yaml stack-7.10.yaml"
     compiler: "stack + GHC-7.10"
 
