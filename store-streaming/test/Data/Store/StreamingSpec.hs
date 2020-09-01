@@ -34,6 +34,7 @@ import           Test.SmallCheck
 import           Network.Socket (Socket, socketPort, withFdSocket)
 #else
 import           Network.Socket (Socket(..), socketPort)
+import           Foreign.C.Types (CInt)
 #endif
 
 spec :: Spec
