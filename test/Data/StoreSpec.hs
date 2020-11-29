@@ -64,6 +64,7 @@ import           GHC.Real (Ratio(..))
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import           Network.Socket
+import           Numeric.Natural (Natural)
 import           Prelude
 import           System.Clock (TimeSpec)
 import           System.Posix.Types
@@ -456,6 +457,10 @@ spec = do
         (decodeEx bs :: HashMap Int ()) `shouldBe` m
         evaluate (decodeEx bs :: Map Int ()) `shouldThrow` isUnexpectedMarkerException
         evaluate (decodeEx bs :: IntMap ()) `shouldThrow` isUnexpectedMarkerException
+    it "Expects decode of negative integer as a natural to throw PeekException" $ do
+        evaluate (decodeEx (encode ((-5) :: Integer)) :: Natural)
+            `shouldThrow` isNegativeNaturalException
+
 
 isPokeException :: Test.Hspec.Selector PokeException
 isPokeException = const True
@@ -469,3 +474,7 @@ isTooManyBytesException (PeekException _ t) = "Attempted to read too many bytes"
 isUnexpectedMarkerException :: Test.Hspec.Selector PeekException
 isUnexpectedMarkerException (PeekException _ t) =
     "Expected marker for ascending Map / IntMap: " `T.isPrefixOf` t
+
+isNegativeNaturalException :: Test.Hspec.Selector PeekException
+isNegativeNaturalException (PeekException _ t) =
+    "Encountered negative integer when expecting a Natural" `T.isPrefixOf` t

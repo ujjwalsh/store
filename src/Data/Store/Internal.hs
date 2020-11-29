@@ -718,7 +718,11 @@ numDigits = go 0
 instance Store Natural where
   size = contramap fromIntegral (size :: Size Integer)
   poke = poke . toInteger
-  peek = fmap fromIntegral (peek :: Peek Integer)
+  peek = do
+      x <- peek :: Peek Integer
+      if x < 0
+          then peekException "Encountered negative integer when expecting a Natural"
+          else return $ fromIntegral x
 
 -- instance Store GHC.Fingerprint.Types.Fingerprint where
 
