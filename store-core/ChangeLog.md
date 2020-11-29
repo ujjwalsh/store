@@ -1,5 +1,12 @@
 # ChangeLog
 
+## 0.4.4.4
+
+* Fixes build of `store-core` with `ghc-prim-0.7.0`
+  (`ghc-9.0.0-alpha1`). See [#155][].
+
+[#155]: https://github.com/mgsloan/store/issues/155
+
 ## 0.4.4.3
 
 * Now only depends on `fail` shim for `ghc < 8`.

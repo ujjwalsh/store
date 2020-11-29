@@ -1,5 +1,11 @@
 # ChangeLog
 
+## 0.7.8
+
+* Adds a `Store` instance for `Natural`. See [#154][].
+
+[#154]: https://github.com/mgsloan/store/issues/154
+
 ## 0.7.7
 
 * Test now compiles with `smallcheck >= 1.2` and `base >= 4.14`.
