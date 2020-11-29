@@ -135,6 +135,7 @@ import           Language.Haskell.TH.Instances ()
 import           Language.Haskell.TH.ReifyMany
 import           Language.Haskell.TH.Syntax
 import           Network.Socket (AddrInfo)
+import           Numeric.Natural (Natural)
 import           Prelude
 import           TH.Derive
 
@@ -711,6 +712,13 @@ numDigits = go 0
   where go !acc I.None = acc
         go !acc (I.Some _ ds) = go (acc + 1) ds
 #endif
+
+-- Piggybacks off of the Integer instance
+
+instance Store Natural where
+  size = contramap fromIntegral (size :: Size Integer)
+  poke = poke . toInteger
+  peek = fmap fromIntegral (peek :: Peek Integer)
 
 -- instance Store GHC.Fingerprint.Types.Fingerprint where
 
