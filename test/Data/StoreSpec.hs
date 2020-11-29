@@ -140,11 +140,13 @@ $(do let ns =
               ,  ''CSUSeconds, ''CFloat, ''CDouble
               ] ++
 #endif
-#ifdef mingw32_HOST_OS
-              []
-#else
-              [ ''CSpeed, ''CCc ]
+#if !MIN_VERSION_smallcheck(1,1,3)
+              [ ''Natural ] ++
 #endif
+#ifndef mingw32_HOST_OS
+              [ ''CSpeed, ''CCc ] ++
+#endif
+              []
          f n = [d| instance Monad m => Serial m $(conT n) where
                       series = generate (\_ -> [0, 1]) |]
      concat <$> mapM f ns)
