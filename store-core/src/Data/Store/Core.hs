@@ -49,7 +49,8 @@ import           Data.Word
 import           Foreign.ForeignPtr (ForeignPtr, withForeignPtr, castForeignPtr)
 import           Foreign.Ptr
 import           Foreign.Storable as Storable
-import           GHC.Prim (unsafeCoerce#, RealWorld, ByteArray#, copyByteArrayToAddr#, copyAddrToByteArray#)
+import           GHC.Exts (unsafeCoerce#)
+import           GHC.Prim (RealWorld, ByteArray#, copyByteArrayToAddr#, copyAddrToByteArray#)
 import           GHC.Ptr (Ptr(..))
 import           GHC.Types (IO(..), Int(..))
 import           Prelude
