@@ -29,12 +29,27 @@ matrix:
 
   - env: BUILD=stack ARGS="--stack-yaml stack-7.10.yaml"
     compiler: "stack + GHC-7.10"
+    arch: amd64
 
   - env: BUILD=stack ARGS="--stack-yaml stack-8.2.yaml"
     compiler: "stack + GHC-8.2"
+    arch: amd64
 
   - env: BUILD=stack ARGS="--stack-yaml stack.yaml"
     compiler: "stack + GHC-8.6"
+    arch: amd64
+
+  - env: BUILD=stack ARGS="--stack-yaml stack-7.10.yaml"
+    compiler: "stack + GHC-7.10"
+    arch: ppcle64
+
+  - env: BUILD=stack ARGS="--stack-yaml stack-8.2.yaml"
+    compiler: "stack + GHC-8.2"
+    arch: ppcle64
+
+  - env: BUILD=stack ARGS="--stack-yaml stack.yaml"
+    compiler: "stack + GHC-8.6"
+    arch: ppcle64 
 
 before_install:
 # Using compiler above sets CC to an invalid value, so unset it
